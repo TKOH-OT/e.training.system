@@ -1747,6 +1747,244 @@
     color: #ffa502;
     font-size: 1.05em;  /* ⭐ 稍微加大 */
 }
+
+        /* ==================== Quiz 測驗系統樣式 ==================== */
+
+.quiz-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.quiz-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.quiz-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.quiz-card-title {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #333;
+}
+
+.quiz-card-info {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 10px;
+}
+
+.quiz-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.quiz-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.quiz-section-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #ffa502;
+}
+
+.quiz-question {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 4px solid #ffa502;
+}
+
+.quiz-question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.quiz-question-text {
+    flex: 1;
+    font-weight: 500;
+    color: #333;
+}
+
+.quiz-question-score {
+    background: #ffa502;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+    white-space: nowrap;
+    margin-left: 10px;
+}
+
+.quiz-answer-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 0.95em;
+    margin-top: 10px;
+}
+
+.quiz-answer-input:focus {
+    outline: none;
+    border-color: #ffa502;
+}
+
+.quiz-mcq-option {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    margin: 8px 0;
+    background: #f8f9fa;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.quiz-mcq-option:hover {
+    background: #e9ecef;
+}
+
+.quiz-mcq-option input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+
+.quiz-mcq-option.selected {
+    background: #fff3cd;
+    border: 2px solid #ffa502;
+}
+
+.quiz-ordering-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    margin: 8px 0;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.quiz-ordering-number {
+    width: 50px;
+    padding: 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    text-align: center;
+    margin-right: 15px;
+}
+
+.quiz-ordering-text {
+    flex: 1;
+    color: #333;
+}
+
+.quiz-summary {
+    background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.quiz-summary-title {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.quiz-summary-score {
+    font-size: 3em;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.quiz-summary-status {
+    font-size: 1.2em;
+    margin-top: 10px;
+}
+
+.quiz-grading-input {
+    width: 80px;
+    padding: 6px 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.quiz-grading-input:focus {
+    outline: none;
+    border-color: #ffa502;
+}
+
+.quiz-correct-answer {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+.quiz-student-answer {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #fff3cd;
+    border-left: 4px solid #ffa502;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+.quiz-pending-badge {
+    background: #ffa502;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+.quiz-passed-badge {
+    background: #28a745;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    display: inline-block;
+}
+
+.quiz-failed-badge {
+    background: #dc3545;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: bold;
+    display: inline-block;
+}
         
     </style>
 </head>
@@ -1844,13 +2082,15 @@
 
         <!-- 培訓分類詳情頁面 -->
         <div id="categoryDetailPage" class="page">
-            <div class="top-bar">
-                <h2 id="categoryDetailTitle">培訓項目</h2>
-                <div>
-                    <button class="btn btn-success btn-small" id="addItemBtn" onclick="showAddItemModal()">➕ 新增項目</button>
-                    <button class="btn btn-secondary btn-small" onclick="backToDashboard()">🔙 返回</button>
-                </div>
-            </div>
+<div class="top-bar">
+    <h2 id="categoryDetailTitle">培訓項目</h2>
+    <div>
+        <button class="btn btn-success btn-small" id="addItemBtn" onclick="showAddItemModal()">➕ 新增項目</button>
+        <!-- ⭐ 新增 Quiz 按鈕 ⭐ -->
+        <button class="btn btn-info btn-small" id="addQuizBtn" onclick="showAddQuizModal()" style="display: none;">📝 新增 Quiz</button>
+        <button class="btn btn-secondary btn-small" onclick="backToDashboard()">🔙 返回</button>
+    </div>
+</div>
             <div id="categoryDetailContent">
                 <!-- 動態生成培訓項目 -->
             </div>
@@ -2110,6 +2350,75 @@
         </div>
     </div>  
 
+<!-- ==================== Quiz 測驗頁面 ==================== -->
+
+<!-- Quiz 列表頁面 (在分類詳情頁顯示) -->
+<div id="quizListPage" class="page">
+    <div class="top-bar">
+        <h2 id="quizListTitle">Quiz 測驗列表</h2>
+        <div>
+            <button class="btn btn-success btn-small" onclick="showAddQuizModal()">📝 新增 Quiz</button>
+            <button class="btn btn-secondary btn-small" onclick="backToDashboard()">🔙 返回</button>
+        </div>
+    </div>
+    <div id="quizListContent">
+        <!-- 動態生成 Quiz 列表 -->
+    </div>
+</div>
+
+<!-- Quiz 編輯頁面 (Admin 建立/編輯 Quiz) -->
+<div id="quizEditorPage" class="page">
+    <div class="top-bar">
+        <h2 id="quizEditorTitle">建立 Quiz 測驗</h2>
+        <div>
+            <button class="btn btn-success" onclick="saveQuiz()">💾 儲存 Quiz</button>
+            <button class="btn btn-secondary" onclick="cancelQuizEditor()">❌ 取消</button>
+        </div>
+    </div>
+    <div id="quizEditorContent">
+        <!-- 動態生成編輯表單 -->
+    </div>
+</div>
+
+<!-- Quiz 答題頁面 (PCA/OTA 答題) -->
+<div id="quizTakingPage" class="page">
+    <div class="top-bar">
+        <h2 id="quizTakingTitle">Quiz 測驗</h2>
+        <div>
+            <button class="btn btn-success" onclick="submitQuizAnswers()">✅ 提交答案</button>
+            <button class="btn btn-secondary" onclick="cancelQuizTaking()">❌ 取消</button>
+        </div>
+    </div>
+    <div id="quizTakingContent">
+        <!-- 動態生成答題表單 -->
+    </div>
+</div>
+
+<!-- Quiz 評核頁面 (Supervisor 改卷) -->
+<div id="quizGradingPage" class="page">
+    <div class="top-bar">
+        <h2 id="quizGradingTitle">Quiz 評核</h2>
+        <div>
+            <button class="btn btn-success" onclick="submitQuizGrading()">✅ 提交評核</button>
+            <button class="btn btn-secondary" onclick="backToQuizList()">🔙 返回</button>
+        </div>
+    </div>
+    <div id="quizGradingContent">
+        <!-- 動態生成評核表單 -->
+    </div>
+</div>
+
+<!-- Quiz 結果頁面 (學員查看結果) -->
+<div id="quizResultPage" class="page">
+    <div class="top-bar">
+        <h2 id="quizResultTitle">Quiz 結果</h2>
+        <button class="btn btn-secondary" onclick="backToProgress()">🔙 返回</button>
+    </div>
+    <div id="quizResultContent">
+        <!-- 動態生成結果顯示 -->
+    </div>
+</div>
+    
     <!-- 彈出視窗 -->
     <div id="modal" class="modal">
         <div class="modal-content">
@@ -2150,6 +2459,15 @@
         let selectedEmoji = '📚';
         let systemInitialized = false;
         let checklistSteps = [];
+
+        // ==================== Quiz 全域變數 ====================
+let currentQuizId = null;
+let currentQuizData = {
+    title: '',
+    passingScore: 60,
+    sections: []
+};
+let quizSections = [];
 
         // ==================== 權限檢查函數 ====================
 // ⭐⭐⭐ 新增：檢查用戶是否有權限編輯訓練記錄 ⭐⭐⭐
@@ -2688,28 +3006,30 @@ async function showCategoryDetail(categoryId) {
         items.sort((a, b) => (a.order || 0) - (b.order || 0));
 
         if (items.length === 0) {
+            // ⭐⭐⭐ 即使沒有培訓項目，也要載入 Quiz 列表 ⭐⭐⭐
+            const quizListHtml = await loadQuizList(categoryId);
             document.getElementById('categoryDetailContent').innerHTML = 
-                '<div class="items-dashboard"><p class="no-items-message">📭 此分類尚無培訓項目</p></div>';
+                `<div class="items-dashboard"><p class="no-items-message">📭 此分類尚無培訓項目</p></div>${quizListHtml}`;
             return;
         }
 
         const itemsHtml = items.map(item => {
-let badges = '';
+            let badges = '';
 
-// ⭐ 新增：顯示記錄類型
-if (item.recordType === 'training') {
-    badges += '<span class="badge badge-info">📝 訓練記錄</span>';
-} else {
-    badges += '<span class="badge badge-success">📋 評核 Checklist</span>';
-}
+            // ⭐ 新增：顯示記錄類型
+            if (item.recordType === 'training') {
+                badges += '<span class="badge badge-info">📝 訓練記錄</span>';
+            } else {
+                badges += '<span class="badge badge-success">📋 評核 Checklist</span>';
+            }
 
-if (item.hasDeadline) {
-    badges += `<span class="badge badge-warning">⏰ ${item.deadlineValue} ${item.deadlineUnit === 'days' ? '日' : item.deadlineUnit === 'weeks' ? '周' : '月'}</span>`;
-}
+            if (item.hasDeadline) {
+                badges += `<span class="badge badge-warning">⏰ ${item.deadlineValue} ${item.deadlineUnit === 'days' ? '日' : item.deadlineUnit === 'weeks' ? '周' : '月'}</span>`;
+            }
 
-if (item.isImportant) {
-    badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
-}
+            if (item.isImportant) {
+                badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
+            }
             
             // ⭐ ADD THIS LINE - Calculate actual steps (excluding subtitles)
             const actualStepCount = item.checklist ? item.checklist.filter(s => !s.isSubtitle).length : 0;
@@ -2720,73 +3040,73 @@ if (item.isImportant) {
             const circumference = 2 * Math.PI * 50;
             const offset = circumference - (percentage / 100) * circumference;
 
-let checklistHtml = '';
+            let checklistHtml = '';
 
-if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
-    let stepCounter = 0;
-    
-    const stepsHtml = item.checklist.map((step, index) => {
-        if (step.isSubtitle) {
-            return `
-                <div style="margin: 20px 0 10px 0;">
-                    <span class="step-subtitle">${step.step}</span>
-                </div>
-            `;
-        }
-        
-        stepCounter++;
-        const criticalBadge = (item.recordType === 'checklist' && step.critical) 
-            ? '<span class="badge badge-critical">⚠️ Critical</span>' 
-            : '';
-        
-        return `
-            <div class="checklist-item ${step.critical ? 'critical' : ''}">
-                <div class="checklist-step-name">
-                    <span class="step-number">Step ${stepCounter}:</span>
-                    ${step.step} ${criticalBadge}
-                </div>
-                <div class="checklist-step-actions">
-                    <button class="step-btn step-btn-pass" onclick="event.stopPropagation(); editChecklistStep('${item.docId}', ${index})">✏️ 編輯</button>
-                    <button class="step-btn step-btn-fail" onclick="event.stopPropagation(); deleteChecklistStep('${item.docId}', ${index})">🗑️ 刪除</button>
-                </div>
-            </div>
-        `;
-    }).join('');
+            if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
+                let stepCounter = 0;
+                
+                const stepsHtml = item.checklist.map((step, index) => {
+                    if (step.isSubtitle) {
+                        return `
+                            <div style="margin: 20px 0 10px 0;">
+                                <span class="step-subtitle">${step.step}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    stepCounter++;
+                    const criticalBadge = (item.recordType === 'checklist' && step.critical) 
+                        ? '<span class="badge badge-critical">⚠️ Critical</span>' 
+                        : '';
+                    
+                    return `
+                        <div class="checklist-item ${step.critical ? 'critical' : ''}">
+                            <div class="checklist-step-name">
+                                <span class="step-number">Step ${stepCounter}:</span>
+                                ${step.step} ${criticalBadge}
+                            </div>
+                            <div class="checklist-step-actions">
+                                <button class="step-btn step-btn-pass" onclick="event.stopPropagation(); editChecklistStep('${item.docId}', ${index})">✏️ 編輯</button>
+                                <button class="step-btn step-btn-fail" onclick="event.stopPropagation(); deleteChecklistStep('${item.docId}', ${index})">🗑️ 刪除</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
 
-    const headerText = item.recordType === 'training' ? '📝 訓練步驟' : '📋 評核步驟 Checklist';
-    
-    checklistHtml = `
-        <div class="checklist-container">
-            <div class="checklist-header">${headerText} (共 ${actualStepCount} 個步驟)</div>
-            ${stepsHtml}
-            <button class="btn btn-success btn-small" style="margin-top: 10px;" onclick="event.stopPropagation(); addChecklistStep('${item.docId}')">➕ 新增步驟</button>
-        </div>
-    `;
-}
+                const headerText = item.recordType === 'training' ? '📝 訓練步驟' : '📋 評核步驟 Checklist';
+                
+                checklistHtml = `
+                    <div class="checklist-container">
+                        <div class="checklist-header">${headerText} (共 ${actualStepCount} 個步驟)</div>
+                        ${stepsHtml}
+                        <button class="btn btn-success btn-small" style="margin-top: 10px;" onclick="event.stopPropagation(); addChecklistStep('${item.docId}')">➕ 新增步驟</button>
+                    </div>
+                `;
+            }
 
             return `
                 <div class="item-card ${item.hasChecklist ? '' : 'completed'}" id="item_${item.docId}" onclick="toggleItemCard('${item.docId}')">
                     <button class="back-button" onclick="event.stopPropagation(); toggleItemCard('${item.docId}')">🔙 收起</button>
                     
                     <div class="item-card-header">
-<div class="item-card-title-section">
-    <div class="item-card-name" style="font-size: 1.8em; 
-                                       font-weight: 900; 
-                                       color: #2c3e50; 
-                                       line-height: 1.3;
-                                       text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-                                       letter-spacing: 0.5px;
-                                       background: linear-gradient(135deg, #ff9500 0%, #ff6b35 100%);
-                                       -webkit-background-clip: text;
-                                       -webkit-text-fill-color: transparent;
-                                       background-clip: text;
-                                       padding: 5px 0;
-                                       margin-bottom: 10px;
-                                       text-align: center;">
-         ${item.name}
-    </div>
-    <div class="item-card-badges">${badges}</div>
-</div>
+                        <div class="item-card-title-section">
+                            <div class="item-card-name" style="font-size: 1.8em; 
+                                                               font-weight: 900; 
+                                                               color: #2c3e50; 
+                                                               line-height: 1.3;
+                                                               text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+                                                               letter-spacing: 0.5px;
+                                                               background: linear-gradient(135deg, #ff9500 0%, #ff6b35 100%);
+                                                               -webkit-background-clip: text;
+                                                               -webkit-text-fill-color: transparent;
+                                                               background-clip: text;
+                                                               padding: 5px 0;
+                                                               margin-bottom: 10px;
+                                                               text-align: center;">
+                                ${item.name}
+                            </div>
+                            <div class="item-card-badges">${badges}</div>
+                        </div>
                         
                         <div class="item-card-progress">
                             <svg class="item-progress-ring" width="120" height="120" viewBox="0 0 120 120">
@@ -2818,7 +3138,23 @@ if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
             `;
         }).join('');
 
-        document.getElementById('categoryDetailContent').innerHTML = `<div class="items-dashboard">${itemsHtml}</div>`;
+        // ⭐⭐⭐ 載入 Quiz 列表 ⭐⭐⭐
+        const quizListHtml = await loadQuizList(categoryId);
+
+        // ⭐⭐⭐ 修改這裡：同時顯示培訓項目和 Quiz 列表 ⭐⭐⭐
+        document.getElementById('categoryDetailContent').innerHTML = `
+            <div class="items-dashboard">${itemsHtml}</div>
+            ${quizListHtml}
+        `;
+
+        // ⭐ 控制「新增 Quiz」按鈕顯示（只有 Admin 可見）
+        setTimeout(() => {
+            const addQuizBtn = document.getElementById('addQuizBtn');
+            if (addQuizBtn) {
+                addQuizBtn.style.display = (currentUser.role === 'admin') ? 'inline-block' : 'none';
+            }
+        }, 100);
+
     } catch (error) {
         console.error('載入分類詳情失敗:', error);
         showToast('❌ 載入失敗', 'error');
@@ -5001,6 +5337,1173 @@ const allCriticalPassed = item.checklist.every((step, index) => {
             }
         }
 
+        // ==================== QUIZ 測驗系統 ====================
+
+// ==================== 顯示新增 Quiz Modal ====================
+function showAddQuizModal() {
+    currentQuizId = null;
+    currentQuizData = {
+        title: '',
+        passingScore: 60,
+        totalScore: 0,
+        sections: []
+    };
+    quizSections = [];
+
+    const modalBody = `
+        <div class="input-group">
+            <label>📝 Quiz 名稱</label>
+            <input type="text" id="quizTitle" placeholder="請輸入 Quiz 名稱">
+        </div>
+        <div class="input-group">
+            <label>✅ 合格分數 (%)</label>
+            <input type="number" id="quizPassingScore" value="60" min="0" max="100" placeholder="請輸入合格百分比">
+        </div>
+        <div style="margin-top: 15px; padding: 12px; background: #f0f4ff; border-radius: 8px; font-size: 0.9em;">
+            <strong>💡 提示：</strong>建立 Quiz 後，可以新增多個部分 (Sections)，每個部分包含不同類型的題目
+        </div>
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="createQuiz()">✅ 建立 Quiz</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+        </div>
+    `;
+
+    showModal('📝 新增 Quiz 測驗', modalBody);
+}
+
+// ==================== 建立 Quiz ====================
+async function createQuiz() {
+    const title = document.getElementById('quizTitle').value.trim();
+    const passingScore = parseInt(document.getElementById('quizPassingScore').value) || 60;
+
+    if (!title) {
+        showToast('❌ 請輸入 Quiz 名稱', 'error');
+        return;
+    }
+
+    currentQuizData.title = title;
+    currentQuizData.passingScore = passingScore;
+    currentQuizData.categoryId = currentCategoryId;
+
+    closeModal();
+    renderQuizEditor();
+}
+
+// ==================== 渲染 Quiz 編輯器 ====================
+function renderQuizEditor() {
+    showPage('quizEditorPage');
+    document.getElementById('quizEditorTitle').textContent = currentQuizData.title ? `編輯 Quiz: ${currentQuizData.title}` : '建立 Quiz 測驗';
+
+    let editorHtml = `
+        <div class="audit-section">
+            <div class="input-group">
+                <label>📝 Quiz 名稱</label>
+                <input type="text" id="editQuizTitle" value="${currentQuizData.title}" placeholder="請輸入 Quiz 名稱">
+            </div>
+            <div class="input-group">
+                <label>✅ 合格分數 (%)</label>
+                <input type="number" id="editQuizPassingScore" value="${currentQuizData.passingScore}" min="0" max="100">
+            </div>
+            <div style="margin-top: 10px; color: #666;">
+                總分：<strong id="totalScoreDisplay">${currentQuizData.totalScore || 0}</strong> 分
+            </div>
+        </div>
+
+        <div class="audit-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="color: #ffa502; margin: 0;">📚 Quiz 部分 (Sections)</h3>
+                <button class="btn btn-success btn-small" onclick="addQuizSection()">➕ 新增部分</button>
+            </div>
+            <div id="quizSectionsContainer">
+                ${renderQuizSections()}
+            </div>
+        </div>
+    `;
+
+    document.getElementById('quizEditorContent').innerHTML = editorHtml;
+}
+
+// ==================== 渲染 Quiz Sections ====================
+function renderQuizSections() {
+    if (quizSections.length === 0) {
+        return '<p class="no-data-message">📭 尚未新增任何部分，請點擊「新增部分」開始</p>';
+    }
+
+    return quizSections.map((section, sIndex) => `
+        <div class="quiz-section" style="position: relative;">
+            <button class="btn btn-danger btn-small" 
+                    style="position: absolute; top: 15px; right: 15px;"
+                    onclick="removeQuizSection(${sIndex})">🗑️ 刪除部分</button>
+            
+            <div class="quiz-section-header">
+                <input type="text" 
+                       value="${section.title}" 
+                       placeholder="請輸入部分標題 (例如：第一部分 - 基礎知識)"
+                       onchange="updateSectionTitle(${sIndex}, this.value)"
+                       style="flex: 1; padding: 10px; border: 2px solid #ffa502; border-radius: 8px; font-size: 1.1em; font-weight: bold;">
+            </div>
+
+            <div style="margin-top: 15px;">
+                ${section.questions.map((q, qIndex) => renderQuizQuestion(sIndex, qIndex, q)).join('')}
+            </div>
+
+            <button class="btn btn-info btn-small" onclick="addQuizQuestion(${sIndex})">➕ 新增題目</button>
+        </div>
+    `).join('');
+}
+
+// ==================== 渲染單一題目 ====================
+function renderQuizQuestion(sIndex, qIndex, question) {
+    let answerHtml = '';
+
+    if (question.type === 'fillblank') {
+        answerHtml = `
+            <div style="margin-top: 10px;">
+                <label style="font-size: 0.9em; color: #666;">✅ 正確答案：</label>
+                <input type="text" 
+                       value="${question.correctAnswer || ''}" 
+                       placeholder="請輸入正確答案"
+                       onchange="updateQuestionAnswer(${sIndex}, ${qIndex}, this.value)"
+                       class="quiz-answer-input">
+            </div>
+        `;
+    } else if (question.type === 'mcq') {
+        answerHtml = `
+            <div style="margin-top: 10px;">
+                <label style="font-size: 0.9em; color: #666;">📝 選項：</label>
+                ${(question.options || []).map((opt, oIndex) => `
+                    <div style="display: flex; gap: 10px; margin: 8px 0; align-items: center;">
+                        <input type="radio" 
+                               name="correct_${sIndex}_${qIndex}" 
+                               ${opt.isCorrect ? 'checked' : ''}
+                               onchange="setCorrectOption(${sIndex}, ${qIndex}, ${oIndex})"
+                               style="width: auto;">
+                        <input type="text" 
+                               value="${opt.text}" 
+                               placeholder="選項 ${String.fromCharCode(65 + oIndex)}"
+                               onchange="updateMCQOption(${sIndex}, ${qIndex}, ${oIndex}, this.value)"
+                               style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                        <button class="btn btn-danger btn-small" onclick="removeMCQOption(${sIndex}, ${qIndex}, ${oIndex})">🗑️</button>
+                    </div>
+                `).join('')}
+                <button class="btn btn-info btn-small" style="margin-top: 8px;" onclick="addMCQOption(${sIndex}, ${qIndex})">➕ 新增選項</button>
+            </div>
+        `;
+    } else if (question.type === 'ordering') {
+        answerHtml = `
+            <div style="margin-top: 10px;">
+                <label style="font-size: 0.9em; color: #666;">📋 項目 (請按正確順序排列)：</label>
+                ${(question.items || []).map((item, iIndex) => `
+                    <div style="display: flex; gap: 10px; margin: 8px 0; align-items: center;">
+                        <span style="min-width: 30px; text-align: center; font-weight: bold; color: #ffa502;">${iIndex + 1}.</span>
+                        <input type="text" 
+                               value="${item}" 
+                               placeholder="項目 ${iIndex + 1}"
+                               onchange="updateOrderingItem(${sIndex}, ${qIndex}, ${iIndex}, this.value)"
+                               style="flex: 1; padding: 8px; border: 1px solid #e0e0e0; border-radius: 6px;">
+                        <button class="btn btn-danger btn-small" onclick="removeOrderingItem(${sIndex}, ${qIndex}, ${iIndex})">🗑️</button>
+                    </div>
+                `).join('')}
+                <button class="btn btn-info btn-small" style="margin-top: 8px;" onclick="addOrderingItem(${sIndex}, ${qIndex})">➕ 新增項目</button>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="quiz-question">
+            <div class="quiz-question-header">
+                <div style="flex: 1;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <select onchange="changeQuestionType(${sIndex}, ${qIndex}, this.value)"
+                                style="padding: 6px 10px; border: 2px solid #ffa502; border-radius: 6px; font-weight: bold;">
+                            <option value="fillblank" ${question.type === 'fillblank' ? 'selected' : ''}>📝 填充題</option>
+                            <option value="mcq" ${question.type === 'mcq' ? 'selected' : ''}>✅ 選擇題 (MCQ)</option>
+                            <option value="ordering" ${question.type === 'ordering' ? 'selected' : ''}>🔢 排序題</option>
+                        </select>
+                        <input type="number" 
+                               value="${question.score || 1}" 
+                               min="1" 
+                               placeholder="分數"
+                               onchange="updateQuestionScore(${sIndex}, ${qIndex}, this.value)"
+                               style="width: 80px; padding: 6px 10px; border: 2px solid #ffa502; border-radius: 6px; text-align: center; font-weight: bold;">
+                        <span style="color: #666;">分</span>
+                    </div>
+                    <textarea placeholder="請輸入題目內容"
+                              onchange="updateQuestionText(${sIndex}, ${qIndex}, this.value)"
+                              style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px; min-height: 60px; font-size: 0.95em;">${question.text || ''}</textarea>
+                </div>
+                <button class="btn btn-danger btn-small" onclick="removeQuizQuestion(${sIndex}, ${qIndex})" style="margin-left: 10px;">🗑️</button>
+            </div>
+            ${answerHtml}
+        </div>
+    `;
+}
+
+// ==================== Quiz Section 管理函數 ====================
+function addQuizSection() {
+    quizSections.push({
+        title: `第 ${quizSections.length + 1} 部分`,
+        questions: []
+    });
+    renderQuizEditor();
+}
+
+function removeQuizSection(sIndex) {
+    if (confirm('❓ 確定要刪除此部分及其所有題目嗎？')) {
+        quizSections.splice(sIndex, 1);
+        renderQuizEditor();
+    }
+}
+
+function updateSectionTitle(sIndex, value) {
+    quizSections[sIndex].title = value;
+}
+
+// ==================== Quiz Question 管理函數 ====================
+function addQuizQuestion(sIndex) {
+    quizSections[sIndex].questions.push({
+        type: 'fillblank',
+        text: '',
+        score: 1,
+        correctAnswer: ''
+    });
+    renderQuizEditor();
+}
+
+function removeQuizQuestion(sIndex, qIndex) {
+    if (confirm('❓ 確定要刪除此題目嗎？')) {
+        quizSections[sIndex].questions.splice(qIndex, 1);
+        renderQuizEditor();
+    }
+}
+
+function changeQuestionType(sIndex, qIndex, newType) {
+    const question = quizSections[sIndex].questions[qIndex];
+    question.type = newType;
+    
+    if (newType === 'fillblank') {
+        question.correctAnswer = '';
+        delete question.options;
+        delete question.items;
+    } else if (newType === 'mcq') {
+        question.options = [
+            { text: '', isCorrect: true },
+            { text: '', isCorrect: false }
+        ];
+        delete question.correctAnswer;
+        delete question.items;
+    } else if (newType === 'ordering') {
+        question.items = ['', ''];
+        delete question.correctAnswer;
+        delete question.options;
+    }
+    
+    renderQuizEditor();
+}
+
+function updateQuestionText(sIndex, qIndex, value) {
+    quizSections[sIndex].questions[qIndex].text = value;
+}
+
+function updateQuestionScore(sIndex, qIndex, value) {
+    quizSections[sIndex].questions[qIndex].score = parseInt(value) || 1;
+    updateTotalScore();
+}
+
+function updateQuestionAnswer(sIndex, qIndex, value) {
+    quizSections[sIndex].questions[qIndex].correctAnswer = value;
+}
+
+// ==================== MCQ 選項管理 ====================
+function addMCQOption(sIndex, qIndex) {
+    if (!quizSections[sIndex].questions[qIndex].options) {
+        quizSections[sIndex].questions[qIndex].options = [];
+    }
+    quizSections[sIndex].questions[qIndex].options.push({
+        text: '',
+        isCorrect: false
+    });
+    renderQuizEditor();
+}
+
+function removeMCQOption(sIndex, qIndex, oIndex) {
+    quizSections[sIndex].questions[qIndex].options.splice(oIndex, 1);
+    renderQuizEditor();
+}
+
+function updateMCQOption(sIndex, qIndex, oIndex, value) {
+    quizSections[sIndex].questions[qIndex].options[oIndex].text = value;
+}
+
+function setCorrectOption(sIndex, qIndex, oIndex) {
+    const options = quizSections[sIndex].questions[qIndex].options;
+    options.forEach((opt, i) => {
+        opt.isCorrect = (i === oIndex);
+    });
+}
+
+// ==================== Ordering 項目管理 ====================
+function addOrderingItem(sIndex, qIndex) {
+    if (!quizSections[sIndex].questions[qIndex].items) {
+        quizSections[sIndex].questions[qIndex].items = [];
+    }
+    quizSections[sIndex].questions[qIndex].items.push('');
+    renderQuizEditor();
+}
+
+function removeOrderingItem(sIndex, qIndex, iIndex) {
+    quizSections[sIndex].questions[qIndex].items.splice(iIndex, 1);
+    renderQuizEditor();
+}
+
+function updateOrderingItem(sIndex, qIndex, iIndex, value) {
+    quizSections[sIndex].questions[qIndex].items[iIndex] = value;
+}
+
+// ==================== 更新總分 ====================
+function updateTotalScore() {
+    let total = 0;
+    quizSections.forEach(section => {
+        section.questions.forEach(q => {
+            total += parseInt(q.score) || 0;
+        });
+    });
+    currentQuizData.totalScore = total;
+    const display = document.getElementById('totalScoreDisplay');
+    if (display) {
+        display.textContent = total;
+    }
+}
+
+// ==================== 儲存 Quiz ====================
+async function saveQuiz() {
+    const title = document.getElementById('editQuizTitle').value.trim();
+    const passingScore = parseInt(document.getElementById('editQuizPassingScore').value) || 60;
+
+    if (!title) {
+        showToast('❌ 請輸入 Quiz 名稱', 'error');
+        return;
+    }
+
+    if (quizSections.length === 0) {
+        showToast('❌ 請至少新增一個部分', 'error');
+        return;
+    }
+
+    let hasEmptyQuestions = false;
+    quizSections.forEach(section => {
+        if (section.questions.length === 0) hasEmptyQuestions = true;
+        section.questions.forEach(q => {
+            if (!q.text.trim()) hasEmptyQuestions = true;
+        });
+    });
+
+    if (hasEmptyQuestions) {
+        showToast('❌ 請確保所有部分都有題目，且題目內容不為空', 'error');
+        return;
+    }
+
+    try {
+        updateTotalScore();
+
+        const quizData = {
+            categoryId: currentCategoryId,
+            title: title,
+            passingScore: passingScore,
+            totalScore: currentQuizData.totalScore,
+            sections: quizSections,
+            createdBy: currentUser.docId,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (currentQuizId) {
+            await db.collection('quizzes').doc(currentQuizId).update(quizData);
+            showToast('✅ Quiz 已更新', 'success');
+        } else {
+            await db.collection('quizzes').add(quizData);
+            showToast('✅ Quiz 已建立', 'success');
+        }
+
+        currentQuizId = null;
+        quizSections = [];
+        showCategoryDetail(currentCategoryId);
+    } catch (error) {
+        console.error('儲存 Quiz 失敗:', error);
+        showToast('❌ 儲存失敗', 'error');
+    }
+}
+
+// ==================== 取消編輯 ====================
+function cancelQuizEditor() {
+    if (confirm('❓ 確定要取消嗎？未儲存的資料將會遺失。')) {
+        currentQuizId = null;
+        quizSections = [];
+        showCategoryDetail(currentCategoryId);
+    }
+}
+
+        // ==================== 載入並顯示 Quiz 列表（在分類詳情頁）====================
+async function loadQuizList(categoryId) {
+    try {
+        const quizzesSnapshot = await db.collection('quizzes')
+            .where('categoryId', '==', categoryId)
+            .get();
+
+        if (quizzesSnapshot.empty) {
+            return ''; // 沒有 Quiz 就不顯示
+        }
+
+        let quizListHtml = `
+            <div style="background: #f0f4ff; padding: 20px; border-radius: 12px; margin-top: 30px; border-left: 4px solid #1e90ff;">
+                <h3 style="color: #1e90ff; margin: 0 0 15px 0;">📝 Quiz 測驗列表</h3>
+        `;
+
+        for (const doc of quizzesSnapshot.docs) {
+            const quiz = doc.data();
+            const quizId = doc.id;
+
+            // 檢查當前員工是否已完成此 Quiz
+            let quizStatus = '待完成';
+            let statusBadge = '<span class="badge badge-warning">⏳ 待完成</span>';
+            let clickAction = `onclick="startQuiz('${quizId}')"`;
+
+            if (currentUser.role === 'staff') {
+                const submissionSnapshot = await db.collection('quizSubmissions')
+                    .where('quizId', '==', quizId)
+                    .where('userId', '==', currentStaffId)
+                    .limit(1)
+                    .get();
+
+                if (!submissionSnapshot.empty) {
+                    const submission = submissionSnapshot.docs[0].data();
+                    if (submission.status === 'graded') {
+                        const passed = submission.score >= (quiz.passingScore * quiz.totalScore / 100);
+                        quizStatus = passed ? '已通過' : '未通過';
+                        statusBadge = passed 
+                            ? `<span class="quiz-passed-badge">✅ 已通過 (${submission.score}/${quiz.totalScore})</span>`
+                            : `<span class="quiz-failed-badge">❌ 未通過 (${submission.score}/${quiz.totalScore})</span>`;
+                        clickAction = `onclick="viewQuizResult('${submissionSnapshot.docs[0].id}')"`;
+                    } else {
+                        quizStatus = '待批改';
+                        statusBadge = '<span class="quiz-pending-badge">⏰ 待主管批改</span>';
+                        clickAction = 'style="cursor: not-allowed;" onclick="showToast(\'⏰ 請等待主管批改\', \'warning\')"';
+                    }
+                }
+            } else if (currentUser.role === 'supervisor' || currentUser.role === 'admin') {
+                // Supervisor/Admin 可以查看待批改的提交
+                const pendingSnapshot = await db.collection('quizSubmissions')
+                    .where('quizId', '==', quizId)
+                    .where('status', '==', 'submitted')
+                    .get();
+
+                if (!pendingSnapshot.empty) {
+                    statusBadge = `<span class="quiz-pending-badge">📋 ${pendingSnapshot.size} 份待批改</span>`;
+                    clickAction = `onclick="showPendingSubmissions('${quizId}')"`;
+                }
+            }
+
+            quizListHtml += `
+                <div class="quiz-card" ${clickAction}>
+                    <div class="quiz-card-header">
+                        <div class="quiz-card-title">📝 ${quiz.title}</div>
+                        ${statusBadge}
+                    </div>
+                    <div class="quiz-card-info">
+                        📊 總分：${quiz.totalScore} 分 | 
+                        ✅ 合格：${quiz.passingScore}% (${Math.ceil(quiz.passingScore * quiz.totalScore / 100)} 分)
+                        <br>
+                        📚 部分數：${quiz.sections.length} | 
+                        📝 題目數：${quiz.sections.reduce((sum, s) => sum + s.questions.length, 0)}
+                    </div>
+                    ${(currentUser.role === 'admin') ? `
+                        <div style="margin-top: 10px; display: flex; gap: 10px;">
+                            <button class="btn btn-warning btn-small" onclick="event.stopPropagation(); editQuiz('${quizId}')">✏️ 編輯</button>
+                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteQuiz('${quizId}', '${quiz.title}')">🗑️ 刪除</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        quizListHtml += `</div>`;
+        return quizListHtml;
+    } catch (error) {
+        console.error('載入 Quiz 列表失敗:', error);
+        return '';
+    }
+}
+
+// ==================== 編輯現有 Quiz ====================
+async function editQuiz(quizId) {
+    try {
+        const quizDoc = await db.collection('quizzes').doc(quizId).get();
+        const quiz = quizDoc.data();
+
+        currentQuizId = quizId;
+        currentQuizData = {
+            title: quiz.title,
+            passingScore: quiz.passingScore,
+            totalScore: quiz.totalScore,
+            categoryId: quiz.categoryId
+        };
+        quizSections = quiz.sections || [];
+
+        renderQuizEditor();
+    } catch (error) {
+        console.error('載入 Quiz 失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 刪除 Quiz ====================
+async function deleteQuiz(quizId, title) {
+    if (!confirm(`❓ 確定要刪除 Quiz「${title}」嗎？\n⚠️ 相關的所有答題記錄也會被刪除！`)) {
+        return;
+    }
+
+    try {
+        // 刪除所有相關的提交記錄
+        const submissionsSnapshot = await db.collection('quizSubmissions')
+            .where('quizId', '==', quizId)
+            .get();
+
+        const batch = db.batch();
+        submissionsSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        // 刪除 Quiz 本身
+        batch.delete(db.collection('quizzes').doc(quizId));
+
+        await batch.commit();
+
+        showToast('✅ Quiz 已刪除', 'success');
+        showCategoryDetail(currentCategoryId);
+    } catch (error) {
+        console.error('刪除 Quiz 失敗:', error);
+        showToast('❌ 刪除失敗', 'error');
+    }
+}
+
+// ==================== 開始答題 ====================
+async function startQuiz(quizId) {
+    try {
+        const quizDoc = await db.collection('quizzes').doc(quizId).get();
+        const quiz = quizDoc.data();
+
+        // 檢查是否已提交過
+        const existingSnapshot = await db.collection('quizSubmissions')
+            .where('quizId', '==', quizId)
+            .where('userId', '==', currentStaffId)
+            .limit(1)
+            .get();
+
+        if (!existingSnapshot.empty) {
+            showToast('⚠️ 你已完成此 Quiz，請等待主管批改', 'warning');
+            return;
+        }
+
+        currentQuizId = quizId;
+        currentQuizData = quiz;
+
+        showPage('quizTakingPage');
+        document.getElementById('quizTakingTitle').textContent = `📝 ${quiz.title}`;
+
+        let takingHtml = `
+            <div class="quiz-summary">
+                <div class="quiz-summary-title">📋 Quiz 資訊</div>
+                <div style="font-size: 1.1em; margin: 15px 0;">
+                    📊 總分：${quiz.totalScore} 分<br>
+                    ✅ 合格分數：${quiz.passingScore}% (${Math.ceil(quiz.passingScore * quiz.totalScore / 100)} 分)
+                </div>
+                <div style="font-size: 0.95em; opacity: 0.95;">
+                    請仔細作答，提交後將無法修改
+                </div>
+            </div>
+        `;
+
+        quiz.sections.forEach((section, sIndex) => {
+            takingHtml += `
+                <div class="quiz-section">
+                    <div class="quiz-section-title">${section.title}</div>
+            `;
+
+            let questionNumber = 1;
+            section.questions.forEach((question, qIndex) => {
+                const questionId = `q_${sIndex}_${qIndex}`;
+
+                takingHtml += `
+                    <div class="quiz-question">
+                        <div class="quiz-question-header">
+                            <div class="quiz-question-text">
+                                <strong>Q${questionNumber}.</strong> ${question.text}
+                            </div>
+                            <div class="quiz-question-score">${question.score} 分</div>
+                        </div>
+                `;
+
+                if (question.type === 'fillblank') {
+                    takingHtml += `
+                        <input type="text" 
+                               class="quiz-answer-input" 
+                               id="${questionId}" 
+                               placeholder="請輸入答案">
+                    `;
+                } else if (question.type === 'mcq') {
+                    takingHtml += `<div style="margin-top: 10px;">`;
+                    question.options.forEach((option, oIndex) => {
+                        const optionId = `${questionId}_${oIndex}`;
+                        takingHtml += `
+                            <label class="quiz-mcq-option" for="${optionId}" onclick="selectMCQOption('${questionId}', ${oIndex})">
+                                <input type="radio" 
+                                       name="${questionId}" 
+                                       id="${optionId}" 
+                                       value="${oIndex}">
+                                <span>${String.fromCharCode(65 + oIndex)}. ${option.text}</span>
+                            </label>
+                        `;
+                    });
+                    takingHtml += `</div>`;
+                } else if (question.type === 'ordering') {
+                    takingHtml += `<div style="margin-top: 10px;">`;
+                    takingHtml += `<div style="color: #666; font-size: 0.9em; margin-bottom: 10px;">請在每個方框中填入正確的順序編號 (1 為最先)</div>`;
+                    question.items.forEach((item, iIndex) => {
+                        takingHtml += `
+                            <div class="quiz-ordering-item">
+                                <input type="number" 
+                                       class="quiz-ordering-number" 
+                                       id="${questionId}_${iIndex}" 
+                                       min="1" 
+                                       max="${question.items.length}"
+                                       placeholder="#">
+                                <div class="quiz-ordering-text">${item}</div>
+                            </div>
+                        `;
+                    });
+                    takingHtml += `</div>`;
+                }
+
+                takingHtml += `</div>`;
+                questionNumber++;
+            });
+
+            takingHtml += `</div>`;
+        });
+
+        document.getElementById('quizTakingContent').innerHTML = takingHtml;
+    } catch (error) {
+        console.error('載入 Quiz 失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 選擇 MCQ 選項 ====================
+function selectMCQOption(questionId, optionIndex) {
+    // 移除同一題目的所有選項的 selected class
+    const allOptions = document.querySelectorAll(`label[for^="${questionId}_"]`);
+    allOptions.forEach(opt => opt.classList.remove('selected'));
+
+    // 添加 selected class 到當前選項
+    const selectedOption = document.querySelector(`label[for="${questionId}_${optionIndex}"]`);
+    if (selectedOption) {
+        selectedOption.classList.add('selected');
+    }
+}
+
+// ==================== 提交 Quiz 答案 ====================
+async function submitQuizAnswers() {
+    if (!confirm('❓ 確定要提交答案嗎？提交後將無法修改。')) {
+        return;
+    }
+
+    try {
+        const answers = {};
+        const quiz = currentQuizData;
+
+        // 收集所有答案
+        quiz.sections.forEach((section, sIndex) => {
+            section.questions.forEach((question, qIndex) => {
+                const questionId = `q_${sIndex}_${qIndex}`;
+
+                if (question.type === 'fillblank') {
+                    const input = document.getElementById(questionId);
+                    answers[questionId] = input ? input.value.trim() : '';
+                } else if (question.type === 'mcq') {
+                    const selected = document.querySelector(`input[name="${questionId}"]:checked`);
+                    answers[questionId] = selected ? parseInt(selected.value) : null;
+                } else if (question.type === 'ordering') {
+                    const ordering = [];
+                    question.items.forEach((item, iIndex) => {
+                        const input = document.getElementById(`${questionId}_${iIndex}`);
+                        ordering.push(input ? parseInt(input.value) || 0 : 0);
+                    });
+                    answers[questionId] = ordering;
+                }
+            });
+        });
+
+        // 檢查是否有未作答的題目
+        const hasUnanswered = Object.values(answers).some(answer => {
+            if (Array.isArray(answer)) {
+                return answer.some(a => a === 0);
+            }
+            return answer === '' || answer === null;
+        });
+
+        if (hasUnanswered) {
+            if (!confirm('⚠️ 有題目尚未作答，確定要提交嗎？')) {
+                return;
+            }
+        }
+
+        // 獲取員工資料
+        const staffDoc = await db.collection('accounts').doc(currentStaffId).get();
+        const staff = staffDoc.data();
+
+        // 儲存提交記錄
+        const submissionData = {
+            quizId: currentQuizId,
+            userId: currentStaffId,
+            userName: staff.name,
+            userLevel: staff.level,
+            answers: answers,
+            status: 'submitted', // submitted, graded
+            submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            submittedDate: new Date().toISOString().split('T')[0]
+        };
+
+        await db.collection('quizSubmissions').add(submissionData);
+
+        showToast('✅ 答案已提交，請等待主管批改', 'success');
+        currentQuizId = null;
+        backToProgress();
+    } catch (error) {
+        console.error('提交答案失敗:', error);
+        showToast('❌ 提交失敗', 'error');
+    }
+}
+
+// ==================== 取消答題 ====================
+function cancelQuizTaking() {
+    if (confirm('❓ 確定要取消答題嗎？已填寫的答案將不會儲存。')) {
+        currentQuizId = null;
+        backToProgress();
+    }
+}
+
+// ==================== 顯示待批改的提交 (Supervisor/Admin) ====================
+async function showPendingSubmissions(quizId) {
+    try {
+        const quizDoc = await db.collection('quizzes').doc(quizId).get();
+        const quiz = quizDoc.data();
+
+        const submissionsSnapshot = await db.collection('quizSubmissions')
+            .where('quizId', '==', quizId)
+            .where('status', '==', 'submitted')
+            .get();
+
+        if (submissionsSnapshot.empty) {
+            showToast('📭 目前沒有待批改的提交', 'warning');
+            return;
+        }
+
+        let modalBody = `
+            <div style="margin-bottom: 15px;">
+                <strong>📝 Quiz：</strong>${quiz.title}
+            </div>
+            <div style="max-height: 400px; overflow-y: auto;">
+        `;
+
+        submissionsSnapshot.forEach(doc => {
+            const submission = doc.data();
+            modalBody += `
+                <div class="quiz-card" onclick="gradeQuizSubmission('${doc.id}')">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: bold;">👤 ${submission.userName}</div>
+                            <div style="color: #666; font-size: 0.9em; margin-top: 5px;">
+                                📊 ${submission.userLevel} | 
+                                📅 ${submission.submittedDate}
+                            </div>
+                        </div>
+                        <span class="quiz-pending-badge">待批改</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        modalBody += `
+            </div>
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeModal()">關閉</button>
+            </div>
+        `;
+
+        showModal('📋 待批改的 Quiz 提交', modalBody);
+    } catch (error) {
+        console.error('載入待批改提交失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 批改 Quiz (Supervisor/Admin) ====================
+async function gradeQuizSubmission(submissionId) {
+    closeModal();
+
+    try {
+        const submissionDoc = await db.collection('quizSubmissions').doc(submissionId).get();
+        const submission = submissionDoc.data();
+
+        const quizDoc = await db.collection('quizzes').doc(submission.quizId).get();
+        const quiz = quizDoc.data();
+
+        showPage('quizGradingPage');
+        document.getElementById('quizGradingTitle').textContent = `評核 Quiz - ${submission.userName}`;
+
+        let gradingHtml = `
+            <div class="quiz-summary">
+                <div class="quiz-summary-title">📋 Quiz 資訊</div>
+                <div style="font-size: 1.1em; margin: 15px 0;">
+                    👤 學員：${submission.userName} (${submission.userLevel})<br>
+                    📅 提交日期：${submission.submittedDate}<br>
+                    📊 總分：${quiz.totalScore} 分<br>
+                    ✅ 合格分數：${quiz.passingScore}% (${Math.ceil(quiz.passingScore * quiz.totalScore / 100)} 分)
+                </div>
+            </div>
+        `;
+
+        let questionNumber = 1;
+
+        quiz.sections.forEach((section, sIndex) => {
+            gradingHtml += `
+                <div class="quiz-section">
+                    <div class="quiz-section-title">${section.title}</div>
+            `;
+
+            section.questions.forEach((question, qIndex) => {
+                const questionId = `q_${sIndex}_${qIndex}`;
+                const studentAnswer = submission.answers[questionId];
+
+                gradingHtml += `
+                    <div class="quiz-question">
+                        <div class="quiz-question-header">
+                            <div class="quiz-question-text">
+                                <strong>Q${questionNumber}.</strong> ${question.text}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="color: #666;">給分：</span>
+                                <input type="number" 
+                                       class="quiz-grading-input" 
+                                       id="score_${questionId}" 
+                                       min="0" 
+                                       max="${question.score}"
+                                       placeholder="0">
+                                <span style="color: #666;">/ ${question.score} 分</span>
+                            </div>
+                        </div>
+                `;
+
+                // 顯示學員答案
+                if (question.type === 'fillblank') {
+                    gradingHtml += `
+                        <div class="quiz-student-answer">
+                            <strong>學員答案：</strong>${studentAnswer || '(未作答)'}
+                        </div>
+                        <div class="quiz-correct-answer">
+                            <strong>正確答案：</strong>${question.correctAnswer}
+                        </div>
+                    `;
+                } else if (question.type === 'mcq') {
+                    const correctIndex = question.options.findIndex(opt => opt.isCorrect);
+                    const studentOptionText = (studentAnswer !== null && question.options[studentAnswer]) 
+                        ? `${String.fromCharCode(65 + studentAnswer)}. ${question.options[studentAnswer].text}` 
+                        : '(未作答)';
+                    const correctOptionText = `${String.fromCharCode(65 + correctIndex)}. ${question.options[correctIndex].text}`;
+                    const isCorrect = studentAnswer === correctIndex;
+
+                    gradingHtml += `
+                        <div class="quiz-student-answer" style="${isCorrect ? 'background: #d4edda; border-left-color: #28a745;' : ''}">
+                            <strong>學員答案：</strong>${studentOptionText} ${isCorrect ? '✅' : ''}
+                        </div>
+                        <div class="quiz-correct-answer">
+                            <strong>正確答案：</strong>${correctOptionText}
+                        </div>
+                    `;
+
+                    // 如果完全正確，自動填入滿分
+                    if (isCorrect) {
+                        setTimeout(() => {
+                            const input = document.getElementById(`score_${questionId}`);
+                            if (input && !input.value) {
+                                input.value = question.score;
+                            }
+                        }, 100);
+                    }
+                } else if (question.type === 'ordering') {
+                    const correctOrder = question.items.map((_, i) => i + 1);
+                    const studentOrder = studentAnswer || [];
+                    const isCorrect = JSON.stringify(correctOrder) === JSON.stringify(studentOrder);
+
+                    gradingHtml += `
+                        <div class="quiz-student-answer" style="${isCorrect ? 'background: #d4edda; border-left-color: #28a745;' : ''}">
+                            <strong>學員答案：</strong>${isCorrect ? '✅' : ''}<br>
+                            ${question.items.map((item, i) => `${studentOrder[i] || '?'}. ${item}`).join('<br>')}
+                        </div>
+                        <div class="quiz-correct-answer">
+                            <strong>正確順序：</strong><br>
+                            ${question.items.map((item, i) => `${i + 1}. ${item}`).join('<br>')}
+                        </div>
+                    `;
+
+                    // 如果完全正確，自動填入滿分
+                    if (isCorrect) {
+                        setTimeout(() => {
+                            const input = document.getElementById(`score_${questionId}`);
+                            if (input && !input.value) {
+                                input.value = question.score;
+                            }
+                        }, 100);
+                    }
+                }
+
+                gradingHtml += `</div>`;
+                questionNumber++;
+            });
+
+            gradingHtml += `</div>`;
+        });
+
+        // 總分顯示
+        gradingHtml += `
+            <div class="audit-section">
+                <div style="text-align: center; padding: 20px; background: #f0f4ff; border-radius: 12px;">
+                    <div style="font-size: 1.2em; color: #666; margin-bottom: 10px;">總分</div>
+                    <div style="font-size: 3em; font-weight: bold; color: #ffa502;" id="totalScoreDisplay">0</div>
+                    <div style="font-size: 1.1em; color: #666; margin-top: 10px;">滿分：${quiz.totalScore} 分</div>
+                    <div style="font-size: 1.1em; color: #666; margin-top: 5px;">合格：${Math.ceil(quiz.passingScore * quiz.totalScore / 100)} 分 (${quiz.passingScore}%)</div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('quizGradingContent').innerHTML = gradingHtml;
+
+        // 自動計算總分
+        quiz.sections.forEach((section, sIndex) => {
+            section.questions.forEach((question, qIndex) => {
+                const questionId = `q_${sIndex}_${qIndex}`;
+                const input = document.getElementById(`score_${questionId}`);
+                if (input) {
+                    input.addEventListener('input', updateGradingTotalScore);
+                }
+            });
+        });
+
+        // 儲存當前批改資訊
+        window.currentGradingSubmissionId = submissionId;
+        window.currentGradingQuiz = quiz;
+    } catch (error) {
+        console.error('載入批改頁面失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 更新批改總分 ====================
+function updateGradingTotalScore() {
+    let total = 0;
+    const inputs = document.querySelectorAll('[id^="score_q_"]');
+    inputs.forEach(input => {
+        total += parseInt(input.value) || 0;
+    });
+
+    const display = document.getElementById('totalScoreDisplay');
+    if (display) {
+        display.textContent = total;
+    }
+}
+
+// ==================== 提交批改結果 ====================
+async function submitQuizGrading() {
+    if (!confirm('❓ 確定要提交批改結果嗎？提交後學員將可看到成績。')) {
+        return;
+    }
+
+    try {
+        const quiz = window.currentGradingQuiz;
+        const scores = {};
+        let totalScore = 0;
+
+        // 收集所有分數
+        quiz.sections.forEach((section, sIndex) => {
+            section.questions.forEach((question, qIndex) => {
+                const questionId = `q_${sIndex}_${qIndex}`;
+                const input = document.getElementById(`score_${questionId}`);
+                const score = parseInt(input.value) || 0;
+                
+                scores[questionId] = score;
+                totalScore += score;
+            });
+        });
+
+        // 更新提交記錄
+        await db.collection('quizSubmissions').doc(window.currentGradingSubmissionId).update({
+            scores: scores,
+            score: totalScore,
+            status: 'graded',
+            gradedBy: currentUser.docId,
+            gradedByName: currentUser.name,
+            gradedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        const passed = totalScore >= (quiz.passingScore * quiz.totalScore / 100);
+        showToast(`✅ 批改完成 (總分: ${totalScore}/${quiz.totalScore}, ${passed ? '通過' : '未通過'})`, 'success');
+        
+        window.currentGradingSubmissionId = null;
+        window.currentGradingQuiz = null;
+        
+        showCategoryDetail(currentCategoryId);
+    } catch (error) {
+        console.error('提交批改失敗:', error);
+        showToast('❌ 提交失敗', 'error');
+    }
+}
+
+// ==================== 返回 Quiz 列表 ====================
+function backToQuizList() {
+    window.currentGradingSubmissionId = null;
+    window.currentGradingQuiz = null;
+    showCategoryDetail(currentCategoryId);
+}
+
+// ==================== 查看 Quiz 結果 (學員) ====================
+async function viewQuizResult(submissionId) {
+    try {
+        const submissionDoc = await db.collection('quizSubmissions').doc(submissionId).get();
+        const submission = submissionDoc.data();
+
+        const quizDoc = await db.collection('quizzes').doc(submission.quizId).get();
+        const quiz = quizDoc.data();
+
+        showPage('quizResultPage');
+        document.getElementById('quizResultTitle').textContent = `Quiz 結果 - ${quiz.title}`;
+
+        const passed = submission.score >= (quiz.passingScore * quiz.totalScore / 100);
+        const percentage = Math.round((submission.score / quiz.totalScore) * 100);
+
+        let resultHtml = `
+            <div class="quiz-summary" style="background: ${passed ? 'linear-gradient(135deg, #28a745 0%, #20c997 100%)' : 'linear-gradient(135deg, #dc3545 0%, #f85149 100%)'};">
+                <div class="quiz-summary-title">${passed ? '🎉 恭喜通過！' : '💪 繼續努力！'}</div>
+                <div class="quiz-summary-score">${submission.score}</div>
+                <div style="font-size: 1.3em; margin: 10px 0;">/ ${quiz.totalScore} 分 (${percentage}%)</div>
+                <div class="quiz-summary-status">
+                    ${passed ? `✅ 已達合格標準 (${quiz.passingScore}%)` : `❌ 未達合格標準 (${quiz.passingScore}%)`}
+                </div>
+            </div>
+
+            <div class="audit-section">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
+                    <div>
+                        <div style="font-size: 0.9em; color: #666;">提交日期</div>
+                        <div style="font-size: 1.2em; font-weight: bold; margin-top: 5px;">${submission.submittedDate}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; color: #666;">批改老師</div>
+                        <div style="font-size: 1.2em; font-weight: bold; margin-top: 5px;">${submission.gradedByName || 'N/A'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; color: #666;">合格分數</div>
+                        <div style="font-size: 1.2em; font-weight: bold; margin-top: 5px;">${Math.ceil(quiz.passingScore * quiz.totalScore / 100)} 分</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        let questionNumber = 1;
+
+        quiz.sections.forEach((section, sIndex) => {
+            resultHtml += `
+                <div class="quiz-section">
+                    <div class="quiz-section-title">${section.title}</div>
+            `;
+
+            section.questions.forEach((question, qIndex) => {
+                const questionId = `q_${sIndex}_${qIndex}`;
+                const studentAnswer = submission.answers[questionId];
+                const studentScore = submission.scores[questionId] || 0;
+                const isFullScore = studentScore === question.score;
+
+                resultHtml += `
+                    <div class="quiz-question" style="border-left-color: ${isFullScore ? '#28a745' : '#ffa502'};">
+                        <div class="quiz-question-header">
+                            <div class="quiz-question-text">
+                                <strong>Q${questionNumber}.</strong> ${question.text}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.3em; font-weight: bold; color: ${isFullScore ? '#28a745' : '#ffa502'};">
+                                    ${studentScore}
+                                </span>
+                                <span style="color: #666;">/ ${question.score} 分</span>
+                            </div>
+                        </div>
+                `;
+
+                // 顯示答案
+                if (question.type === 'fillblank') {
+                    const isCorrect = studentAnswer && studentAnswer.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim();
+                    resultHtml += `
+                        <div class="quiz-student-answer" style="${isCorrect ? 'background: #d4edda; border-left-color: #28a745;' : ''}">
+                            <strong>你的答案：</strong>${studentAnswer || '(未作答)'} ${isCorrect ? '✅' : ''}
+                        </div>
+                        <div class="quiz-correct-answer">
+                            <strong>正確答案：</strong>${question.correctAnswer}
+                        </div>
+                    `;
+                } else if (question.type === 'mcq') {
+                    const correctIndex = question.options.findIndex(opt => opt.isCorrect);
+                    const studentOptionText = (studentAnswer !== null && question.options[studentAnswer]) 
+                        ? `${String.fromCharCode(65 + studentAnswer)}. ${question.options[studentAnswer].text}` 
+                        : '(未作答)';
+                    const correctOptionText = `${String.fromCharCode(65 + correctIndex)}. ${question.options[correctIndex].text}`;
+                    const isCorrect = studentAnswer === correctIndex;
+
+                    resultHtml += `
+                        <div class="quiz-student-answer" style="${isCorrect ? 'background: #d4edda; border-left-color: #28a745;' : ''}">
+                            <strong>你的答案：</strong>${studentOptionText} ${isCorrect ? '✅' : ''}
+                        </div>
+                        <div class="quiz-correct-answer">
+                            <strong>正確答案：</strong>${correctOptionText}
+                        </div>
+                    `;
+                } else if (question.type === 'ordering') {
+                    const correctOrder = question.items.map((_, i) => i + 1);
+                    const studentOrder = studentAnswer || [];
+                    const isCorrect = JSON.stringify(correctOrder) === JSON.stringify(studentOrder);
+
+                    resultHtml += `
+                        <div class="quiz-student-answer" style="${isCorrect ? 'background: #d4edda; border-left-color: #28a745;' : ''}">
+                            <strong>你的答案：</strong>${isCorrect ? '✅' : ''}<br>
+                            ${question.items.map((item, i) => `${studentOrder[i] || '?'}. ${item}`).join('<br>')}
+                        </div>
+                        <div class="quiz-correct-answer">
+                            <strong>正確順序：</strong><br>
+                            ${question.items.map((item, i) => `${i + 1}. ${item}`).join('<br>')}
+                        </div>
+                    `;
+                }
+
+                resultHtml += `</div>`;
+                questionNumber++;
+            });
+
+            resultHtml += `</div>`;
+        });
+
+        document.getElementById('quizResultContent').innerHTML = resultHtml;
+    } catch (error) {
+        console.error('載入結果失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+        
         // ==================== 工具函數 ====================
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(page => {
