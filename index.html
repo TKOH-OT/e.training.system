@@ -2850,12 +2850,12 @@ async function showCategoryDetail(categoryId) {
 
         document.getElementById('categoryDetailTitle').textContent = `${category.emoji} ${category.name}`;
 
-        const itemsSnapshot = await db.collection('trainingItems')
-            .where('categoryId', '==', categoryId)
-            .get();
+const itemsSnapshot = await db.collection('trainingItems')
+    .where('categoryId', '==', currentCategoryId)  
+    .get();
 
-        const items = [];
-        itemsSnapshot.forEach(doc => {
+const items = [];
+itemsSnapshot.forEach(doc => {
             items.push({ docId: doc.id, ...doc.data() });
         });
         items.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -4069,9 +4069,9 @@ function filterStaffList() {
 
                 const progressHtml = [];
 
-  for (const category of categories) {
+for (const category of categories) {
 const itemsSnapshot = await db.collection('trainingItems')
-    .where('categoryId', '==', categoryId)
+    .where('categoryId', '==', category.docId)  
     .get();
 
 const items = [];
