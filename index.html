@@ -1747,6 +1747,176 @@
     color: #ffa502;
     font-size: 1.05em;  /* ⭐ 稍微加大 */
 }
+
+        /* ==================== Quiz 測驗系統樣式 ==================== */
+.quiz-section {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+}
+
+.quiz-section-title {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #1e90ff;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.quiz-question {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    border-left: 4px solid #1e90ff;
+}
+
+.quiz-question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.quiz-question-text {
+    font-weight: 500;
+    color: #333;
+    flex: 1;
+}
+
+.quiz-question-points {
+    background: #1e90ff;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: bold;
+}
+
+.quiz-answer-area {
+    margin-top: 12px;
+}
+
+.quiz-answer-input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+}
+
+.quiz-answer-input:focus {
+    outline: none;
+    border-color: #1e90ff;
+}
+
+.quiz-mcq-option {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin: 8px 0;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.quiz-mcq-option:hover {
+    border-color: #1e90ff;
+    background: #f0f8ff;
+}
+
+.quiz-mcq-option input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+    cursor: pointer;
+}
+
+.quiz-mcq-option.selected {
+    border-color: #1e90ff;
+    background: #e3f2fd;
+}
+
+.quiz-ordering-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin: 8px 0;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.quiz-ordering-number {
+    width: 50px;
+    padding: 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    text-align: center;
+    margin-right: 12px;
+    font-weight: bold;
+}
+
+.quiz-status-pending {
+    background: #fff3cd;
+    color: #856404;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.quiz-result-card {
+    background: linear-gradient(135deg, #1e90ff 0%, #1e3a8a 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.quiz-result-score {
+    font-size: 3em;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.quiz-result-status {
+    font-size: 1.2em;
+    margin-top: 10px;
+}
+
+.quiz-grading-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 15px;
+}
+
+.quiz-grading-input {
+    width: 100px;
+    padding: 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.quiz-grading-input:focus {
+    outline: none;
+    border-color: #1e90ff;
+}
+
+.badge-quiz {
+    background: #1e90ff;
+    color: white;
+}
         
     </style>
 </head>
@@ -2150,6 +2320,9 @@
         let selectedEmoji = '📚';
         let systemInitialized = false;
         let checklistSteps = [];
+        let currentQuizId = '';
+let quizQuestions = [];
+let quizSections = [];
 
         // ==================== 權限檢查函數 ====================
 // ⭐⭐⭐ 新增：檢查用戶是否有權限編輯訓練記錄 ⭐⭐⭐
@@ -2699,6 +2872,8 @@ let badges = '';
 // ⭐ 新增：顯示記錄類型
 if (item.recordType === 'training') {
     badges += '<span class="badge badge-info">📝 訓練記錄</span>';
+} else if (item.recordType === 'quiz') {
+    badges += '<span class="badge badge-quiz">📝 Quiz 測驗</span>';
 } else {
     badges += '<span class="badge badge-success">📋 評核 Checklist</span>';
 }
@@ -2711,9 +2886,16 @@ if (item.isImportant) {
     badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
 }
             
-            // ⭐ ADD THIS LINE - Calculate actual steps (excluding subtitles)
-            const actualStepCount = item.checklist ? item.checklist.filter(s => !s.isSubtitle).length : 0;
-            const totalSteps = actualStepCount; // Use actualStepCount instead of item.checklist.length
+ // ⭐ 計算步驟/題目數量
+let totalSteps = 0;
+if (item.recordType === 'quiz') {
+    // Quiz: 計算總題目數量
+    totalSteps = item.quizSections ? 
+        item.quizSections.reduce((sum, section) => sum + (section.questions?.length || 0), 0) : 0;
+} else {
+    // Checklist/Training: 計算步驟數量（排除章節標題）
+    totalSteps = item.checklist ? item.checklist.filter(s => !s.isSubtitle).length : 0;
+}
             
             const percentage = item.hasChecklist ? 100 : 0;
             
@@ -2722,7 +2904,54 @@ if (item.isImportant) {
 
 let checklistHtml = '';
 
-if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
+// ⭐⭐⭐ Quiz 類型顯示邏輯 ⭐⭐⭐
+if (item.recordType === 'quiz' && item.quizSections) {
+    let totalQuestions = 0;
+    let totalPoints = 0;
+    
+    item.quizSections.forEach(section => {
+        totalQuestions += section.questions?.length || 0;
+        section.questions?.forEach(q => {
+            totalPoints += q.points || 0;
+        });
+    });
+    
+    const sectionsHtml = item.quizSections.map((section, secIndex) => {
+        const questionsHtml = section.questions?.map((q, qIndex) => {
+            const typeLabel = q.type === 'fill' ? '填充題' : q.type === 'mcq' ? '選擇題' : '排序題';
+            return `
+                <div style="background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 4px solid #1e90ff;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>Q${qIndex + 1}.</strong> ${q.question}
+                            <span class="badge badge-info" style="margin-left: 10px;">${typeLabel}</span>
+                            <span class="badge badge-warning">${q.points} 分</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('') || '<p style="color: #999; padding: 10px;">此部分尚無題目</p>';
+        
+        return `
+            <div style="margin-bottom: 20px;">
+                <div class="quiz-section-title">${section.title}</div>
+                ${questionsHtml}
+            </div>
+        `;
+    }).join('');
+    
+    checklistHtml = `
+        <div class="checklist-container">
+            <div class="checklist-header">📝 Quiz 測驗內容 (共 ${totalQuestions} 題 / 總分 ${totalPoints} 分)</div>
+            <div style="background: #fff9e6; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffa502;">
+                <strong>🎯 及格分數：</strong>${item.quizPassScore || 60} 分
+            </div>
+            ${sectionsHtml}
+        </div>
+    `;
+}
+// ⭐⭐⭐ 原本的 Checklist/Training 顯示邏輯 ⭐⭐⭐
+else if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
     let stepCounter = 0;
     
     const stepsHtml = item.checklist.map((step, index) => {
@@ -2798,10 +3027,10 @@ if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
                                     stroke-dashoffset="${offset}"
                                     stroke-linecap="round"/>
                             </svg>
-                            <div class="item-progress-text">
-                                <div class="item-progress-percent">${totalSteps}</div>
-                                <div class="item-progress-label">步驟</div>
-                            </div>
+<div class="item-progress-text">
+    <div class="item-progress-percent">${totalSteps}</div>
+    <div class="item-progress-label">${item.recordType === 'quiz' ? '題目' : '步驟'}</div>
+</div>
                         </div>
 
                         <div class="item-card-actions">
@@ -3172,6 +3401,7 @@ function showAddItemModal() {
             <select id="recordType" onchange="toggleRecordTypeOptions()">
                 <option value="checklist">評核步驟 Checklist (需評估合格/不合格)</option>
                 <option value="training">訓練記錄 (只記錄教授日期及簽名)</option>
+                <option value="quiz">Quiz 測驗 (問答題/選擇題/排序題)</option>
             </select>
         </div>
         
@@ -3193,7 +3423,24 @@ function showAddItemModal() {
                 </div>
             </div>
         </div>
-        
+
+        <!-- ⭐ Quiz 測驗設定區域 -->
+<div id="quizSettingsGroup" style="display: none; margin-top: 20px;">
+    <div class="input-group">
+        <label>🎯 及格分數</label>
+        <input type="number" id="quizPassScore" min="0" max="100" value="60" placeholder="例如: 60">
+        <small style="color: #666; margin-top: 5px; display: block;">設定幾多分先算合格（預設 60 分）</small>
+    </div>
+    
+    <div class="input-group">
+        <label>📋 Quiz 部分及題目</label>
+        <div id="quizSectionsContainer">
+            <!-- 動態生成 -->
+        </div>
+        <button class="btn btn-info btn-small" onclick="addQuizSection()" style="margin-top: 10px;">➕ 新增部分</button>
+    </div>
+</div>
+
         <div class="checkbox-group">
             <input type="checkbox" id="hasDeadlineCheck" onchange="toggleDeadlineSettings()">
             <label for="hasDeadlineCheck">⏰ 設定截止日期</label>
@@ -3276,15 +3523,32 @@ function toggleRecordTypeOptions() {
     const recordType = document.getElementById('recordType').value;
     const hint = document.getElementById('recordTypeHint');
     const stepsLabel = document.getElementById('stepsLabel');
+    const checklistInputGroup = document.getElementById('checklistInputGroup');
+    const quizSettingsGroup = document.getElementById('quizSettingsGroup');
     
     if (recordType === 'checklist') {
         hint.innerHTML = '<strong>📋 評核步驟 Checklist:</strong> 需要逐步評估每個步驟是否合格/不合格，有 Critical 步驟控制';
         hint.style.borderLeftColor = '#ffa502';
         stepsLabel.textContent = '📋 Checklist 步驟';
-    } else {
+        if (checklistInputGroup) checklistInputGroup.style.display = 'block';
+        if (quizSettingsGroup) quizSettingsGroup.style.display = 'none';
+    } else if (recordType === 'training') {
         hint.innerHTML = '<strong>📝 訓練記錄:</strong> 只記錄教授/講解日期及雙方簽名，不需評估合格/不合格';
         hint.style.borderLeftColor = '#2ed573';
         stepsLabel.textContent = '📝 訓練步驟';
+        if (checklistInputGroup) checklistInputGroup.style.display = 'block';
+        if (quizSettingsGroup) quizSettingsGroup.style.display = 'none';
+    } else if (recordType === 'quiz') {
+        hint.innerHTML = '<strong>📝 Quiz 測驗:</strong> 支援填充題、選擇題、排序題，只有 Admin/Supervisor 可以建立及改卷';
+        hint.style.borderLeftColor = '#1e90ff';
+        if (checklistInputGroup) checklistInputGroup.style.display = 'none';
+        if (quizSettingsGroup) quizSettingsGroup.style.display = 'block';
+        
+        // ⭐ 初始化一個預設部分
+        if (quizSections.length === 0) {
+            quizSections = [{ title: '第一部分', questions: [] }];
+            renderQuizSections();
+        }
     }
 }
         
@@ -3397,22 +3661,44 @@ async function createTrainingItem() {
         return;
     }
 
-    // ⭐ 驗證步驟
+// ⭐ 驗證：Checklist/Training 需要步驟，Quiz 需要題目
+if (recordType !== 'quiz') {
     if (checklistSteps.length === 0 || checklistSteps.some(s => !s.step.trim())) {
         showToast('❌ 請至少新增一個步驟並填寫內容', 'error');
         return;
     }
+} else {
+    // Quiz 驗證
+    if (quizSections.length === 0) {
+        showToast('❌ 請至少新增一個 Quiz 部分', 'error');
+        return;
+    }
+    
+    const hasQuestions = quizSections.some(section => section.questions && section.questions.length > 0);
+    if (!hasQuestions) {
+        showToast('❌ 請至少新增一道題目', 'error');
+        return;
+    }
+}
 
     let itemData = {
-        categoryId: currentCategoryId,
-        name: name,
-        recordType: recordType,
-        hasChecklist: true, // ⭐ 兩種類型都有步驟
-        checklist: checklistSteps, // ⭐ 都儲存步驟內容
-        hasDeadline: hasDeadline,
-        isImportant: isImportant,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
+    categoryId: currentCategoryId,
+    name: name,
+    recordType: recordType,
+    hasDeadline: hasDeadline,
+    isImportant: isImportant,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+};
+
+// ⭐ 根據類型儲存不同的資料
+if (recordType === 'quiz') {
+    itemData.hasChecklist = false;
+    itemData.quizSections = quizSections;
+    itemData.quizPassScore = parseInt(document.getElementById('quizPassScore').value) || 60;
+} else {
+    itemData.hasChecklist = true;
+    itemData.checklist = checklistSteps;
+}
 
     if (currentTrainingType === 'PCA') {
         const pcaLevel = document.getElementById('newPcaLevel').value;
@@ -6784,6 +7070,408 @@ function showPCA1MentorMenu() {
         </div>
     `;
 }
+
+        // ==================== Quiz 測驗相關函數 ====================
+
+// 新增 Quiz 部分
+function addQuizSection() {
+    quizSections.push({ 
+        title: `第${quizSections.length + 1}部分`, 
+        questions: [] 
+    });
+    renderQuizSections();
+}
+
+// 渲染 Quiz 部分
+function renderQuizSections() {
+    const container = document.getElementById('quizSectionsContainer');
+    if (!container) return;
+    
+    let html = '';
+    
+    quizSections.forEach((section, sectionIndex) => {
+        html += `
+            <div class="quiz-section" style="margin-bottom: 20px; padding: 15px; background: #f0f4ff; border-radius: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <input type="text" value="${section.title}" 
+                           onchange="updateSectionTitle(${sectionIndex}, this.value)"
+                           style="flex: 1; padding: 8px; border: 2px solid #1e90ff; border-radius: 6px; font-weight: bold;">
+                    <button class="btn btn-danger btn-small" onclick="removeQuizSection(${sectionIndex})" style="margin-left: 10px;">🗑️</button>
+                </div>
+                
+                <div id="quizQuestions_${sectionIndex}">
+                    ${renderQuizQuestions(sectionIndex)}
+                </div>
+                
+                <button class="btn btn-success btn-small" onclick="addQuizQuestion(${sectionIndex})" style="margin-top: 10px;">➕ 新增題目</button>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 渲染題目列表
+function renderQuizQuestions(sectionIndex) {
+    const section = quizSections[sectionIndex];
+    if (!section.questions || section.questions.length === 0) {
+        return '<p style="color: #999; text-align: center; padding: 20px;">尚未新增題目</p>';
+    }
+    
+    let html = '';
+    section.questions.forEach((q, qIndex) => {
+        const typeLabel = q.type === 'fill' ? '填充題' : q.type === 'mcq' ? '選擇題' : '排序題';
+        html += `
+            <div style="background: white; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 4px solid #1e90ff;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>Q${qIndex + 1}.</strong> ${q.question} 
+                        <span class="badge badge-info" style="margin-left: 10px;">${typeLabel}</span>
+                        <span class="badge badge-warning">${q.points} 分</span>
+                    </div>
+                    <div>
+                        <button class="btn btn-warning btn-small" onclick="editQuizQuestion(${sectionIndex}, ${qIndex})">✏️</button>
+                        <button class="btn btn-danger btn-small" onclick="removeQuizQuestion(${sectionIndex}, ${qIndex})">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    return html;
+}
+
+// 更新部分標題
+function updateSectionTitle(sectionIndex, title) {
+    quizSections[sectionIndex].title = title;
+}
+
+// 移除部分
+function removeQuizSection(sectionIndex) {
+    if (!confirm('確定要刪除此部分嗎？')) return;
+    quizSections.splice(sectionIndex, 1);
+    renderQuizSections();
+}
+
+// 新增題目
+function addQuizQuestion(sectionIndex) {
+    const modalBody = `
+        <div class="input-group">
+            <label>❓ 題目類型</label>
+            <select id="newQuestionType" onchange="toggleQuestionTypeInputs()">
+                <option value="fill">填充題 (Fill in the blanks)</option>
+                <option value="mcq">選擇題 (MCQ)</option>
+                <option value="ordering">數字排列 (Ordering)</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label>📝 題目內容</label>
+            <textarea id="newQuestionText" rows="3" placeholder="請輸入題目" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px;"></textarea>
+        </div>
+        
+        <div class="input-group">
+            <label>🎯 分數</label>
+            <input type="number" id="newQuestionPoints" value="10" min="1" placeholder="例如: 10">
+        </div>
+        
+        <!-- 選擇題選項 -->
+        <div id="mcqOptionsGroup" style="display: none;">
+            <div class="input-group">
+                <label>📋 選項設定</label>
+                <div id="mcqOptionsContainer"></div>
+                <button class="btn btn-info btn-small" onclick="addMcqOption()" style="margin-top: 10px;">➕ 新增選項</button>
+            </div>
+        </div>
+        
+        <!-- 排序題選項 -->
+        <div id="orderingOptionsGroup" style="display: none;">
+            <div class="input-group">
+                <label>📋 排序項目（正確順序）</label>
+                <div id="orderingItemsContainer"></div>
+                <button class="btn btn-info btn-small" onclick="addOrderingItem()" style="margin-top: 10px;">➕ 新增項目</button>
+            </div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="saveNewQuestion(${sectionIndex})">✅ 新增</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+        </div>
+    `;
+    
+    showModal('➕ 新增題目', modalBody);
+    
+    // 初始化臨時變數
+    window.tempMcqOptions = [];
+    window.tempOrderingItems = [];
+}
+
+// 切換題目類型輸入
+function toggleQuestionTypeInputs() {
+    const type = document.getElementById('newQuestionType').value;
+    const mcqGroup = document.getElementById('mcqOptionsGroup');
+    const orderingGroup = document.getElementById('orderingOptionsGroup');
+    
+    mcqGroup.style.display = type === 'mcq' ? 'block' : 'none';
+    orderingGroup.style.display = type === 'ordering' ? 'block' : 'none';
+    
+    if (type === 'mcq' && (!window.tempMcqOptions || window.tempMcqOptions.length === 0)) {
+        window.tempMcqOptions = [
+            { text: '', isCorrect: false },
+            { text: '', isCorrect: false }
+        ];
+        renderMcqOptions();
+    }
+    
+    if (type === 'ordering' && (!window.tempOrderingItems || window.tempOrderingItems.length === 0)) {
+        window.tempOrderingItems = ['', ''];
+        renderOrderingItems();
+    }
+}
+
+// 新增選擇題選項
+function addMcqOption() {
+    window.tempMcqOptions.push({ text: '', isCorrect: false });
+    renderMcqOptions();
+}
+
+// 渲染選擇題選項
+function renderMcqOptions() {
+    const container = document.getElementById('mcqOptionsContainer');
+    if (!container) return;
+    
+    let html = '';
+    window.tempMcqOptions.forEach((opt, index) => {
+        html += `
+            <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                <input type="text" placeholder="選項 ${String.fromCharCode(65 + index)}" 
+                       value="${opt.text}"
+                       onchange="window.tempMcqOptions[${index}].text = this.value"
+                       style="flex: 1; padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px;">
+                <label style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                    <input type="radio" name="correctOption" ${opt.isCorrect ? 'checked' : ''}
+                           onchange="setCorrectOption(${index})"
+                           style="width: auto;">
+                    <span>正確答案</span>
+                </label>
+                <button class="btn btn-danger btn-small" onclick="removeMcqOption(${index})">🗑️</button>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 設定正確選項
+function setCorrectOption(index) {
+    window.tempMcqOptions.forEach((opt, i) => {
+        opt.isCorrect = (i === index);
+    });
+}
+
+// 移除選擇題選項
+function removeMcqOption(index) {
+    window.tempMcqOptions.splice(index, 1);
+    renderMcqOptions();
+}
+
+// 新增排序項目
+function addOrderingItem() {
+    window.tempOrderingItems.push('');
+    renderOrderingItems();
+}
+
+// 渲染排序項目
+function renderOrderingItems() {
+    const container = document.getElementById('orderingItemsContainer');
+    if (!container) return;
+    
+    let html = '';
+    window.tempOrderingItems.forEach((item, index) => {
+        html += `
+            <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                <span style="font-weight: bold; color: #1e90ff; width: 30px;">${index + 1}.</span>
+                <input type="text" placeholder="項目內容" 
+                       value="${item}"
+                       onchange="window.tempOrderingItems[${index}] = this.value"
+                       style="flex: 1; padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px;">
+                <button class="btn btn-danger btn-small" onclick="removeOrderingItem(${index})">🗑️</button>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 移除排序項目
+function removeOrderingItem(index) {
+    window.tempOrderingItems.splice(index, 1);
+    renderOrderingItems();
+}
+
+// 儲存新題目
+function saveNewQuestion(sectionIndex) {
+    const type = document.getElementById('newQuestionType').value;
+    const question = document.getElementById('newQuestionText').value.trim();
+    const points = parseInt(document.getElementById('newQuestionPoints').value) || 10;
+    
+    if (!question) {
+        showToast('❌ 請輸入題目內容', 'error');
+        return;
+    }
+    
+    const newQuestion = {
+        type: type,
+        question: question,
+        points: points
+    };
+    
+    if (type === 'mcq') {
+        if (!window.tempMcqOptions || window.tempMcqOptions.length < 2) {
+            showToast('❌ 請至少新增 2 個選項', 'error');
+            return;
+        }
+        
+        if (!window.tempMcqOptions.some(opt => opt.isCorrect)) {
+            showToast('❌ 請選擇正確答案', 'error');
+            return;
+        }
+        
+        newQuestion.options = window.tempMcqOptions.filter(opt => opt.text.trim());
+    } else if (type === 'ordering') {
+        if (!window.tempOrderingItems || window.tempOrderingItems.length < 2) {
+            showToast('❌ 請至少新增 2 個項目', 'error');
+            return;
+        }
+        
+        newQuestion.items = window.tempOrderingItems.filter(item => item.trim());
+    }
+    
+    quizSections[sectionIndex].questions.push(newQuestion);
+    
+    showToast('✅ 題目已新增', 'success');
+    closeModal();
+    renderQuizSections();
+}
+
+// 編輯題目
+function editQuizQuestion(sectionIndex, qIndex) {
+    const question = quizSections[sectionIndex].questions[qIndex];
+    
+    // 初始化臨時變數
+    if (question.type === 'mcq') {
+        window.tempMcqOptions = JSON.parse(JSON.stringify(question.options || []));
+    } else if (question.type === 'ordering') {
+        window.tempOrderingItems = JSON.parse(JSON.stringify(question.items || []));
+    }
+    
+    const typeOptions = `
+        <option value="fill" ${question.type === 'fill' ? 'selected' : ''}>填充題</option>
+        <option value="mcq" ${question.type === 'mcq' ? 'selected' : ''}>選擇題</option>
+        <option value="ordering" ${question.type === 'ordering' ? 'selected' : ''}>數字排列</option>
+    `;
+    
+    const modalBody = `
+        <div class="input-group">
+            <label>❓ 題目類型</label>
+            <select id="newQuestionType" onchange="toggleQuestionTypeInputs()">
+                ${typeOptions}
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label>📝 題目內容</label>
+            <textarea id="newQuestionText" rows="3" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px;">${question.question}</textarea>
+        </div>
+        
+        <div class="input-group">
+            <label>🎯 分數</label>
+            <input type="number" id="newQuestionPoints" value="${question.points}" min="1">
+        </div>
+        
+        <div id="mcqOptionsGroup" style="display: ${question.type === 'mcq' ? 'block' : 'none'};">
+            <div class="input-group">
+                <label>📋 選項設定</label>
+                <div id="mcqOptionsContainer"></div>
+                <button class="btn btn-info btn-small" onclick="addMcqOption()" style="margin-top: 10px;">➕ 新增選項</button>
+            </div>
+        </div>
+        
+        <div id="orderingOptionsGroup" style="display: ${question.type === 'ordering' ? 'block' : 'none'};">
+            <div class="input-group">
+                <label>📋 排序項目</label>
+                <div id="orderingItemsContainer"></div>
+                <button class="btn btn-info btn-small" onclick="addOrderingItem()" style="margin-top: 10px;">➕ 新增項目</button>
+            </div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="updateQuestion(${sectionIndex}, ${qIndex})">✅ 更新</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+        </div>
+    `;
+    
+    showModal('✏️ 編輯題目', modalBody);
+    
+    if (question.type === 'mcq') {
+        renderMcqOptions();
+    } else if (question.type === 'ordering') {
+        renderOrderingItems();
+    }
+}
+
+// 更新題目
+function updateQuestion(sectionIndex, qIndex) {
+    const type = document.getElementById('newQuestionType').value;
+    const question = document.getElementById('newQuestionText').value.trim();
+    const points = parseInt(document.getElementById('newQuestionPoints').value) || 10;
+    
+    if (!question) {
+        showToast('❌ 請輸入題目內容', 'error');
+        return;
+    }
+    
+    const updatedQuestion = {
+        type: type,
+        question: question,
+        points: points
+    };
+    
+    if (type === 'mcq') {
+        if (!window.tempMcqOptions || window.tempMcqOptions.length < 2) {
+            showToast('❌ 請至少新增 2 個選項', 'error');
+            return;
+        }
+        
+        if (!window.tempMcqOptions.some(opt => opt.isCorrect)) {
+            showToast('❌ 請選擇正確答案', 'error');
+            return;
+        }
+        
+        updatedQuestion.options = window.tempMcqOptions.filter(opt => opt.text.trim());
+    } else if (type === 'ordering') {
+        if (!window.tempOrderingItems || window.tempOrderingItems.length < 2) {
+            showToast('❌ 請至少新增 2 個項目', 'error');
+            return;
+        }
+        
+        updatedQuestion.items = window.tempOrderingItems.filter(item => item.trim());
+    }
+    
+    quizSections[sectionIndex].questions[qIndex] = updatedQuestion;
+    
+    showToast('✅ 題目已更新', 'success');
+    closeModal();
+    renderQuizSections();
+}
+
+// 移除題目
+function removeQuizQuestion(sectionIndex, qIndex) {
+    if (!confirm('確定要刪除此題目嗎？')) return;
+    quizSections[sectionIndex].questions.splice(qIndex, 1);
+    renderQuizSections();
+}
+        
     </script>
 </body>
 </html>
