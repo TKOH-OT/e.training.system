@@ -4070,21 +4070,30 @@ function filterStaffList() {
                 const progressHtml = [];
 
   for (const category of categories) {
-    const itemsSnapshot = await db.collection('trainingItems')
-        .where('categoryId', '==', category.docId)
-        .get();
+const itemsSnapshot = await db.collection('trainingItems')
+    .where('categoryId', '==', categoryId)
+    .get();
 
-    const items = [];
-    itemsSnapshot.forEach(doc => {
-        const item = doc.data();
-        // Filter by PCA level if applicable
-        if (staffTrainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
-            if (item.pcaLevel !== staff.level) {
-                return; // Skip this item
-            }
-        }
+const items = [];
+itemsSnapshot.forEach(doc => {
+    const item = doc.data();
+    
+    // ⭐⭐⭐ 修改：Quiz 類型不受 pcaLevel 限制 ⭐⭐⭐
+    if (item.recordType === 'quiz') {
+        // Quiz 項目：所有 PCA 員工都可以看到
         items.push({ docId: doc.id, ...item });
-    });
+        return;
+    }
+    
+    // ⭐ 過濾 PCA 級別項目（只針對 Checklist 和 Training）
+    if (category.trainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+        if (item.pcaLevel !== staff.level) {
+            return; // 跳過不符合級別的項目
+        }
+    }
+    
+    items.push({ docId: doc.id, ...item });
+});
     items.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     // Continue with existing logic but use 'items' array instead of creating a new one
@@ -7349,8 +7358,12 @@ function saveNewQuestion(sectionIndex) {
     
     quizSections[sectionIndex].questions.push(newQuestion);
     
-    showToast('✅ 題目已新增', 'success');
-    closeModal();
+showToast('✅ 題目已新增', 'success');
+closeModal();
+
+// ⭐ 檢查容器是否存在才渲染
+const container = document.getElementById('quizSectionsContainer');
+if (container) {
     renderQuizSections();
 }
 
@@ -7460,16 +7473,25 @@ function updateQuestion(sectionIndex, qIndex) {
     
     quizSections[sectionIndex].questions[qIndex] = updatedQuestion;
     
-    showToast('✅ 題目已更新', 'success');
-    closeModal();
+showToast('✅ 題目已更新', 'success');
+closeModal();
+
+// ⭐ 檢查容器是否存在才渲染
+const container = document.getElementById('quizSectionsContainer');
+if (container) {
     renderQuizSections();
 }
-
+    
 // 移除題目
 function removeQuizQuestion(sectionIndex, qIndex) {
     if (!confirm('確定要刪除此題目嗎？')) return;
     quizSections[sectionIndex].questions.splice(qIndex, 1);
-    renderQuizSections();
+    
+    // ⭐ 檢查容器是否存在才渲染
+    const container = document.getElementById('quizSectionsContainer');
+    if (container) {
+        renderQuizSections();
+    }
 }
         
     </script>
