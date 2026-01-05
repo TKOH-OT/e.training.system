@@ -7356,7 +7356,7 @@ function saveNewQuestion(sectionIndex) {
         newQuestion.items = window.tempOrderingItems.filter(item => item.trim());
     }
     
-    quizSections[sectionIndex].questions.push(newQuestion);
+quizSections[sectionIndex].questions.push(newQuestion);
     
 showToast('✅ 題目已新增', 'success');
 closeModal();
@@ -7366,6 +7366,7 @@ const container = document.getElementById('quizSectionsContainer');
 if (container) {
     renderQuizSections();
 }
+}  // ⭐⭐⭐ 新增這個 } 關閉 saveNewQuestion 函數 ⭐⭐⭐
 
 // 編輯題目
 function editQuizQuestion(sectionIndex, qIndex) {
@@ -7471,7 +7472,7 @@ function updateQuestion(sectionIndex, qIndex) {
         updatedQuestion.items = window.tempOrderingItems.filter(item => item.trim());
     }
     
-    quizSections[sectionIndex].questions[qIndex] = updatedQuestion;
+quizSections[sectionIndex].questions[qIndex] = updatedQuestion;
     
 showToast('✅ 題目已更新', 'success');
 closeModal();
@@ -7481,6 +7482,7 @@ const container = document.getElementById('quizSectionsContainer');
 if (container) {
     renderQuizSections();
 }
+}  // ⭐⭐⭐ 新增這個 } 關閉 updateQuestion 函數 ⭐⭐⭐
     
 // 移除題目
 function removeQuizQuestion(sectionIndex, qIndex) {
@@ -7492,7 +7494,7 @@ function removeQuizQuestion(sectionIndex, qIndex) {
     if (container) {
         renderQuizSections();
     }
-}
+}  // ⭐⭐⭐ 新增這個 } 關閉 removeQuizQuestion 函數 ⭐⭐⭐
         
     </script>
 </body>
