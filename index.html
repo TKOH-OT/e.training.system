@@ -8653,21 +8653,32 @@ async function submitQuizGrade() {
             .get();
         
         let totalScore = 0;
-        const updatedAnswers = { ...record.answers };
+        const updatedAnswers = { ...record.answers }; // ⭐ 複製現有答案
         
+        // ⭐⭐⭐ 遍歷所有題目，更新分數和評語 ⭐⭐⭐
         itemsSnapshot.forEach(doc => {
             const item = doc.data();
             const itemId = doc.id;
             const answer = updatedAnswers[itemId];
             
+            if (!answer) return; // 跳過無答案的題目
+            
             if (answer.type === 'fill') {
+                // ⭐ 填充題：讀取主管輸入的分數和評語
                 const score = parseInt(document.getElementById(`score_${itemId}`)?.value) || 0;
                 const remark = document.getElementById(`remark_${itemId}`)?.value || '';
                 
-                answer.score = score;
-                answer.remark = remark;
+                // ⭐⭐⭐ 關鍵修改：直接更新答案物件 ⭐⭐⭐
+                updatedAnswers[itemId] = {
+                    ...answer,           // 保留原有資料
+                    score: score,        // 更新分數
+                    remark: remark       // ⭐ 儲存評語
+                };
+                
                 totalScore += score;
+                
             } else {
+                // 選擇題和排序題：分數已經自動計算好
                 totalScore += answer.score;
             }
         });
@@ -8678,26 +8689,33 @@ async function submitQuizGrade() {
         const percentage = Math.round((totalScore / record.maxScore) * 100);
         const isPassed = percentage >= category.passingScore;
         
-        // ⭐⭐⭐ 新增：記錄批改者資訊 ⭐⭐⭐
+        // ⭐⭐⭐ 儲存到 Firebase（包含所有評語）⭐⭐⭐
         await db.collection('quizRecords').doc(currentQuizRecordId).update({
             status: isPassed ? 'graded' : 'failed',
-            answers: updatedAnswers,
+            answers: updatedAnswers,              // ⭐ 包含所有評語
             totalScore: totalScore,
             isPassed: isPassed,
-            gradedBy: currentUser.docId,           // ⭐ 批改者 ID
-            gradedByName: currentUser.name,        // ⭐ 批改者姓名
-            gradedAt: firebase.firestore.FieldValue.serverTimestamp() // ⭐ 批改時間
+            gradedBy: currentUser.docId,
+            gradedByName: currentUser.name,
+            gradedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        showToast(isPassed ? '✅ 批改完成 - 合格' : '⚠️ 批改完成 - 不合格（將繼續顯示提醒）', isPassed ? 'success' : 'warning');
+        showToast(
+            isPassed 
+                ? '✅ 批改完成 - 合格（評語已儲存）' 
+                : '⚠️ 批改完成 - 不合格（評語已儲存）', 
+            isPassed ? 'success' : 'warning'
+        );
+        
         showQuizRecordsForSupervisor(record.categoryId);
         
     } catch (error) {
         console.error('提交批改失敗:', error);
-        showToast('❌ 提交失敗', 'error');
+        console.error('錯誤詳情:', error.message);
+        showToast('❌ 提交失敗：' + error.message, 'error');
     }
 }
-
+        
 // ==================== 返回記錄列表 ====================
 function backToQuizRecords() {
     // ⭐⭐⭐ 檢查是否有來源標記 ⭐⭐⭐
