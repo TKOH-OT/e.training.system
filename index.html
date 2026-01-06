@@ -8653,33 +8653,51 @@ async function submitQuizGrade() {
             .get();
         
         let totalScore = 0;
-        const updatedAnswers = { ...record.answers }; // ⭐ 複製現有答案
+        const updatedAnswers = {}; // ⭐ 改用空物件，唔複製舊資料
         
-        // ⭐⭐⭐ 遍歷所有題目，更新分數和評語 ⭐⭐⭐
+        // ⭐⭐⭐ 遍歷所有題目，重新建立答案物件 ⭐⭐⭐
         itemsSnapshot.forEach(doc => {
             const item = doc.data();
             const itemId = doc.id;
-            const answer = updatedAnswers[itemId];
+            const answer = record.answers[itemId];
             
             if (!answer) return; // 跳過無答案的題目
             
             if (answer.type === 'fill') {
                 // ⭐ 填充題：讀取主管輸入的分數和評語
                 const score = parseInt(document.getElementById(`score_${itemId}`)?.value) || 0;
-                const remark = document.getElementById(`remark_${itemId}`)?.value || '';
+                const remark = document.getElementById(`remark_${itemId}`)?.value.trim() || ''; // ⭐ 加 trim()
                 
-                // ⭐⭐⭐ 關鍵修改：直接更新答案物件 ⭐⭐⭐
+                console.log(`📝 填充題 ${itemId} 評語:`, remark); // ⭐ Debug 用
+                
                 updatedAnswers[itemId] = {
-                    ...answer,           // 保留原有資料
-                    score: score,        // 更新分數
-                    remark: remark       // ⭐ 儲存評語
+                    type: 'fill',
+                    answer: answer.answer || '',
+                    score: score,
+                    remark: remark  // ⭐ 儲存評語
                 };
                 
                 totalScore += score;
                 
-            } else {
-                // 選擇題和排序題：分數已經自動計算好
-                totalScore += answer.score;
+            } else if (answer.type === 'choice') {
+                // ⭐ 選擇題：保留原有資料
+                updatedAnswers[itemId] = {
+                    type: 'choice',
+                    selectedOptions: answer.selectedOptions || [],
+                    isCorrect: answer.isCorrect || false,
+                    score: answer.score || 0
+                };
+                totalScore += answer.score || 0;
+                
+            } else if (answer.type === 'sort') {
+                // ⭐ 排序題：保留原有資料
+                updatedAnswers[itemId] = {
+                    type: 'sort',
+                    userOrder: answer.userOrder || [],
+                    isCorrect: answer.isCorrect || false,
+                    score: answer.score || 0
+                };
+                totalScore += answer.score || 0;
             }
         });
         
@@ -8689,10 +8707,12 @@ async function submitQuizGrade() {
         const percentage = Math.round((totalScore / record.maxScore) * 100);
         const isPassed = percentage >= category.passingScore;
         
-        // ⭐⭐⭐ 儲存到 Firebase（包含所有評語）⭐⭐⭐
+        console.log('📊 最終儲存資料:', updatedAnswers); // ⭐ Debug 用
+        
+        // ⭐⭐⭐ 儲存到 Firebase ⭐⭐⭐
         await db.collection('quizRecords').doc(currentQuizRecordId).update({
             status: isPassed ? 'graded' : 'failed',
-            answers: updatedAnswers,              // ⭐ 包含所有評語
+            answers: updatedAnswers,  // ⭐ 包含所有評語
             totalScore: totalScore,
             isPassed: isPassed,
             gradedBy: currentUser.docId,
@@ -8710,8 +8730,7 @@ async function submitQuizGrade() {
         showQuizRecordsForSupervisor(record.categoryId);
         
     } catch (error) {
-        console.error('提交批改失敗:', error);
-        console.error('錯誤詳情:', error.message);
+        console.error('❌ 提交批改失敗:', error);
         showToast('❌ 提交失敗：' + error.message, 'error');
     }
 }
@@ -8897,20 +8916,29 @@ async function viewQuizResult(recordId, fromSource = 'staff') {
             
             let answerDisplay = '';
             
-            if (answer.type === 'fill') {
-                answerDisplay = `
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
-                        <strong>你的答案：</strong>
-                        <div style="margin-top: 8px; white-space: pre-wrap;">${answer.answer || '(未作答)'}</div>
+if (answer.type === 'fill') {
+    console.log(`📝 填充題 ${itemId} 評語 (前端):`, answer.remark); // ⭐ Debug 用
+    
+    answerDisplay = `
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
+            <strong>你的答案：</strong>
+            <div style="margin-top: 8px; white-space: pre-wrap;">${answer.answer || '(未作答)'}</div>
+        </div>
+        ${(record.status === 'graded' || record.status === 'failed') ? `
+            <div style="margin-top: 15px; padding: 12px; background: ${answer.score > 0 ? '#f0fff4' : '#fff5f5'}; border-radius: 8px;">
+                <strong>得分：</strong>${answer.score || 0} / ${item.score} 分
+                ${answer.remark && answer.remark.trim() ? `
+                    <div style="margin-top: 12px; padding: 10px; background: white; border-left: 4px solid #ffa502; border-radius: 6px;">
+                        <strong style="color: #ffa502;">💬 主管評語：</strong>
+                        <div style="margin-top: 8px; color: #333;">${answer.remark}</div>
                     </div>
-                    ${record.status === 'graded' ? `
-                        <div style="margin-top: 15px; padding: 12px; background: ${answer.score > 0 ? '#f0fff4' : '#fff5f5'}; border-radius: 8px;">
-                            <strong>得分：</strong>${answer.score} / ${item.score} 分
-                            ${answer.remark ? `<div style="margin-top: 8px;"><strong>評語：</strong>${answer.remark}</div>` : ''}
-                        </div>
-                    ` : ''}
-                `;
-            } else if (answer.type === 'choice') {
+                ` : `
+                    <div style="margin-top: 8px; color: #999; font-style: italic;">無評語</div>
+                `}
+            </div>
+        ` : ''}
+    `;
+} else if (answer.type === 'choice') {
                 answerDisplay = `
                     <div style="margin-top: 10px;">
                         ${item.options.map(opt => {
