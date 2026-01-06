@@ -7103,7 +7103,111 @@ function showPCA1MentorMenu() {
     `;
 }
 
-        // ==================== QUIZ SYSTEM FUNCTIONS ====================
+// ==================== QUIZ SYSTEM FUNCTIONS ====================
+
+// ==================== 新增測驗分類 ====================
+function showAddQuizCategoryModal() {
+    const modalBody = `
+        <div class="form-section">
+            <label>分類名稱</label>
+            <input type="text" id="newQuizCategoryName" placeholder="例如：手部衛生測驗">
+        </div>
+        
+        <div class="form-section">
+            <label>Emoji 圖示</label>
+            <input type="text" id="newQuizCategoryEmoji" placeholder="例如：🧼" maxlength="2">
+        </div>
+        
+        <div class="form-section">
+            <label>合格分數 (%)</label>
+            <input type="number" id="newQuizCategoryPassingScore" min="0" max="100" value="60" placeholder="60">
+        </div>
+        
+        <div class="form-section">
+            <label>顯示順序</label>
+            <input type="number" id="newQuizCategoryOrder" min="1" value="1" placeholder="1">
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="saveNewQuizCategory()">✅ 新增</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+        </div>
+    `;
+    
+    showModal('➕ 新增測驗分類', modalBody);
+}
+
+// ==================== 儲存新測驗分類 ====================
+async function saveNewQuizCategory() {
+    const name = document.getElementById('newQuizCategoryName').value.trim();
+    const emoji = document.getElementById('newQuizCategoryEmoji').value.trim();
+    const passingScore = parseInt(document.getElementById('newQuizCategoryPassingScore').value) || 60;
+    const order = parseInt(document.getElementById('newQuizCategoryOrder').value) || 1;
+    
+    if (!name) {
+        showToast('❌ 請輸入分類名稱', 'error');
+        return;
+    }
+    
+    if (!emoji) {
+        showToast('❌ 請輸入 Emoji 圖示', 'error');
+        return;
+    }
+    
+    try {
+        await db.collection('quizCategories').add({
+            name: name,
+            emoji: emoji,
+            passingScore: passingScore,
+            order: order,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.docId
+        });
+        
+        showToast('✅ 測驗分類新增成功', 'success');
+        closeModal();
+        loadQuizCategories();
+        
+    } catch (error) {
+        console.error('新增測驗分類失敗:', error);
+        showToast('❌ 新增失敗', 'error');
+    }
+}
+
+// ==================== 刪除測驗分類 ====================
+async function deleteQuizCategory(categoryId, categoryName) {
+    if (!confirm(`❓ 確定要刪除測驗分類「${categoryName}」嗎？\n\n⚠️ 此操作會同時刪除所有相關題目和記錄，無法復原！`)) {
+        return;
+    }
+    
+    try {
+        // 刪除相關題目
+        const itemsSnapshot = await db.collection('quizItems')
+            .where('categoryId', '==', categoryId)
+            .get();
+        
+        const itemDeletePromises = itemsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(itemDeletePromises);
+        
+        // 刪除相關記錄
+        const recordsSnapshot = await db.collection('quizRecords')
+            .where('categoryId', '==', categoryId)
+            .get();
+        
+        const recordDeletePromises = recordsSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(recordDeletePromises);
+        
+        // 刪除分類本身
+        await db.collection('quizCategories').doc(categoryId).delete();
+        
+        showToast('✅ 測驗分類已刪除', 'success');
+        loadQuizCategories();
+        
+    } catch (error) {
+        console.error('刪除測驗分類失敗:', error);
+        showToast('❌ 刪除失敗', 'error');
+    }
+}
 
 // ==================== 顯示 Quiz 主頁面 ====================
 async function showQuizMain() {
