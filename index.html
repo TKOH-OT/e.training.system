@@ -428,6 +428,88 @@
             color: white;
         }
 
+        /* ==================== Quiz 測驗卡片顏色狀態 ==================== */
+.training-card.quiz-pending {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.training-card.quiz-pending .card-title,
+.training-card.quiz-pending .card-stats,
+.training-card.quiz-pending .progress-percent,
+.training-card.quiz-pending .progress-label {
+    color: white;
+}
+
+.training-card.quiz-pending .progress-ring-circle {
+    stroke: white;
+}
+
+.training-card.quiz-pending .progress-ring-bg {
+    stroke: rgba(255,255,255,0.3);
+}
+
+.training-card.quiz-passed {
+    background: linear-gradient(135deg, #2ed573 0%, #26d07c 100%);
+    color: white;
+}
+
+.training-card.quiz-passed .card-title,
+.training-card.quiz-passed .card-stats,
+.training-card.quiz-passed .progress-percent,
+.training-card.quiz-passed .progress-label {
+    color: white;
+}
+
+.training-card.quiz-passed .progress-ring-circle {
+    stroke: white;
+}
+
+.training-card.quiz-passed .progress-ring-bg {
+    stroke: rgba(255,255,255,0.3);
+}
+
+.training-card.quiz-failed {
+    background: linear-gradient(135deg, #ff4757 0%, #e84118 100%);
+    color: white;
+    animation: pulse 2s infinite;
+}
+
+.training-card.quiz-failed .card-title,
+.training-card.quiz-failed .card-stats,
+.training-card.quiz-failed .progress-percent,
+.training-card.quiz-failed .progress-label {
+    color: white;
+}
+
+.training-card.quiz-failed .progress-ring-circle {
+    stroke: white;
+}
+
+.training-card.quiz-failed .progress-ring-bg {
+    stroke: rgba(255,255,255,0.3);
+}
+
+.training-card.quiz-incomplete {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+    color: white;
+}
+
+.training-card.quiz-incomplete .card-title,
+.training-card.quiz-incomplete .card-stats,
+.training-card.quiz-incomplete .progress-percent,
+.training-card.quiz-incomplete .progress-label {
+    color: white;
+}
+
+.training-card.quiz-incomplete .progress-ring-circle {
+    stroke: white;
+}
+
+.training-card.quiz-incomplete .progress-ring-bg {
+    stroke: rgba(255,255,255,0.3);
+}
+        
         .training-card.in-progress {
             border: 2px solid #;
         }
@@ -7257,37 +7339,66 @@ async function loadQuizCategories() {
             const circumference = 2 * Math.PI * 60;
             const percentage = 100;
             const offset = circumference - (percentage / 100) * circumference;
-            
-            cardsHtml += `
-                <div class="training-card" onclick="viewQuizCategory('${doc.id}')">
-                    <div class="card-icon">${category.emoji}</div>
-                    <div class="card-title">${category.name}</div>
-                    <div class="card-progress">
-                        <svg class="progress-ring" width="150" height="150" viewBox="0 0 150 150">
-                            <circle class="progress-ring-bg" cx="75" cy="75" r="60" 
-                                fill="none" stroke-width="12"/>
-                            <circle class="progress-ring-circle" cx="75" cy="75" r="60" 
-                                fill="none" stroke-width="12"
-                                stroke-dasharray="${circumference}" 
-                                stroke-dashoffset="${offset}"
-                                stroke-linecap="round"/>
-                        </svg>
-                        <div class="progress-text">
-                            <div class="progress-percent">${totalItems}</div>
-                            <div class="progress-label">題目</div>
-                        </div>
-                    </div>
-                    <div class="card-stats">
-                        總分: ${totalScore} 分 | 合格: ${category.passingScore}%
-                    </div>
-                    ${currentUser.role === 'admin' ? `
-                        <div class="card-actions">
-                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteQuizCategory('${doc.id}', '${category.name}')">🗑️ 刪除</button>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
+
+            // ⭐⭐⭐ 檢查員工的測驗狀態 ⭐⭐⭐
+let quizStatusClass = 'quiz-incomplete';
+let quizStatusText = '未完成';
+
+if (currentUser.role === 'staff') {
+    const userRecordsSnapshot = await db.collection('quizRecords')
+        .where('userId', '==', currentUser.docId)
+        .where('categoryId', '==', doc.id)
+        .orderBy('completedAt', 'desc')
+        .limit(1)
+        .get();
+    
+    if (!userRecordsSnapshot.empty) {
+        const latestRecord = userRecordsSnapshot.docs[0].data();
+        
+        if (latestRecord.status === 'submitted') {
+            quizStatusClass = 'quiz-pending';
+            quizStatusText = '待批改';
+        } else if (latestRecord.status === 'graded' && latestRecord.isPassed) {
+            quizStatusClass = 'quiz-passed';
+            quizStatusText = '合格';
+        } else if (latestRecord.status === 'failed' || (latestRecord.status === 'graded' && !latestRecord.isPassed)) {
+            quizStatusClass = 'quiz-failed';
+            quizStatusText = '不合格';
         }
+    }
+}
+
+cardsHtml += `
+    <div class="training-card ${quizStatusClass}" onclick="viewQuizCategory('${doc.id}')">
+        <div class="card-icon">${category.emoji}</div>
+        <div class="card-title">${category.name}</div>
+        <div class="card-progress">
+            <svg class="progress-ring" width="150" height="150" viewBox="0 0 150 150">
+                <circle class="progress-ring-bg" cx="75" cy="75" r="60" 
+                    fill="none" stroke-width="12"/>
+                <circle class="progress-ring-circle" cx="75" cy="75" r="60" 
+                    fill="none" stroke-width="12"
+                    stroke-dasharray="${circumference}" 
+                    stroke-dashoffset="${offset}"
+                    stroke-linecap="round"/>
+            </svg>
+            <div class="progress-text">
+                <div class="progress-percent">${totalItems}</div>
+                <div class="progress-label">題目</div>
+            </div>
+        </div>
+        <div class="card-stats">
+            總分: ${totalScore} 分 | 合格: ${category.passingScore}%
+            ${currentUser.role === 'staff' ? `<br><strong style="font-size: 1.1em; margin-top: 8px; display: block;">狀態：${quizStatusText}</strong>` : ''}
+        </div>
+        ${currentUser.role === 'admin' ? `
+            <div class="card-actions">
+                <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteQuizCategory('${doc.id}', '${category.name}')">🗑️ 刪除</button>
+            </div>
+        ` : ''}
+    </div>
+`;
+ }
         
         document.getElementById('quizCategoryDashboard').innerHTML = cardsHtml;
         
@@ -8110,6 +8221,188 @@ function backToQuizDashboard() {
     showQuizMain();
 }
 
+        // ==================== 主管查看指定測驗的待批改記錄 + 員工進度 ====================
+async function showQuizRecordsForSupervisor(categoryId) {
+    currentQuizCategoryId = categoryId;
+    showPage('quizRecordsPage');
+    
+    try {
+        const categoryDoc = await db.collection('quizCategories').doc(categoryId).get();
+        const category = categoryDoc.data();
+        
+        document.getElementById('quizRecordsTitle').textContent = 
+            `${category.emoji} ${category.name} - 測驗管理`;
+        
+        // ⭐⭐⭐ 新增：員工選擇下拉選單 ⭐⭐⭐
+        let employeeSelectorHtml = `
+            <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 3px 15px rgba(0,0,0,0.08);">
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; color: #ffa502; margin-bottom: 8px; display: block;">
+                        👥 查詢員工進度：
+                    </label>
+                    <select id="employeeProgressSelect" 
+                            onchange="loadEmployeeQuizProgress('${categoryId}')"
+                            style="width: 100%; padding: 12px; border: 2px solid #ffa502; border-radius: 8px; font-size: 1em;">
+                        <option value="">-- 選擇員工 --</option>
+                    </select>
+                </div>
+                <div id="employeeProgressDisplay" style="display: none;"></div>
+            </div>
+        `;
+        
+        // ⭐⭐⭐ 載入員工清單到下拉選單 ⭐⭐⭐
+        const accountsSnapshot = await db.collection('accounts')
+            .where('role', '==', 'staff')
+            .get();
+        
+        const employeeOptions = [];
+        accountsSnapshot.forEach(doc => {
+            const account = doc.data();
+            employeeOptions.push(`
+                <option value="${doc.id}">
+                    ${account.name} (${account.level})
+                </option>
+            `);
+        });
+        
+        // 待批改記錄區域
+        const recordsSnapshot = await db.collection('quizRecords')
+            .where('categoryId', '==', categoryId)
+            .where('status', 'in', ['submitted', 'failed']) // ⭐ 只顯示待批改和不合格
+            .orderBy('completedAt', 'desc')
+            .get();
+        
+        let pendingRecordsHtml = `
+            <div style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 3px 15px rgba(0,0,0,0.08);">
+                <h3 style="color: #ffa502; margin-bottom: 20px;">📋 待批改測驗</h3>
+        `;
+        
+        if (recordsSnapshot.empty) {
+            pendingRecordsHtml += '<div class="no-data-message">✅ 目前沒有待批改的測驗</div>';
+        } else {
+            recordsSnapshot.forEach(doc => {
+                const record = doc.data();
+                const percentage = Math.round((record.totalScore / record.maxScore) * 100);
+                const isFailed = record.status === 'failed';
+                
+                pendingRecordsHtml += `
+                    <div class="quiz-record-card ${isFailed ? 'failed' : 'pending'}" 
+                         onclick="gradeQuiz('${doc.id}')"
+                         style="${isFailed ? 'background: linear-gradient(135deg, #ff4757 0%, #e84118 100%); color: white;' : ''}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h3 style="margin-bottom: 5px; ${isFailed ? 'color: white;' : ''}">${record.staffName}</h3>
+                                <div style="${isFailed ? 'color: rgba(255,255,255,0.9);' : 'color: #666;'}">
+                                    <span class="badge badge-${record.staffLevel}">${record.staffLevel}</span>
+                                    <span style="margin-left: 10px;">${record.completedAt?.toDate().toLocaleString('zh-TW')}</span>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 2em; font-weight: bold; color: ${isFailed ? 'white' : '#ff4757'};">
+                                    ${percentage}%
+                                </div>
+                                <div style="${isFailed ? 'color: rgba(255,255,255,0.9);' : 'color: #666;'}">
+                                    ${record.totalScore} / ${record.maxScore} 分
+                                </div>
+                            </div>
+                        </div>
+                        <div style="padding: 10px; background: ${isFailed ? 'rgba(255,255,255,0.2)' : '#fff3cd'}; border-radius: 8px; text-align: center;">
+                            <strong>${isFailed ? '🔴 不合格 - 需重做' : '⏳ 待批改'}</strong>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        pendingRecordsHtml += '</div>';
+        
+        // 組合 HTML
+        document.getElementById('quizRecordsContent').innerHTML = 
+            employeeSelectorHtml + pendingRecordsHtml;
+        
+        // ⭐⭐⭐ 動態填入員工選項 ⭐⭐⭐
+        const selectElement = document.getElementById('employeeProgressSelect');
+        if (selectElement) {
+            selectElement.innerHTML += employeeOptions.join('');
+        }
+        
+    } catch (error) {
+        console.error('載入記錄失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ⭐⭐⭐ 新增：載入員工 Quiz 進度 ⭐⭐⭐
+async function loadEmployeeQuizProgress(categoryId) {
+    const employeeId = document.getElementById('employeeProgressSelect').value;
+    const displayDiv = document.getElementById('employeeProgressDisplay');
+    
+    if (!employeeId) {
+        displayDiv.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const employeeDoc = await db.collection('accounts').doc(employeeId).get();
+        const employee = employeeDoc.data();
+        
+        const recordsSnapshot = await db.collection('quizRecords')
+            .where('userId', '==', employeeId)
+            .where('categoryId', '==', categoryId)
+            .orderBy('completedAt', 'desc')
+            .get();
+        
+        let progressHtml = `
+            <div style="border-top: 2px solid #f0f0f0; padding-top: 20px; margin-top: 20px;">
+                <h4 style="color: #333; margin-bottom: 15px;">
+                    📊 ${employee.name} (${employee.level}) 的測驗記錄
+                </h4>
+        `;
+        
+        if (recordsSnapshot.empty) {
+            progressHtml += '<div style="text-align: center; color: #999; padding: 20px;">此員工尚未完成測驗</div>';
+        } else {
+            recordsSnapshot.forEach(doc => {
+                const record = doc.data();
+                const percentage = Math.round((record.totalScore / record.maxScore) * 100);
+                const statusText = record.status === 'graded' ? '已批改' : record.status === 'failed' ? '不合格' : '待批改';
+                const statusColor = record.status === 'graded' && record.isPassed ? '#2ed573' : '#ff4757';
+                
+                progressHtml += `
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${record.completedAt?.toDate().toLocaleString('zh-TW')}</strong>
+                                <div style="color: #666; font-size: 0.9em; margin-top: 5px;">
+                                    ${statusText} | 
+                                    ${record.isPassed ? '✅ 合格' : '❌ 不合格'}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.5em; font-weight: bold; color: ${statusColor};">
+                                    ${percentage}%
+                                </div>
+                                <div style="color: #666; font-size: 0.9em;">
+                                    ${record.totalScore} / ${record.maxScore} 分
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        progressHtml += '</div>';
+        
+        displayDiv.innerHTML = progressHtml;
+        displayDiv.style.display = 'block';
+        
+    } catch (error) {
+        console.error('載入員工進度失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+        
 // ==================== 查看測驗記錄（主管）====================
 async function showQuizRecordsForSupervisor(categoryId) {
     currentQuizCategoryId = categoryId;
@@ -8395,17 +8688,19 @@ async function submitQuizGrade() {
         const category = categoryDoc.data();
         
         const percentage = Math.round((totalScore / record.maxScore) * 100);
+        const isPassed = percentage >= category.passingScore;
         
+        // ⭐⭐⭐ 關鍵修改：根據合格與否設定 status ⭐⭐⭐
         await db.collection('quizRecords').doc(currentQuizRecordId).update({
-            status: 'graded',
+            status: isPassed ? 'graded' : 'failed', // ⭐ 不合格設為 'failed'
             answers: updatedAnswers,
             totalScore: totalScore,
-            isPassed: percentage >= category.passingScore,
+            isPassed: isPassed,
             gradedBy: currentUser.docId,
             gradedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        showToast('✅ 批改完成', 'success');
+        showToast(isPassed ? '✅ 批改完成 - 合格' : '⚠️ 批改完成 - 不合格（將繼續顯示提醒）', isPassed ? 'success' : 'warning');
         showQuizRecordsForSupervisor(record.categoryId);
         
     } catch (error) {
