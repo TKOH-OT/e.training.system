@@ -8386,7 +8386,6 @@ async function loadEmployeeQuizProgress(categoryId) {
                 const record = doc.data();
                 const percentage = Math.round((record.totalScore / record.maxScore) * 100);
                 
-                // ⭐⭐⭐ 修正：統一判斷邏輯 ⭐⭐⭐
                 let statusText = '';
                 let statusColor = '';
                 
@@ -8404,7 +8403,16 @@ async function loadEmployeeQuizProgress(categoryId) {
                     statusColor = '#ff4757';
                 }
                 
-                // ⭐⭐⭐ 關鍵修改：加入點擊事件查看詳細結果 ⭐⭐⭐
+                // ⭐⭐⭐ 新增：批改者資訊 ⭐⭐⭐
+                let graderInfo = '';
+                if ((record.status === 'graded' || record.status === 'failed') && record.gradedByName) {
+                    graderInfo = `
+                        <div style="color: #666; font-size: 0.85em; margin-top: 5px;">
+                            👤 批改者：${record.gradedByName}
+                        </div>
+                    `;
+                }
+                
                 progressHtml += `
                     <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; 
                                 border-left: 4px solid ${statusColor}; cursor: pointer; transition: all 0.3s;"
@@ -8417,6 +8425,7 @@ async function loadEmployeeQuizProgress(categoryId) {
                                 <div style="color: #666; font-size: 0.9em; margin-top: 5px;">
                                     ${statusText}
                                 </div>
+                                ${graderInfo}
                             </div>
                             <div style="text-align: right;">
                                 <div style="font-size: 1.5em; font-weight: bold; color: ${statusColor};">
@@ -8669,14 +8678,15 @@ async function submitQuizGrade() {
         const percentage = Math.round((totalScore / record.maxScore) * 100);
         const isPassed = percentage >= category.passingScore;
         
-        // ⭐⭐⭐ 關鍵修改：根據合格與否設定 status ⭐⭐⭐
+        // ⭐⭐⭐ 新增：記錄批改者資訊 ⭐⭐⭐
         await db.collection('quizRecords').doc(currentQuizRecordId).update({
-            status: isPassed ? 'graded' : 'failed', // ⭐ 不合格設為 'failed'
+            status: isPassed ? 'graded' : 'failed',
             answers: updatedAnswers,
             totalScore: totalScore,
             isPassed: isPassed,
-            gradedBy: currentUser.docId,
-            gradedAt: firebase.firestore.FieldValue.serverTimestamp()
+            gradedBy: currentUser.docId,           // ⭐ 批改者 ID
+            gradedByName: currentUser.name,        // ⭐ 批改者姓名
+            gradedAt: firebase.firestore.FieldValue.serverTimestamp() // ⭐ 批改時間
         });
         
         showToast(isPassed ? '✅ 批改完成 - 合格' : '⚠️ 批改完成 - 不合格（將繼續顯示提醒）', isPassed ? 'success' : 'warning');
@@ -8803,6 +8813,23 @@ async function viewQuizResult(recordId, fromSource = 'staff') {
         const percentage = Math.round((record.totalScore / record.maxScore) * 100);
         const isPassed = record.isPassed;
         
+        // ⭐⭐⭐ 新增：批改者資訊 ⭐⭐⭐
+        let graderInfo = '';
+        if (record.status === 'graded' || record.status === 'failed') {
+            if (record.gradedByName && record.gradedAt) {
+                const gradedDate = record.gradedAt.toDate ? 
+                    record.gradedAt.toDate().toLocaleString('zh-TW') : 
+                    new Date(record.gradedAt).toLocaleString('zh-TW');
+                
+                graderInfo = `
+                    <div style="margin-top: 15px; font-size: 0.9em; opacity: 0.95;">
+                        👤 批改者：${record.gradedByName}<br>
+                        📅 批改時間：${gradedDate}
+                    </div>
+                `;
+            }
+        }
+        
         let resultHtml = `
             <div class="quiz-result-summary ${isPassed ? 'passed' : 'failed'}">
                 <div style="font-size: 1.5em; margin-bottom: 10px;">
@@ -8812,14 +8839,15 @@ async function viewQuizResult(recordId, fromSource = 'staff') {
                 <div style="font-size: 1.2em; margin: 10px 0;">
                     ${record.totalScore} / ${record.maxScore} 分
                 </div>
-<div class="quiz-status-badge">
-    ${record.status === 'graded' || record.status === 'failed' 
-        ? (isPassed ? '✅ 已批改 - 合格' : '❌ 已批改 - 不合格') 
-        : '⏳ 待批改'}
-</div>
+                <div class="quiz-status-badge">
+                    ${record.status === 'graded' || record.status === 'failed' 
+                        ? (isPassed ? '✅ 已批改 - 合格' : '❌ 已批改 - 不合格') 
+                        : '⏳ 待批改'}
+                </div>
                 <div style="margin-top: 15px; font-size: 0.95em;">
                     合格標準：${category.passingScore}%
                 </div>
+                ${graderInfo}
             </div>
         `;
         
