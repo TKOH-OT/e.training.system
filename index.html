@@ -8222,7 +8222,7 @@ function backToQuizDashboard() {
     showQuizMain();
 }
 
-        // ==================== 主管查看指定測驗的待批改記錄 + 員工進度 ====================
+// ==================== 主管查看指定測驗的待批改記錄 + 員工進度 ====================
 async function showQuizRecordsForSupervisor(categoryId) {
     currentQuizCategoryId = categoryId;
     showPage('quizRecordsPage');
@@ -8234,7 +8234,7 @@ async function showQuizRecordsForSupervisor(categoryId) {
         document.getElementById('quizRecordsTitle').textContent = 
             `${category.emoji} ${category.name} - 測驗管理`;
         
-        // ⭐⭐⭐ 新增：員工選擇下拉選單 ⭐⭐⭐
+        // ⭐⭐⭐ 員工選擇下拉選單 ⭐⭐⭐
         let employeeSelectorHtml = `
             <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 3px 15px rgba(0,0,0,0.08);">
                 <div style="margin-bottom: 15px;">
@@ -8251,25 +8251,41 @@ async function showQuizRecordsForSupervisor(categoryId) {
             </div>
         `;
         
-        // ⭐⭐⭐ 載入員工清單到下拉選單 ⭐⭐⭐
+        // ⭐⭐⭐ 載入員工清單到下拉選單（按職級排序）⭐⭐⭐
         const accountsSnapshot = await db.collection('accounts')
             .where('role', '==', 'staff')
             .get();
         
-        const employeeOptions = [];
+        // ⭐⭐⭐ 職級排序 ⭐⭐⭐
+        const levelOrder = { 'PCA1': 1, 'PCA2': 2, 'PCA3': 3, 'OTA': 4 };
+        const employees = [];
+        
         accountsSnapshot.forEach(doc => {
             const account = doc.data();
-            employeeOptions.push(`
-                <option value="${doc.id}">
-                    ${account.name} (${account.level})
-                </option>
-            `);
+            employees.push({
+                id: doc.id,
+                name: account.name,
+                level: account.level,
+                order: levelOrder[account.level] || 999
+            });
         });
         
-        // 待批改記錄區域
+        // 按職級排序
+        employees.sort((a, b) => {
+            if (a.order !== b.order) return a.order - b.order;
+            return a.name.localeCompare(b.name, 'zh-TW'); // 同職級按名字排
+        });
+        
+        const employeeOptions = employees.map(emp => `
+            <option value="${emp.id}">
+                ${emp.name} (${emp.level})
+            </option>
+        `);
+        
+        // ⭐⭐⭐ 修正：只顯示真正「待批改」嘅記錄（排除已批改嘅不合格/合格）⭐⭐⭐
         const recordsSnapshot = await db.collection('quizRecords')
             .where('categoryId', '==', categoryId)
-            .where('status', 'in', ['submitted', 'failed']) // ⭐ 只顯示待批改和不合格
+            .where('status', '==', 'submitted') // ⭐ 只顯示 submitted，唔包括 failed 同 graded
             .orderBy('completedAt', 'desc')
             .get();
         
@@ -8284,31 +8300,28 @@ async function showQuizRecordsForSupervisor(categoryId) {
             recordsSnapshot.forEach(doc => {
                 const record = doc.data();
                 const percentage = Math.round((record.totalScore / record.maxScore) * 100);
-                const isFailed = record.status === 'failed';
                 
                 pendingRecordsHtml += `
-                    <div class="quiz-record-card ${isFailed ? 'failed' : 'pending'}" 
-                         onclick="gradeQuiz('${doc.id}')"
-                         style="${isFailed ? 'background: linear-gradient(135deg, #ff4757 0%, #e84118 100%); color: white;' : ''}">
+                    <div class="quiz-record-card pending" onclick="gradeQuiz('${doc.id}')">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <div>
-                                <h3 style="margin-bottom: 5px; ${isFailed ? 'color: white;' : ''}">${record.staffName}</h3>
-                                <div style="${isFailed ? 'color: rgba(255,255,255,0.9);' : 'color: #666;'}">
+                                <h3 style="margin-bottom: 5px;">${record.staffName}</h3>
+                                <div style="color: #666;">
                                     <span class="badge badge-${record.staffLevel}">${record.staffLevel}</span>
                                     <span style="margin-left: 10px;">${record.completedAt?.toDate().toLocaleString('zh-TW')}</span>
                                 </div>
                             </div>
                             <div style="text-align: right;">
-                                <div style="font-size: 2em; font-weight: bold; color: ${isFailed ? 'white' : '#ff4757'};">
+                                <div style="font-size: 2em; font-weight: bold; color: #ff4757;">
                                     ${percentage}%
                                 </div>
-                                <div style="${isFailed ? 'color: rgba(255,255,255,0.9);' : 'color: #666;'}">
+                                <div style="color: #666;">
                                     ${record.totalScore} / ${record.maxScore} 分
                                 </div>
                             </div>
                         </div>
-                        <div style="padding: 10px; background: ${isFailed ? 'rgba(255,255,255,0.2)' : '#fff3cd'}; border-radius: 8px; text-align: center;">
-                            <strong>${isFailed ? '🔴 不合格 - 需重做' : '⏳ 待批改'}</strong>
+                        <div style="padding: 10px; background: #fff3cd; border-radius: 8px; text-align: center;">
+                            <strong>⏳ 待批改</strong>
                         </div>
                     </div>
                 `;
@@ -8648,7 +8661,14 @@ async function submitQuizGrade() {
 
 // ==================== 返回記錄列表 ====================
 function backToQuizRecords() {
-    showQuizRecordsForSupervisor(currentQuizCategoryId);
+    // ⭐⭐⭐ 修正：根據用戶角色返回不同頁面 ⭐⭐⭐
+    if (currentUser.role === 'staff') {
+        // 員工：返回自己的測驗記錄
+        viewMyQuizRecords(currentQuizCategoryId);
+    } else {
+        // 主管/管理員：返回測驗管理介面
+        showQuizRecordsForSupervisor(currentQuizCategoryId);
+    }
 }
 
 // ==================== 查看我的測驗記錄（員工）====================
