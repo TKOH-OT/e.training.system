@@ -8690,14 +8690,29 @@ async function submitQuizGrade() {
 
 // ==================== 返回記錄列表 ====================
 function backToQuizRecords() {
-    // ⭐⭐⭐ 修正：根據用戶角色返回不同頁面 ⭐⭐⭐
-    if (currentUser.role === 'staff') {
-        // 員工：返回自己的測驗記錄
-        viewMyQuizRecords(currentQuizCategoryId);
+    // ⭐⭐⭐ 檢查是否有來源標記 ⭐⭐⭐
+    const source = window.quizResultSource || 'staff';
+    
+    if (source === 'supervisor') {
+        // 主管查看員工記錄：返回測驗管理介面
+        showQuizRecordsForSupervisor(currentQuizCategoryId).then(() => {
+            // 恢復之前選擇的員工
+            if (window.previousSelectedEmployee) {
+                const selectElement = document.getElementById('employeeProgressSelect');
+                if (selectElement) {
+                    selectElement.value = window.previousSelectedEmployee;
+                    loadEmployeeQuizProgress(currentQuizCategoryId);
+                }
+            }
+        });
     } else {
-        // 主管/管理員：返回測驗管理介面
-        showQuizRecordsForSupervisor(currentQuizCategoryId);
+        // 員工查看自己記錄：返回員工記錄頁面
+        viewMyQuizRecords(currentQuizCategoryId);
     }
+    
+    // 清除來源標記
+    delete window.quizResultSource;
+    delete window.previousSelectedEmployee;
 }
 
 // ==================== 查看我的測驗記錄（員工）====================
@@ -8727,35 +8742,35 @@ async function viewMyQuizRecords(categoryId) {
         
         let recordsHtml = '';
         
-        recordsSnapshot.forEach(doc => {
-            const record = doc.data();
-            const statusClass = record.status === 'graded' ? 'graded' : 'pending';
-            const statusText = record.status === 'graded' ? '已批改' : '待批改';
-            const percentage = Math.round((record.totalScore / record.maxScore) * 100);
-            
-            recordsHtml += `
-                <div class="quiz-record-card ${statusClass}" onclick="viewQuizResult('${doc.id}')">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <div>
-                            <h3 style="margin-bottom: 5px;">測驗記錄</h3>
-                            <div style="color: #666;">
-                                ${record.completedAt?.toDate().toLocaleString('zh-TW')}
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 2em; font-weight: bold; color: ${record.isPassed ? '#2ed573' : '#ff4757'};">
-                                ${percentage}%
-                            </div>
-                            <div style="color: #666;">${record.totalScore} / ${record.maxScore} 分</div>
-                        </div>
-                    </div>
-                    <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center;">
-                        <strong>${statusText}</strong>
-                        ${record.status === 'graded' ? (record.isPassed ? ' | ✅ 合格' : ' | ❌ 不合格') : ''}
+recordsSnapshot.forEach(doc => {
+    const record = doc.data();
+    const statusClass = record.status === 'graded' ? 'graded' : 'pending';
+    const statusText = record.status === 'graded' ? '已批改' : '待批改';
+    const percentage = Math.round((record.totalScore / record.maxScore) * 100);
+    
+    recordsHtml += `
+        <div class="quiz-record-card ${statusClass}" onclick="viewQuizResult('${doc.id}', 'staff')">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div>
+                    <h3 style="margin-bottom: 5px;">測驗記錄</h3>
+                    <div style="color: #666;">
+                        ${record.completedAt?.toDate().toLocaleString('zh-TW')}
                     </div>
                 </div>
-            `;
-        });
+                <div style="text-align: right;">
+                    <div style="font-size: 2em; font-weight: bold; color: ${record.isPassed ? '#2ed573' : '#ff4757'};">
+                        ${percentage}%
+                    </div>
+                    <div style="color: #666;">${record.totalScore} / ${record.maxScore} 分</div>
+                </div>
+            </div>
+            <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                <strong>${statusText}</strong>
+                ${record.status === 'graded' ? (record.isPassed ? ' | ✅ 合格' : ' | ❌ 不合格') : ''}
+            </div>
+        </div>
+    `;
+});
         
         document.getElementById('quizRecordsContent').innerHTML = recordsHtml;
         
@@ -8766,8 +8781,11 @@ async function viewMyQuizRecords(categoryId) {
 }
 
 // ==================== 查看測驗結果詳情 ====================
-async function viewQuizResult(recordId) {
+async function viewQuizResult(recordId, fromSource = 'staff') {
     showPage('quizResultPage');
+    
+    // ⭐⭐⭐ 儲存來源資訊，用於返回導航 ⭐⭐⭐
+    window.quizResultSource = fromSource;
     
     try {
         const recordDoc = await db.collection('quizRecords').doc(recordId).get();
@@ -8923,33 +8941,14 @@ async function viewQuizResult(recordId) {
     }
 }
 
-        // ==================== 主管查看員工測驗結果詳情 ====================
+// ==================== 主管查看員工測驗結果詳情 ====================
 async function viewQuizResultBySupervisor(recordId) {
-    // ⭐ 暫存當前選中的員工 ID，返回時可以保持選擇
+    // ⭐ 暫存當前選中的員工 ID
     const currentSelectedEmployee = document.getElementById('employeeProgressSelect')?.value;
     window.previousSelectedEmployee = currentSelectedEmployee;
     
-    // ⭐ 直接使用原有的 viewQuizResult 函數
-    await viewQuizResult(recordId);
-    
-    // ⭐⭐⭐ 修改返回按鈕行為 ⭐⭐⭐
-    const backButton = document.querySelector('#quizResultPage .top-bar button');
-    if (backButton) {
-        backButton.onclick = function() {
-            // 返回測驗管理頁面
-            showQuizRecordsForSupervisor(currentQuizCategoryId).then(() => {
-                // 恢復之前選擇的員工
-                if (window.previousSelectedEmployee) {
-                    const selectElement = document.getElementById('employeeProgressSelect');
-                    if (selectElement) {
-                        selectElement.value = window.previousSelectedEmployee;
-                        // 重新載入該員工的進度
-                        loadEmployeeQuizProgress(currentQuizCategoryId);
-                    }
-                }
-            });
-        };
-    }
+    // ⭐⭐⭐ 關鍵修改：傳入 'supervisor' 標記 ⭐⭐⭐
+    await viewQuizResult(recordId, 'supervisor');
 }
     </script>
 </body>
