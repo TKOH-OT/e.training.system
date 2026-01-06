@@ -8744,8 +8744,11 @@ async function viewMyQuizRecords(categoryId) {
         
 recordsSnapshot.forEach(doc => {
     const record = doc.data();
-    const statusClass = record.status === 'graded' ? 'graded' : 'pending';
-    const statusText = record.status === 'graded' ? '已批改' : '待批改';
+    
+    // ⭐⭐⭐ 修正：同時處理 'graded' 和 'failed' 狀態
+    const isGraded = record.status === 'graded' || record.status === 'failed';
+    const statusClass = isGraded ? 'graded' : 'pending';
+    const statusText = isGraded ? '已批改' : '待批改';
     const percentage = Math.round((record.totalScore / record.maxScore) * 100);
     
     recordsHtml += `
@@ -8766,7 +8769,7 @@ recordsSnapshot.forEach(doc => {
             </div>
             <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center;">
                 <strong>${statusText}</strong>
-                ${record.status === 'graded' ? (record.isPassed ? ' | ✅ 合格' : ' | ❌ 不合格') : ''}
+                ${isGraded ? (record.isPassed ? ' | ✅ 合格' : ' | ❌ 不合格') : ''}
             </div>
         </div>
     `;
