@@ -8809,9 +8809,11 @@ async function viewQuizResult(recordId, fromSource = 'staff') {
                 <div style="font-size: 1.2em; margin: 10px 0;">
                     ${record.totalScore} / ${record.maxScore} 分
                 </div>
-                <div class="quiz-status-badge">
-                    ${record.status === 'graded' ? (isPassed ? '✅ 已批改 - 合格' : '❌ 已批改 - 不合格') : '⏳ 待批改'}
-                </div>
+<div class="quiz-status-badge">
+    ${record.status === 'graded' || record.status === 'failed' 
+        ? (isPassed ? '✅ 已批改 - 合格' : '❌ 已批改 - 不合格') 
+        : '⏳ 待批改'}
+</div>
                 <div style="margin-top: 15px; font-size: 0.95em;">
                     合格標準：${category.passingScore}%
                 </div>
