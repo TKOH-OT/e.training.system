@@ -7340,11 +7340,12 @@ async function loadQuizCategories() {
             const percentage = 100;
             const offset = circumference - (percentage / 100) * circumference;
 
-            // ⭐⭐⭐ 檢查員工的測驗狀態 ⭐⭐⭐
-let quizStatusClass = 'quiz-incomplete';
+// ⭐⭐⭐ 檢查員工的測驗狀態（只有員工先檢查）⭐⭐⭐
+let quizStatusClass = '';  // ⭐ 改為空字串
 let quizStatusText = '未完成';
 
 if (currentUser.role === 'staff') {
+    quizStatusClass = 'quiz-incomplete';  // ⭐ 先設定預設值
     const userRecordsSnapshot = await db.collection('quizRecords')
         .where('userId', '==', currentUser.docId)
         .where('categoryId', '==', doc.id)
@@ -7398,7 +7399,6 @@ cardsHtml += `
         ` : ''}
     </div>
 `;
- }
         
         document.getElementById('quizCategoryDashboard').innerHTML = cardsHtml;
         
@@ -8403,70 +8403,6 @@ async function loadEmployeeQuizProgress(categoryId) {
     }
 }
         
-// ==================== 查看測驗記錄（主管）====================
-async function showQuizRecordsForSupervisor(categoryId) {
-    currentQuizCategoryId = categoryId;
-    showPage('quizRecordsPage');
-    
-    try {
-        const categoryDoc = await db.collection('quizCategories').doc(categoryId).get();
-        const category = categoryDoc.data();
-        
-        document.getElementById('quizRecordsTitle').textContent = 
-            `${category.emoji} ${category.name} - 測驗記錄`;
-        
-        const recordsSnapshot = await db.collection('quizRecords')
-            .where('categoryId', '==', categoryId)
-            .orderBy('completedAt', 'desc')
-            .get();
-        
-        if (recordsSnapshot.empty) {
-            document.getElementById('quizRecordsContent').innerHTML = 
-                '<div class="no-data-message">📭 尚無測驗記錄</div>';
-            return;
-        }
-        
-        let recordsHtml = '';
-        
-        recordsSnapshot.forEach(doc => {
-            const record = doc.data();
-            const statusClass = record.status === 'graded' ? 'graded' : 'pending';
-            const statusText = record.status === 'graded' ? '已批改' : '待批改';
-            const percentage = Math.round((record.totalScore / record.maxScore) * 100);
-            
-            recordsHtml += `
-                <div class="quiz-record-card ${statusClass}" onclick="gradeQuiz('${doc.id}')">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <div>
-                            <h3 style="margin-bottom: 5px;">${record.staffName}</h3>
-                            <div style="color: #666;">
-                                <span class="badge badge-${record.staffLevel}">${record.staffLevel}</span>
-                                <span style="margin-left: 10px;">${record.completedAt?.toDate().toLocaleString('zh-TW')}</span>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 2em; font-weight: bold; color: ${record.isPassed ? '#2ed573' : '#ff4757'};">
-                                ${percentage}%
-                            </div>
-                            <div style="color: #666;">${record.totalScore} / ${record.maxScore} 分</div>
-                        </div>
-                    </div>
-                    <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center;">
-                        <strong>${statusText}</strong>
-                        ${record.isPassed ? ' | ✅ 合格' : ' | ❌ 不合格'}
-                    </div>
-                </div>
-            `;
-        });
-        
-        document.getElementById('quizRecordsContent').innerHTML = recordsHtml;
-        
-    } catch (error) {
-        console.error('載入記錄失敗:', error);
-        showToast('❌ 載入失敗', 'error');
-    }
-}
-
 // ==================== 批改測驗 ====================
 async function gradeQuiz(recordId) {
     currentQuizRecordId = recordId;
