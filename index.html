@@ -7408,6 +7408,395 @@ async function showQuizCategoryDetail(categoryId) {
     }
 }
 
+        // ==================== 新增測驗題目 ====================
+function showAddQuizItemModal() {
+    const modalBody = `
+        <div class="form-section">
+            <label>題目內容</label>
+            <textarea id="newQuizQuestion" rows="3" placeholder="例如：手部衛生的五個時機是什麼？"></textarea>
+        </div>
+        
+        <div class="form-section">
+            <label>題目類型</label>
+            <select id="quizItemType" onchange="updateQuizItemTypeOptions()">
+                <option value="choice">選擇題（單選/多選）</option>
+                <option value="fill">填充題</option>
+                <option value="sort">排序題</option>
+            </select>
+        </div>
+        
+        <!-- 選擇題選項 -->
+        <div id="choiceOptions" class="form-section">
+            <div style="margin-bottom: 10px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="isMultipleChoice">
+                    <span>設為多選題（可選擇多個正確答案）</span>
+                </label>
+            </div>
+            
+            <label>選項 A</label>
+            <input type="text" id="optionA" placeholder="選項 A 內容">
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                <input type="checkbox" id="correctA">
+                <span>正確答案</span>
+            </label>
+            
+            <label style="margin-top: 15px;">選項 B</label>
+            <input type="text" id="optionB" placeholder="選項 B 內容">
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                <input type="checkbox" id="correctB">
+                <span>正確答案</span>
+            </label>
+            
+            <label style="margin-top: 15px;">選項 C</label>
+            <input type="text" id="optionC" placeholder="選項 C 內容">
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                <input type="checkbox" id="correctC">
+                <span>正確答案</span>
+            </label>
+            
+            <label style="margin-top: 15px;">選項 D</label>
+            <input type="text" id="optionD" placeholder="選項 D 內容">
+            <label style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                <input type="checkbox" id="correctD">
+                <span>正確答案</span>
+            </label>
+        </div>
+        
+        <!-- 排序題選項 -->
+        <div id="sortOptions" class="form-section" style="display: none;">
+            <div id="sortItemsContainer">
+                <div class="sort-item-input" style="margin-bottom: 10px;">
+                    <label>項目 1</label>
+                    <input type="text" class="sort-item-text" placeholder="輸入項目內容">
+                </div>
+            </div>
+            <button type="button" class="btn btn-info btn-small" onclick="addSortItem()">➕ 新增項目</button>
+        </div>
+        
+        <div class="form-section">
+            <label>分數</label>
+            <input type="number" id="quizItemScore" min="1" value="10" placeholder="10">
+        </div>
+        
+        <div class="form-section">
+            <label>題目順序</label>
+            <input type="number" id="quizItemOrder" min="1" value="1" placeholder="1">
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="saveNewQuizItem()">✅ 新增</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+        </div>
+    `;
+    
+    showModal('➕ 新增測驗題目', modalBody);
+}
+
+// ==================== 更新題目類型選項 ====================
+function updateQuizItemTypeOptions() {
+    const type = document.getElementById('quizItemType').value;
+    
+    document.getElementById('choiceOptions').style.display = type === 'choice' ? 'block' : 'none';
+    document.getElementById('sortOptions').style.display = type === 'sort' ? 'block' : 'none';
+}
+
+// ==================== 新增排序項目 ====================
+function addSortItem() {
+    const container = document.getElementById('sortItemsContainer');
+    const count = container.children.length + 1;
+    
+    const itemHtml = `
+        <div class="sort-item-input" style="margin-bottom: 10px;">
+            <label>項目 ${count}</label>
+            <input type="text" class="sort-item-text" placeholder="輸入項目內容">
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', itemHtml);
+}
+
+// ==================== 儲存新測驗題目 ====================
+async function saveNewQuizItem() {
+    const question = document.getElementById('newQuizQuestion').value.trim();
+    const type = document.getElementById('quizItemType').value;
+    const score = parseInt(document.getElementById('quizItemScore').value) || 10;
+    const order = parseInt(document.getElementById('quizItemOrder').value) || 1;
+    
+    if (!question) {
+        showToast('❌ 請輸入題目內容', 'error');
+        return;
+    }
+    
+    let itemData = {
+        categoryId: currentQuizCategoryId,
+        question: question,
+        type: type,
+        score: score,
+        order: order,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: currentUser.docId
+    };
+    
+    // 根據題目類型處理資料
+    if (type === 'choice') {
+        const optionA = document.getElementById('optionA').value.trim();
+        const optionB = document.getElementById('optionB').value.trim();
+        const optionC = document.getElementById('optionC').value.trim();
+        const optionD = document.getElementById('optionD').value.trim();
+        
+        if (!optionA || !optionB || !optionC || !optionD) {
+            showToast('❌ 請填寫所有選項', 'error');
+            return;
+        }
+        
+        const correctA = document.getElementById('correctA').checked;
+        const correctB = document.getElementById('correctB').checked;
+        const correctC = document.getElementById('correctC').checked;
+        const correctD = document.getElementById('correctD').checked;
+        
+        if (!correctA && !correctB && !correctC && !correctD) {
+            showToast('❌ 請至少選擇一個正確答案', 'error');
+            return;
+        }
+        
+        itemData.isMultipleChoice = document.getElementById('isMultipleChoice').checked;
+        itemData.options = [
+            { label: 'A', text: optionA, isCorrect: correctA },
+            { label: 'B', text: optionB, isCorrect: correctB },
+            { label: 'C', text: optionC, isCorrect: correctC },
+            { label: 'D', text: optionD, isCorrect: correctD }
+        ];
+        
+    } else if (type === 'sort') {
+        const sortInputs = document.querySelectorAll('.sort-item-text');
+        const items = [];
+        
+        sortInputs.forEach((input, index) => {
+            const text = input.value.trim();
+            if (text) {
+                items.push({
+                    text: text,
+                    correctOrder: index + 1
+                });
+            }
+        });
+        
+        if (items.length < 2) {
+            showToast('❌ 排序題至少需要 2 個項目', 'error');
+            return;
+        }
+        
+        itemData.items = items;
+    }
+    
+    try {
+        await db.collection('quizItems').add(itemData);
+        
+        showToast('✅ 題目新增成功', 'success');
+        closeModal();
+        showQuizCategoryDetail(currentQuizCategoryId);
+        
+    } catch (error) {
+        console.error('新增題目失敗:', error);
+        showToast('❌ 新增失敗', 'error');
+    }
+}
+
+// ==================== 編輯測驗題目 ====================
+async function editQuizItem(itemId) {
+    try {
+        const itemDoc = await db.collection('quizItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        let typeOptions = `
+            <option value="choice" ${item.type === 'choice' ? 'selected' : ''}>選擇題</option>
+            <option value="fill" ${item.type === 'fill' ? 'selected' : ''}>填充題</option>
+            <option value="sort" ${item.type === 'sort' ? 'selected' : ''}>排序題</option>
+        `;
+        
+        let choiceOptionsHtml = '';
+        if (item.type === 'choice') {
+            choiceOptionsHtml = `
+                <div id="editChoiceOptions" class="form-section">
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="editIsMultipleChoice" ${item.isMultipleChoice ? 'checked' : ''}>
+                            <span>設為多選題</span>
+                        </label>
+                    </div>
+                    ${item.options.map(opt => `
+                        <label style="margin-top: 15px;">選項 ${opt.label}</label>
+                        <input type="text" id="editOption${opt.label}" value="${opt.text}">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
+                            <input type="checkbox" id="editCorrect${opt.label}" ${opt.isCorrect ? 'checked' : ''}>
+                            <span>正確答案</span>
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        let sortOptionsHtml = '';
+        if (item.type === 'sort') {
+            sortOptionsHtml = `
+                <div id="editSortOptions" class="form-section">
+                    <div id="editSortItemsContainer">
+                        ${item.items.map((sortItem, index) => `
+                            <div class="sort-item-input" style="margin-bottom: 10px;">
+                                <label>項目 ${index + 1}</label>
+                                <input type="text" class="edit-sort-item-text" value="${sortItem.text}">
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        const modalBody = `
+            <div class="form-section">
+                <label>題目內容</label>
+                <textarea id="editQuizQuestion" rows="3">${item.question}</textarea>
+            </div>
+            
+            <div class="form-section">
+                <label>題目類型</label>
+                <select id="editQuizItemType" disabled style="background: #f0f0f0;">
+                    ${typeOptions}
+                </select>
+                <div style="margin-top: 5px; color: #666; font-size: 0.9em;">⚠️ 題目類型無法修改</div>
+            </div>
+            
+            ${choiceOptionsHtml}
+            ${sortOptionsHtml}
+            
+            <div class="form-section">
+                <label>分數</label>
+                <input type="number" id="editQuizItemScore" min="1" value="${item.score}">
+            </div>
+            
+            <div class="form-section">
+                <label>題目順序</label>
+                <input type="number" id="editQuizItemOrder" min="1" value="${item.order}">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="updateQuizItem('${itemId}')">✅ 儲存</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('✏️ 編輯測驗題目', modalBody);
+        
+    } catch (error) {
+        console.error('載入題目失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 更新測驗題目 ====================
+async function updateQuizItem(itemId) {
+    const question = document.getElementById('editQuizQuestion').value.trim();
+    const score = parseInt(document.getElementById('editQuizItemScore').value) || 10;
+    const order = parseInt(document.getElementById('editQuizItemOrder').value) || 1;
+    
+    if (!question) {
+        showToast('❌ 請輸入題目內容', 'error');
+        return;
+    }
+    
+    try {
+        const itemDoc = await db.collection('quizItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        let updateData = {
+            question: question,
+            score: score,
+            order: order,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: currentUser.docId
+        };
+        
+        if (item.type === 'choice') {
+            const optionA = document.getElementById('editOptionA').value.trim();
+            const optionB = document.getElementById('editOptionB').value.trim();
+            const optionC = document.getElementById('editOptionC').value.trim();
+            const optionD = document.getElementById('editOptionD').value.trim();
+            
+            if (!optionA || !optionB || !optionC || !optionD) {
+                showToast('❌ 請填寫所有選項', 'error');
+                return;
+            }
+            
+            const correctA = document.getElementById('editCorrectA').checked;
+            const correctB = document.getElementById('editCorrectB').checked;
+            const correctC = document.getElementById('editCorrectC').checked;
+            const correctD = document.getElementById('editCorrectD').checked;
+            
+            if (!correctA && !correctB && !correctC && !correctD) {
+                showToast('❌ 請至少選擇一個正確答案', 'error');
+                return;
+            }
+            
+            updateData.isMultipleChoice = document.getElementById('editIsMultipleChoice').checked;
+            updateData.options = [
+                { label: 'A', text: optionA, isCorrect: correctA },
+                { label: 'B', text: optionB, isCorrect: correctB },
+                { label: 'C', text: optionC, isCorrect: correctC },
+                { label: 'D', text: optionD, isCorrect: correctD }
+            ];
+            
+        } else if (item.type === 'sort') {
+            const sortInputs = document.querySelectorAll('.edit-sort-item-text');
+            const items = [];
+            
+            sortInputs.forEach((input, index) => {
+                const text = input.value.trim();
+                if (text) {
+                    items.push({
+                        text: text,
+                        correctOrder: index + 1
+                    });
+                }
+            });
+            
+            if (items.length < 2) {
+                showToast('❌ 排序題至少需要 2 個項目', 'error');
+                return;
+            }
+            
+            updateData.items = items;
+        }
+        
+        await db.collection('quizItems').doc(itemId).update(updateData);
+        
+        showToast('✅ 題目更新成功', 'success');
+        closeModal();
+        showQuizCategoryDetail(currentQuizCategoryId);
+        
+    } catch (error) {
+        console.error('更新題目失敗:', error);
+        showToast('❌ 更新失敗', 'error');
+    }
+}
+
+// ==================== 刪除測驗題目 ====================
+async function deleteQuizItem(itemId, question) {
+    if (!confirm(`❓ 確定要刪除此題目嗎？\n\n「${question}」`)) {
+        return;
+    }
+    
+    try {
+        await db.collection('quizItems').doc(itemId).delete();
+        showToast('✅ 題目已刪除', 'success');
+        showQuizCategoryDetail(currentQuizCategoryId);
+        
+    } catch (error) {
+        console.error('刪除題目失敗:', error);
+        showToast('❌ 刪除失敗', 'error');
+    }
+}
+        
 // ==================== 顯示員工選項（開始測驗或查看記錄）====================
 async function showQuizOptionsForStaff(categoryId) {
     try {
