@@ -3191,15 +3191,6 @@ async function initializeSystem() {
 }
 
             if (currentUser.role === 'admin') {
-                menuHtml.push(`
-                    <div class="menu-card" onclick="showAccountManage()">
-                        <div class="emoji">👥</div>
-                        <div class="title">帳戶管理系統</div>
-                    </div>
-                `);
-            }
-
-            if (currentUser.role === 'admin') {
     menuHtml.push(`
         <div class="menu-card" onclick="showAccountManage()">
             <div class="emoji">👥</div>
