@@ -2449,6 +2449,46 @@
         min-height: 44px; /* Apple 建議的最小觸控區域 */
     }
 
+    /* ==================== 縮放控制按鈕 ==================== */
+.zoom-controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: none; /* 預設隱藏 */
+    flex-direction: column;
+    gap: 10px;
+    background: white;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.zoom-btn {
+    width: 50px;
+    height: 50px;
+    border: none;
+    background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
+    color: white;
+    font-size: 1.5em;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.zoom-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 5px 15px rgba(255, 165, 2, 0.4);
+}
+
+.zoom-level {
+    text-align: center;
+    font-weight: bold;
+    color: #ffa502;
+    font-size: 1.2em;
+    padding: 5px 0;
+}
+    
     /* 移除 hover 效果 */
     .menu-card:hover,
     .training-card:hover,
@@ -2671,6 +2711,15 @@
             <div class="training-dashboard" id="trainingProgress">
                 <!-- 動態生成培訓進度卡片 -->
             </div>
+
+            <!-- ⭐⭐⭐ 縮放控制按鈕 ⭐⭐⭐ -->
+            <div class="zoom-controls" id="zoomControls" style="display: none;">
+                <button class="zoom-btn" onclick="zoomIn()" title="放大">➕</button>
+                <div class="zoom-level" id="zoomLevel">100%</div>
+                <button class="zoom-btn" onclick="zoomOut()" title="縮小">➖</button>
+                <button class="zoom-btn" onclick="resetZoom()" title="重設" style="font-size: 1.2em;">↻</button>
+            </div>
+
         </div>
 
       <!-- 培訓項目評核頁面 -->
@@ -2948,6 +2997,7 @@
         let currentStaffId = '';
         let currentCategoryId = '';
         let currentTrainingType = ''; // 'PCA' 或 'OTA'
+        let currentZoomLevel = 1.0; // ⭐ 縮放級別
         let selectedEmoji = '📚';
         let systemInitialized = false;
         let checklistSteps = [];
@@ -3090,6 +3140,8 @@ function canEditTrainingRecord(categoryName, targetStaffLevel) {
 
         // ==================== 顯示主選單 ====================
         function showMainPage() {
+            hideZoomControls();
+            
             const welcomeText = document.getElementById('userWelcome');
             welcomeText.textContent = `👤 歡迎，${currentUser.name}`;
 
@@ -4577,6 +4629,8 @@ function filterStaffList() {
             currentStaffId = staffId;
             showPage('trainingProgressPage');
 
+            showZoomControls(); // 
+            
             try {
                 const staffDoc = await db.collection('accounts').doc(staffId).get();
                 const staff = staffDoc.data();
@@ -4720,7 +4774,10 @@ const offset = circumference - (percentage / 100) * circumference;
                     progressHtml.push('<p class="no-data-message">📭 尚無培訓項目</p>');
                 }
 
-                document.getElementById('trainingProgress').innerHTML = progressHtml.join('');
+document.getElementById('trainingProgress').innerHTML = progressHtml.join('');
+                
+                resetZoom(); // 
+                
             } catch (error) {
                 console.error('載入培訓進度失敗:', error);
                 showToast('❌ 載入培訓進度失敗', 'error');
@@ -9451,6 +9508,53 @@ async function viewQuizResultBySupervisor(recordId) {
     
     // ⭐⭐⭐ 關鍵修改：傳入 'supervisor' 標記 ⭐⭐⭐
     await viewQuizResult(recordId, 'supervisor');
+}
+
+        // ==================== 縮放功能 ====================
+function zoomIn() {
+    if (currentZoomLevel < 1.5) {
+        currentZoomLevel += 0.1;
+        applyZoom();
+    }
+}
+
+function zoomOut() {
+    if (currentZoomLevel > 0.6) {
+        currentZoomLevel -= 0.1;
+        applyZoom();
+    }
+}
+
+function resetZoom() {
+    currentZoomLevel = 1.0;
+    applyZoom();
+}
+
+function applyZoom() {
+    const cards = document.querySelectorAll('#trainingProgress .training-card, #trainingProgress .staff-card, #trainingProgress .item-card');
+    cards.forEach(card => {
+        card.style.transform = `scale(${currentZoomLevel})`;
+        card.style.transformOrigin = 'top center';
+    });
+    
+    const zoomLevelDisplay = document.getElementById('zoomLevel');
+    if (zoomLevelDisplay) {
+        zoomLevelDisplay.textContent = Math.round(currentZoomLevel * 100) + '%';
+    }
+}
+
+function showZoomControls() {
+    const controls = document.getElementById('zoomControls');
+    if (controls) {
+        controls.style.display = 'flex';
+    }
+}
+
+function hideZoomControls() {
+    const controls = document.getElementById('zoomControls');
+    if (controls) {
+        controls.style.display = 'none';
+    }
 }
     </script>
 </body>
