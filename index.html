@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>TKOH A&OT Training & Quality Monitoring System</title>
@@ -2975,7 +2976,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
     <!-- jsPDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
     <script>
         // ==================== Firebase 初始化 ====================
@@ -9535,6 +9536,214 @@ async function viewQuizResultBySupervisor(recordId) {
     await viewQuizResult(recordId, 'supervisor');
 }
 
+        // ==================== 查看測驗結果詳情（員工版本：只顯示分數，唔顯示答案）====================
+async function viewQuizResult(recordId, fromSource = 'staff') {
+    showPage('quizResultPage');
+    
+    // ⭐⭐⭐ 儲存來源資訊，用於返回導航 ⭐⭐⭐
+    window.quizResultSource = fromSource;
+    
+    try {
+        const recordDoc = await db.collection('quizRecords').doc(recordId).get();
+        const record = recordDoc.data();
+        
+        const categoryDoc = await db.collection('quizCategories').doc(record.categoryId).get();
+        const category = categoryDoc.data();
+        
+        document.getElementById('quizResultTitle').textContent = 
+            `${category.emoji} ${category.name} - 測驗結果`;
+        
+        const percentage = Math.round((record.totalScore / record.maxScore) * 100);
+        const isPassed = record.isPassed;
+        
+        // ⭐⭐⭐ 判斷是否為 PCA 員工 ⭐⭐⭐
+        const isPCAStaff = currentUser.role === 'staff' && 
+                           (currentUser.level === 'PCA1' || 
+                            currentUser.level === 'PCA2' || 
+                            currentUser.level === 'PCA3');
+        
+        // ⭐⭐⭐ 批改者資訊 ⭐⭐⭐
+        let graderInfo = '';
+        if (record.status === 'graded' || record.status === 'failed') {
+            if (record.gradedByName && record.gradedAt) {
+                const gradedDate = record.gradedAt.toDate ? 
+                    record.gradedAt.toDate().toLocaleString('zh-TW') : 
+                    new Date(record.gradedAt).toLocaleString('zh-TW');
+                
+                graderInfo = `
+                    <div style="margin-top: 15px; font-size: 0.9em; opacity: 0.95;">
+                        👤 批改者：${record.gradedByName}<br>
+                        📅 批改時間：${gradedDate}
+                    </div>
+                `;
+            }
+        }
+        
+        let resultHtml = `
+            <div class="quiz-result-summary ${isPassed ? 'passed' : 'failed'}">
+                <div style="font-size: 1.5em; margin-bottom: 10px;">
+                    ${isPassed ? '🎉 恭喜合格！' : '💪 繼續努力！'}
+                </div>
+                <div class="quiz-score-display">${percentage}%</div>
+                <div style="font-size: 1.2em; margin: 10px 0;">
+                    ${record.totalScore} / ${record.maxScore} 分
+                </div>
+                <div class="quiz-status-badge">
+                    ${record.status === 'graded' || record.status === 'failed' 
+                        ? (isPassed ? '✅ 已批改 - 合格' : '❌ 已批改 - 不合格') 
+                        : '⏳ 待批改'}
+                </div>
+                <div style="margin-top: 15px; font-size: 0.95em;">
+                    合格標準：${category.passingScore}%
+                </div>
+                ${graderInfo}
+            </div>
+        `;
+        
+        // ⭐⭐⭐ PCA 員工只顯示分數，Admin/Supervisor 顯示詳細答案 ⭐⭐⭐
+        if (isPCAStaff) {
+            resultHtml += `
+                <div style="background: #fff3cd; padding: 20px; border-radius: 12px; border: 1px solid #ffc107; margin-top: 20px; text-align: center;">
+                    <div style="font-size: 2em; margin-bottom: 15px;">📊</div>
+                    <p style="margin: 0; color: #856404; font-size: 1.1em; font-weight: bold;">
+                        你只可以查看分數
+                    </p>
+                    <p style="margin-top: 10px; color: #856404;">
+                        如需查看詳細答案及評語，請聯絡主管
+                    </p>
+                </div>
+            `;
+        } else {
+            // ⭐⭐⭐ Admin 和 Supervisor 可以查看詳細答案 ⭐⭐⭐
+            const itemsSnapshot = await db.collection('quizItems')
+                .where('categoryId', '==', record.categoryId)
+                .orderBy('order', 'asc')
+                .get();
+            
+            itemsSnapshot.forEach(doc => {
+                const item = doc.data();
+                const itemId = doc.id;
+                const answer = record.answers[itemId];
+                
+                if (!answer) return;
+                
+                let typeText = '';
+                let typeBadge = '';
+                
+                if (item.type === 'fill') {
+                    typeText = '填充題';
+                    typeBadge = 'fill';
+                } else if (item.type === 'choice') {
+                    typeText = item.isMultipleChoice ? '多選題' : '單選題';
+                    typeBadge = 'choice';
+                } else if (item.type === 'sort') {
+                    typeText = '排序題';
+                    typeBadge = 'sort';
+                }
+                
+                let answerDisplay = '';
+                
+                if (answer.type === 'fill') {
+                    answerDisplay = `
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
+                            <strong>你的答案：</strong>
+                            <div style="margin-top: 8px; white-space: pre-wrap;">${answer.answer || '(未作答)'}</div>
+                        </div>
+                        ${(record.status === 'graded' || record.status === 'failed') ? `
+                            <div style="margin-top: 15px; padding: 12px; background: ${answer.score > 0 ? '#f0fff4' : '#fff5f5'}; border-radius: 8px;">
+                                <strong>得分：</strong>${answer.score || 0} / ${item.score} 分
+                                ${answer.remark && answer.remark.trim() ? `
+                                    <div style="margin-top: 12px; padding: 10px; background: white; border-left: 4px solid #ffa502; border-radius: 6px;">
+                                        <strong style="color: #ffa502;">💬 主管評語：</strong>
+                                        <div style="margin-top: 8px; color: #333;">${answer.remark}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                    `;
+                } else if (answer.type === 'choice') {
+                    answerDisplay = `
+                        <div style="margin-top: 10px;">
+                            ${item.options.map(opt => {
+                                const isUserSelected = answer.selectedOptions.includes(opt.label);
+                                const isCorrect = opt.isCorrect;
+                                let optionClass = '';
+                                
+                                if (record.status === 'graded' || record.status === 'failed') {
+                                    if (isUserSelected && isCorrect) {
+                                        optionClass = 'correct';
+                                    } else if (isUserSelected && !isCorrect) {
+                                        optionClass = 'incorrect';
+                                    } else if (!isUserSelected && isCorrect) {
+                                        optionClass = 'correct';
+                                    }
+                                }
+                                
+                                return `
+                                    <div class="quiz-option ${optionClass}" style="cursor: default;">
+                                        <input type="checkbox" ${isUserSelected ? 'checked' : ''} disabled>
+                                        <span>
+                                            ${opt.label}. ${opt.text}
+                                            ${(record.status === 'graded' || record.status === 'failed') && isCorrect ? '<span class="badge badge-success" style="margin-left: 10px;">✅ 正確答案</span>' : ''}
+                                        </span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="margin-top: 15px; padding: 12px; background: ${answer.isCorrect ? '#f0fff4' : '#fff5f5'}; border-radius: 8px; text-align: center;">
+                            <strong>得分：</strong>${answer.score} / ${item.score} 分
+                        </div>
+                    `;
+                } else if (answer.type === 'sort') {
+                    answerDisplay = `
+                        <div style="margin-top: 10px;">
+                            ${answer.userOrder.map(userItem => {
+                                const correctItem = item.items.find(i => i.text === userItem.text);
+                                const isCorrect = userItem.order === correctItem.correctOrder;
+                                
+                                return `
+                                    <div style="display: flex; align-items: center; padding: 8px; margin: 5px 0; background: ${isCorrect ? '#f0fff4' : '#fff5f5'}; border-radius: 8px;">
+                                        <span style="width: 40px; text-align: center; font-weight: bold; color: ${isCorrect ? '#2ed573' : '#ff4757'};">
+                                            ${userItem.order}
+                                        </span>
+                                        <span style="flex: 1;">${userItem.text}</span>
+                                        <span style="width: 100px; text-align: center; font-size: 0.9em; color: #666;">
+                                            ${isCorrect ? '✅ 正確' : `應為 ${correctItem.correctOrder}`}
+                                        </span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="margin-top: 15px; padding: 12px; background: ${answer.isCorrect ? '#f0fff4' : '#fff5f5'}; border-radius: 8px; text-align: center;">
+                            <strong>得分：</strong>${answer.score} / ${item.score} 分
+                        </div>
+                    `;
+                }
+                
+                resultHtml += `
+                    <div class="quiz-question-card">
+                        <div class="quiz-question-header">
+                            <div>
+                                <span class="quiz-question-number">第 ${item.order} 題</span>
+                                <span class="quiz-type-badge ${typeBadge}">${typeText}</span>
+                            </div>
+                            <span class="quiz-question-score">${item.score} 分</span>
+                        </div>
+                        <div class="quiz-question-text">${item.question}</div>
+                        ${answerDisplay}
+                    </div>
+                `;
+            });
+        }
+        
+        document.getElementById('quizResultContent').innerHTML = resultHtml;
+        
+    } catch (error) {
+        console.error('載入結果失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+        
         // ==================== 縮放功能 ====================
 function zoomIn() {
     if (currentZoomLevel < 1.5) {
