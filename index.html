@@ -7,68 +7,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>TKOH A&OT Training & Quality Monitoring System</title>
     <style>
-    /* ==================== 🔍 卡片縮放功能 CSS ==================== */
-.zoom-toolbar {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: white;
-    padding: 8px 15px;
-    border-radius: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: all 0.3s;
-}
-
-.zoom-toolbar:hover {
-    box-shadow: 0 6px 25px rgba(0,0,0,0.2);
-}
-
-.zoom-btn {
-    background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
-    color: white;
-    border: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 18px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s;
-}
-
-.zoom-btn:hover {
-    background: linear-gradient(135deg, #ff9500 0%, #ff8500 100%);
-    transform: scale(1.1);
-}
-
-.zoom-btn:active {
-    transform: scale(0.95);
-}
-
-.zoom-display {
-    min-width: 55px;
-    text-align: center;
-    font-weight: bold;
-    color: #ffa502;
-    font-size: 0.95em;
-    user-select: none;
-}
-
-/* ⭐ 卡片容器縮放效果 */
-.training-dashboard,
-.items-dashboard,
-.staff-grid,
-.menu-grid {
-    transition: transform 0.3s ease;
-    transform-origin: top left; /* 從左上角開始縮放 */
-}
         
         * {
             margin: 0;
@@ -2532,16 +2470,6 @@
     </style>
 </head>
 <body>
-    <!-- ==================== 🔍 卡片縮放工具條 ==================== -->
-    <div class="zoom-toolbar">
-        <button class="zoom-btn" onclick="zoomCards('out')" title="縮小卡片 (Ctrl + -)">−</button>
-        <span class="zoom-display" id="cardZoomDisplay">100%</span>
-        <button class="zoom-btn" onclick="zoomCards('in')" title="放大卡片 (Ctrl + +)">+</button>
-        <button class="zoom-btn" onclick="resetCardZoom()" title="重設 (Ctrl + 0)" 
-                style="width: auto; padding: 0 12px; border-radius: 15px; font-size: 14px;">
-            重設
-        </button>
-    </div>
     <div class="container">
 <!-- 登入頁面 -->
 <div id="loginPage" class="page active">
@@ -3001,109 +2929,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script>
-        // ==================== 🔍 卡片專用縮放功能 ==================== 
-let cardZoomLevel = 100;
-
-function zoomCards(direction) {
-    if (direction === 'in' && cardZoomLevel < 150) {
-        cardZoomLevel += 10;
-    } else if (direction === 'out' && cardZoomLevel > 60) {
-        cardZoomLevel -= 10;
-    } else {
-        showToast(
-            direction === 'in' ? '⚠️ 已達最大縮放 (150%)' : '⚠️ 已達最小縮放 (60%)', 
-            'warning'
-        );
-        return;
-    }
-    
-    applyCardZoom();
-}
-
-function resetCardZoom() {
-    cardZoomLevel = 100;
-    applyCardZoom();
-    showToast('✅ 卡片已重設為 100%', 'success');
-}
-
-function applyCardZoom() {
-    const scale = cardZoomLevel / 100;
-    
-    // ⭐ 針對所有卡片容器應用縮放
-    const cardContainers = document.querySelectorAll(
-        '.training-dashboard, .items-dashboard, .staff-grid, .menu-grid'
-    );
-    
-    cardContainers.forEach(container => {
-        container.style.transform = `scale(${scale})`;
-        
-        // 🔧 調整容器寬度以避免內容溢出
-        if (scale !== 1) {
-            container.style.width = `${100 / scale}%`;
-            container.style.transformOrigin = 'top left';
-        } else {
-            container.style.width = '';
-            container.style.transformOrigin = '';
-        }
-    });
-    
-    // 更新顯示
-    document.getElementById('cardZoomDisplay').textContent = cardZoomLevel + "%";
-    
-    // 儲存設定
-    localStorage.setItem('cardZoomLevel', cardZoomLevel);
-}
-
-// 🔍 鍵盤快捷鍵支援
-document.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
-        e.preventDefault();
-        zoomCards('in');
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === '-') {
-        e.preventDefault();
-        zoomCards('out');
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault();
-        resetCardZoom();
-    }
-});
-
-// 🔍 頁面載入時恢復設定 + 動態監聽新卡片
-window.addEventListener('DOMContentLoaded', function() {
-    const saved = localStorage.getItem('cardZoomLevel');
-    if (saved) {
-        cardZoomLevel = parseInt(saved);
-        applyCardZoom();
-    }
-    
-    // ⭐ 監聽 DOM 變化，當有新卡片出現時自動套用縮放
-    const observer = new MutationObserver(function() {
-        if (cardZoomLevel !== 100) {
-            applyCardZoom();
-        }
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-});
-
-// ⭐ 當切換頁面時重新應用縮放（配合你的 showPage 函數）
-const originalShowPage = showPage;
-showPage = function(pageId) {
-    originalShowPage(pageId);
-    
-    // 延遲套用縮放（等頁面渲染完成）
-    setTimeout(() => {
-        if (cardZoomLevel !== 100) {
-            applyCardZoom();
-        }
-    }, 100);
-};
-        
         // ==================== Firebase 初始化 ====================
         const firebaseConfig = {
             apiKey: "AIzaSyDDkALOTGl6fZunGU_Xd5FOy45WnXZWT8E",
