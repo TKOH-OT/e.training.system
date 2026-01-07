@@ -3044,37 +3044,54 @@ function canEditTrainingRecord(categoryName, targetStaffLevel) {
         ];
 
         // ==================== 初始化系統 ====================
-        async function initializeSystem() {
-            if (systemInitialized) return;
-            
-            try {
-                console.log('🔧 開始初始化系統...');
-                
-                const adminSnapshot = await db.collection('accounts')
-                    .where('id', '==', 'tkohot')
-                    .limit(1)
-                    .get();
-                
-                if (adminSnapshot.empty) {
-                    console.log('📝 創建系統管理員帳戶...');
-                    await db.collection('accounts').add({
-                        id: 'tkohot',
-                        password: 'A123456*#',
-                        name: '系統管理員',
-                        role: 'admin',
-                        level: 'ADMIN',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    console.log('✅ 系統管理員帳戶已創建');
-                }
-
-                systemInitialized = true;
-                console.log('✅ 系統初始化完成');
-            } catch (error) {
-                console.error('❌ 系統初始化失敗:', error);
-                showToast('⚠️ 系統初始化中，請稍後再試', 'warning');
-            }
+async function initializeSystem() {
+    if (systemInitialized) return;
+    
+    try {
+        console.log('🔧 開始初始化系統...');
+        
+        const adminSnapshot = await db.collection('accounts')
+            .where('id', '==', 'tkohot')
+            .limit(1)
+            .get();
+        
+        if (adminSnapshot.empty) {
+            console.log('📝 創建系統管理員帳戶...');
+            await db.collection('accounts').add({
+                id: 'tkohot',
+                password: 'A123456*#',
+                name: '系統管理員',
+                role: 'admin',
+                level: 'ADMIN',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log('✅ 系統管理員帳戶已創建');
         }
+
+        // ⭐⭐⭐ 新增：檢查並創建 Quiz 密碼設定 ⭐⭐⭐
+        const quizPasswordSnapshot = await db.collection('systemSettings')
+            .where('key', '==', 'quizPassword')
+            .limit(1)
+            .get();
+        
+        if (quizPasswordSnapshot.empty) {
+            console.log('📝 創建 Quiz 測驗密碼...');
+            await db.collection('systemSettings').add({
+                key: 'quizPassword',
+                value: 'TKOH2025',  // ⭐ 預設密碼
+                description: 'Quiz 測驗密碼（防止員工事前查看測驗）',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            console.log('✅ Quiz 密碼已設定為：TKOH2025');
+        }
+
+        systemInitialized = true;
+        console.log('✅ 系統初始化完成');
+    } catch (error) {
+        console.error('❌ 系統初始化失敗:', error);
+        showToast('⚠️ 系統初始化中，請稍後再試', 'warning');
+    }
+}
 
         window.addEventListener('load', () => {
             initializeSystem();
@@ -3182,6 +3199,23 @@ function canEditTrainingRecord(categoryName, targetStaffLevel) {
                 `);
             }
 
+            if (currentUser.role === 'admin') {
+    menuHtml.push(`
+        <div class="menu-card" onclick="showAccountManage()">
+            <div class="emoji">👥</div>
+            <div class="title">帳戶管理系統</div>
+        </div>
+    `);
+    
+    // ⭐⭐⭐ 新增：Quiz 密碼管理 ⭐⭐⭐
+    menuHtml.push(`
+        <div class="menu-card" onclick="showChangeQuizPasswordModal()">
+            <div class="emoji">🔐</div>
+            <div class="title">Quiz 測驗密碼</div>
+        </div>
+    `);
+}
+            
 // ⭐ 開放給 admin 和 supervisor
 if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
     menuHtml.push(`
@@ -8419,7 +8453,7 @@ async function showQuizOptionsForStaff(categoryId) {
             modalBody += `
                 <p style="text-align: center; margin: 20px 0;">你尚未完成此測驗</p>
                 <div class="modal-buttons">
-                    <button class="btn btn-success" onclick="startQuiz('${categoryId}')">✍️ 開始測驗</button>
+                    <button class="btn btn-success" onclick="promptQuizPassword('${categoryId}', 'start')">✍️ 開始測驗</button>
                     <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
                 </div>
             `;
@@ -8428,7 +8462,7 @@ async function showQuizOptionsForStaff(categoryId) {
                 <p style="text-align: center; margin: 20px 0;">你已完成過此測驗</p>
                 <div class="modal-buttons">
                     <button class="btn btn-info" onclick="viewMyQuizRecords('${categoryId}')">📊 查看記錄</button>
-                    <button class="btn btn-success" onclick="startQuiz('${categoryId}')">✍️ 重新測驗</button>
+                    <button class="btn btn-success" onclick="promptQuizPassword('${categoryId}', 'retake')">✍️ 重新測驗</button>
                     <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
                 </div>
             `;
@@ -9554,6 +9588,177 @@ function hideZoomControls() {
     const controls = document.getElementById('zoomControls');
     if (controls) {
         controls.style.display = 'none';
+    }
+}
+
+        // ==================== Quiz 測驗密碼保護 ====================
+async function promptQuizPassword(categoryId, action) {
+    closeModal();
+    
+    const actionText = action === 'start' ? '開始測驗' : '重新測驗';
+    
+    const modalBody = `
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 3em; margin-bottom: 15px;">🔐</div>
+            <h3 style="color: #ffa502;">請輸入測驗密碼</h3>
+            <p style="color: #666; margin-top: 10px;">此密碼由主管提供，防止事前查看測驗內容</p>
+        </div>
+        
+        <div class="input-group">
+            <label>🔑 測驗密碼</label>
+            <input type="password" id="quizPasswordInput" placeholder="請輸入密碼" autofocus 
+                   onkeypress="if(event.key==='Enter') verifyQuizPassword('${categoryId}', '${action}')">
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="verifyQuizPassword('${categoryId}', '${action}')">✅ 確認</button>
+            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+        </div>
+    `;
+    
+    showModal(`🔐 ${actionText}`, modalBody);
+    
+    // 自動聚焦密碼輸入框
+    setTimeout(() => {
+        document.getElementById('quizPasswordInput')?.focus();
+    }, 100);
+}
+
+async function verifyQuizPassword(categoryId, action) {
+    const inputPassword = document.getElementById('quizPasswordInput').value.trim();
+    
+    if (!inputPassword) {
+        showToast('❌ 請輸入密碼', 'error');
+        return;
+    }
+    
+    try {
+        // 從 Firebase 讀取正確密碼
+        const passwordSnapshot = await db.collection('systemSettings')
+            .where('key', '==', 'quizPassword')
+            .limit(1)
+            .get();
+        
+        if (passwordSnapshot.empty) {
+            showToast('❌ 系統錯誤：找不到測驗密碼設定', 'error');
+            return;
+        }
+        
+        const correctPassword = passwordSnapshot.docs[0].data().value;
+        
+        if (inputPassword === correctPassword) {
+            showToast('✅ 密碼正確！正在載入測驗...', 'success');
+            closeModal();
+            
+            // 密碼正確：開始測驗
+            setTimeout(() => {
+                startQuiz(categoryId);
+            }, 500);
+        } else {
+            showToast('❌ 密碼錯誤！請向主管索取正確密碼', 'error');
+            document.getElementById('quizPasswordInput').value = '';
+            document.getElementById('quizPasswordInput').focus();
+        }
+        
+    } catch (error) {
+        console.error('驗證密碼失敗:', error);
+        showToast('❌ 驗證失敗', 'error');
+    }
+}
+
+// ==================== Admin 修改 Quiz 密碼 ====================
+async function showChangeQuizPasswordModal() {
+    try {
+        const passwordSnapshot = await db.collection('systemSettings')
+            .where('key', '==', 'quizPassword')
+            .limit(1)
+            .get();
+        
+        let currentPassword = 'TKOH2025';
+        let docId = null;
+        
+        if (!passwordSnapshot.empty) {
+            const doc = passwordSnapshot.docs[0];
+            currentPassword = doc.data().value;
+            docId = doc.id;
+        }
+        
+        const modalBody = `
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
+                <strong>⚠️ 注意：</strong>此密碼用於防止員工事前查看測驗內容，請妥善保管
+            </div>
+            
+            <div class="input-group">
+                <label>🔑 當前密碼</label>
+                <input type="text" value="${currentPassword}" disabled style="background: #f0f0f0;">
+            </div>
+            
+            <div class="input-group">
+                <label>🔐 新密碼</label>
+                <input type="text" id="newQuizPassword" placeholder="請輸入新密碼" autofocus>
+            </div>
+            
+            <div class="input-group">
+                <label>🔐 確認新密碼</label>
+                <input type="text" id="confirmQuizPassword" placeholder="請再次輸入新密碼">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="saveNewQuizPassword('${docId}')">✅ 儲存</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('🔐 修改 Quiz 測驗密碼', modalBody);
+        
+    } catch (error) {
+        console.error('載入密碼設定失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+async function saveNewQuizPassword(docId) {
+    const newPassword = document.getElementById('newQuizPassword').value.trim();
+    const confirmPassword = document.getElementById('confirmQuizPassword').value.trim();
+    
+    if (!newPassword || !confirmPassword) {
+        showToast('❌ 請填寫所有欄位', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showToast('❌ 兩次輸入的密碼不一致', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 4) {
+        showToast('❌ 密碼長度至少 4 個字元', 'error');
+        return;
+    }
+    
+    try {
+        if (docId) {
+            await db.collection('systemSettings').doc(docId).update({
+                value: newPassword,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedBy: currentUser.docId
+            });
+        } else {
+            await db.collection('systemSettings').add({
+                key: 'quizPassword',
+                value: newPassword,
+                description: 'Quiz 測驗密碼（防止員工事前查看測驗）',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedBy: currentUser.docId
+            });
+        }
+        
+        showToast(`✅ 密碼已更新為：${newPassword}`, 'success');
+        closeModal();
+        
+    } catch (error) {
+        console.error('更新密碼失敗:', error);
+        showToast('❌ 更新失敗', 'error');
     }
 }
     </script>
