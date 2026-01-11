@@ -10425,6 +10425,111 @@ function closeResultAndRefresh() {
     showCategoryEvaluation(currentCategoryId);
 }
 
+        // ==================== 顯示評核結果彈窗 ====================
+async function showEvaluationResult(itemId, isPassed, failCount) {
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        const categoryDoc = await db.collection('trainingCategories').doc(item.categoryId).get();
+        const category = categoryDoc.data();
+        
+        let resultHtml = `
+            <div style="text-align: center;">
+                <div style="font-size: 5em; margin-bottom: 20px;">
+                    ${isPassed ? '🎉' : '💪'}
+                </div>
+                <h2 style="color: ${isPassed ? '#2ed573' : '#ff4757'}; margin-bottom: 15px;">
+                    ${isPassed ? '✅ 評核合格！' : '❌ 評核不合格'}
+                </h2>
+                <p style="font-size: 1.2em; color: #666; margin-bottom: 20px;">
+                    ${category.emoji} ${category.name}<br>
+                    ${item.name}
+                </p>
+        `;
+        
+        if (!isPassed) {
+            resultHtml += `
+                <div style="background: #fff3cd; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #ffa502;">
+                    <h3 style="color: #856404; margin-bottom: 10px;">
+                        ⚠️ 此項目已不合格 ${failCount} 次
+                    </h3>
+                    <p style="color: #856404; margin: 0;">
+                        請重新完成評核，直至合格為止
+                    </p>
+                </div>
+            `;
+        } else {
+            resultHtml += `
+                <div style="background: #d4edda; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #2ed573;">
+                    <h3 style="color: #155724; margin-bottom: 10px;">
+                        🎊 恭喜完成此項目！
+                    </h3>
+                    <p style="color: #155724; margin: 0;">
+                        可以繼續完成其他培訓項目
+                    </p>
+                </div>
+            `;
+        }
+        
+        resultHtml += `
+            </div>
+            <div class="modal-buttons">
+                ${!isPassed ? `
+                    <button class="btn btn-warning" onclick="resetAndRetry('${itemId}')">
+                        🔄 重新評核
+                    </button>
+                ` : ''}
+                <button class="btn btn-success" onclick="closeResultAndRefresh()">
+                    ✅ 確定
+                </button>
+            </div>
+        `;
+        
+        showModal('📊 評核結果', resultHtml);
+        
+    } catch (error) {
+        console.error('顯示結果失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 重設並重新評核 ====================
+async function resetAndRetry(itemId) {
+    try {
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .limit(1)
+            .get();
+        
+        if (!recordsSnapshot.empty) {
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
+                status: 'pending',
+                isPassed: false,
+                checklistStatus: {},
+                remarks: {},
+                stepRecords: {},
+                updatedAt: new Date().toISOString()
+            });
+        }
+        
+        showToast('✅ 已重設評核，請重新開始', 'success');
+        closeModal();
+        showCategoryEvaluation(currentCategoryId);
+        
+    } catch (error) {
+        console.error('重設失敗:', error);
+        showToast('❌ 重設失敗', 'error');
+    }
+}
+
+// ==================== 關閉結果並刷新頁面 ====================
+function closeResultAndRefresh() {
+    closeModal();
+    showCategoryEvaluation(currentCategoryId);
+}
+
     </script>
 </body>
 </html>
