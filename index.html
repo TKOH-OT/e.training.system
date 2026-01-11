@@ -1137,6 +1137,30 @@
     box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
 
+        .item-card.failed {
+    background: linear-gradient(135deg, #ff4757 0%, #e84118 100%) !important;
+    color: white !important;
+    animation: pulse 2s infinite;
+}
+
+.item-card.failed .card-title,
+.item-card.failed .card-stats,
+.item-card.failed .progress-percent,
+.item-card.failed .progress-label,
+.item-card.failed .item-card-name,
+.item-card.failed .score-item-label,
+.item-card.failed .score-item-value {
+    color: white !important;
+}
+
+.item-card.failed .item-progress-ring-circle {
+    stroke: white !important;
+}
+
+.item-card.failed .item-progress-ring-bg {
+    stroke: rgba(255,255,255,0.3) !important;
+}
+        
 .item-card.expanded {
     grid-column: 1 / -1;
     cursor: default;
@@ -3323,19 +3347,20 @@ async function loadAccounts() {
 
                     const levelBadge = `<span class="badge badge-${account.level}">${account.level}</span>`;
 
-                    accountListHtml.push(`
-                        <div class="account-item">
-                            <div class="account-info">
-                                <div class="name">👤 ${account.name} ${roleBadge} ${levelBadge}</div>
-                                <div class="details">
-                                    📋 帳號: ${account.id} | 📅 入職日期: ${account.joinDate || '未設定'}
-                                </div>
-                            </div>
-                            <div class="account-actions">
-                                <button class="btn btn-danger btn-small" onclick="deleteAccount('${account.docId}', '${account.name}')">🗑️ 刪除</button>
-                            </div>
-                        </div>
-                    `);
+accountListHtml.push(`
+    <div class="account-item">
+        <div class="account-info">
+            <div class="name">👤 ${account.name} ${roleBadge} ${levelBadge}</div>
+            <div class="details">
+                📋 帳號: ${account.id} | 📅 入職日期: ${account.joinDate || '未設定'}
+            </div>
+        </div>
+        <div class="account-actions">
+            <button class="btn btn-warning btn-small" onclick="showEditAccountModal('${account.docId}')">✏️ 編輯</button>
+            <button class="btn btn-danger btn-small" onclick="deleteAccount('${account.docId}', '${account.name}')">🗑️ 刪除</button>
+        </div>
+    </div>
+`);
                 });
             }
         });
@@ -3489,6 +3514,106 @@ async function loadAccounts() {
             }
         }
 
+        // ==================== 編輯帳戶資訊 ====================
+async function showEditAccountModal(docId) {
+    try {
+        const accountDoc = await db.collection('accounts').doc(docId).get();
+        const account = accountDoc.data();
+        
+        const modalBody = `
+            <div class="input-group">
+                <label>👤 姓名</label>
+                <input type="text" value="${account.name}" disabled style="background: #f0f0f0;">
+            </div>
+            
+            <div class="input-group">
+                <label>📊 職級</label>
+                <input type="text" value="${account.level}" disabled style="background: #f0f0f0;">
+            </div>
+            
+            <div class="input-group">
+                <label>📅 入職日期</label>
+                <input type="date" id="editJoinDate" value="${account.joinDate || ''}">
+            </div>
+            
+            <div class="input-group">
+                <label>🔒 新密碼 (留空表示不修改)</label>
+                <input type="password" id="editPassword" placeholder="輸入新密碼（可選）">
+            </div>
+            
+            <div class="input-group">
+                <label>🔒 確認新密碼</label>
+                <input type="password" id="editPasswordConfirm" placeholder="再次輸入新密碼">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="saveEditAccount('${docId}')">✅ 儲存</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal(`✏️ 編輯帳戶 - ${account.name}`, modalBody);
+        
+    } catch (error) {
+        console.error('載入帳戶資料失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 儲存帳戶修改 ====================
+async function saveEditAccount(docId) {
+    const joinDate = document.getElementById('editJoinDate').value;
+    const newPassword = document.getElementById('editPassword').value.trim();
+    const confirmPassword = document.getElementById('editPasswordConfirm').value.trim();
+    
+    // ⭐ 驗證密碼（如果有輸入）
+    if (newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) {
+            showToast('❌ 兩次輸入的密碼不一致', 'error');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            showToast('❌ 密碼長度至少 6 個字元', 'error');
+            return;
+        }
+    }
+    
+    if (!joinDate) {
+        showToast('❌ 請選擇入職日期', 'error');
+        return;
+    }
+    
+    try {
+        const updateData = {
+            joinDate: joinDate,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: currentUser.docId
+        };
+        
+        // ⭐ 如果有輸入新密碼，就更新
+        if (newPassword) {
+            updateData.password = newPassword;
+        }
+        
+        await db.collection('accounts').doc(docId).update(updateData);
+        
+        showToast(
+            newPassword 
+                ? '✅ 帳戶資訊及密碼已更新' 
+                : '✅ 帳戶資訊已更新', 
+            'success'
+        );
+        
+        closeModal();
+        loadAccounts();
+        
+    } catch (error) {
+        console.error('更新帳戶失敗:', error);
+        showToast('❌ 更新失敗', 'error');
+    }
+}
+        
         // ==================== 顯示培訓管理 Dashboard ====================
         async function showTrainingManage() {
             const typeTitle = currentTrainingType === 'PCA' ? 'PCA 培訓' : 'OTA 培訓';
@@ -4718,7 +4843,7 @@ items.forEach(itemObj => {
     const item = itemObj;
     const record = records[itemObj.docId];
     
-    // ⭐⭐⭐ 新增：判斷訓練記錄類型 ⭐⭐⭐
+    // ⭐ 訓練記錄類型
     if (item.recordType === 'training' && item.hasChecklist && record) {
         const stepRecords = record.stepRecords || {};
         const actualSteps = item.checklist.filter(s => !s.isSubtitle);
@@ -4730,6 +4855,23 @@ items.forEach(itemObj => {
                 completedSteps++;
             }
         });
+        
+        if (completedSteps === actualSteps.length) {
+            completedCount++;
+        }
+    }
+    // ⭐ Checklist 類型（問題所在：計算邏輯）
+    else if (item.recordType === 'checklist' && item.hasChecklist && record) {
+        // ✅ 修正：只要有 record.status === 'completed' 就算完成
+        if (record.status === 'completed') {
+            completedCount++;
+        }
+    }
+    // ⭐ 舊版項目（兼容性）
+    else if (!item.recordType && record && record.status === 'completed') {
+        completedCount++;
+    }
+});
         
         // 訓練記錄：所有步驟都完成才算完成
         if (completedSteps === actualSteps.length) {
@@ -5330,32 +5472,45 @@ async function showCategoryEvaluation(categoryId) {
                     `;
                 }).join('');
 
-                let overallStatus = '';
-                let overallClass = '';
+let overallStatus = '';
+let overallClass = '';
 
-                const criticalSteps = item.checklist.filter(s => !s.isSubtitle && s.critical);
-                const hasCriticalPending = criticalSteps.some((step) => {
-                    const stepIndex = item.checklist.indexOf(step);
-                    return !checklistStatus[stepIndex] || checklistStatus[stepIndex] === 'pending';
-                });
+// ⭐⭐⭐ 新增：計算不合格次數 ⭐⭐⭐
+const failedCount = record?.failedAttempts || 0;
 
-                if (allCriticalPassed && completionRate === 100 && record?.status === 'completed') {
-                    overallStatus = '✅ 已完成';
-                    overallClass = 'completed';
-                } else if (hasCriticalPending) {
-                    overallStatus = '<span class="critical-warning">⚠️ 尚有 Critical 步驟未通過</span>';
-                    overallClass = '';
-                } else if (!allCriticalPassed) {
-                    overallStatus = '<span class="critical-warning">❌ Critical 步驟不合格</span>';
-                    overallClass = '';
-                } else if (completionRate < 100) {
-                    overallStatus = `⚠️ 完成率 ${completionRate}%`;
-                    overallClass = '';
-                } else {
-                    overallStatus = '⏳ 待完成';
-                    overallClass = '';
-                }
+const criticalSteps = item.checklist.filter(s => !s.isSubtitle && s.critical);
+const hasCriticalPending = criticalSteps.some((step) => {
+    const stepIndex = item.checklist.indexOf(step);
+    return !checklistStatus[stepIndex] || checklistStatus[stepIndex] === 'pending';
+});
 
+// ⭐⭐⭐ 新增：檢查是否有 Critical 不合格 ⭐⭐⭐
+const hasCriticalFailed = criticalSteps.some((step) => {
+    const stepIndex = item.checklist.indexOf(step);
+    return checklistStatus[stepIndex] === 'fail';
+});
+
+if (allCriticalPassed && completionRate === 100 && record?.status === 'completed') {
+    overallStatus = '✅ 已完成';
+    overallClass = 'completed';
+} else if (hasCriticalFailed || hasFailedSteps) {
+    // ⭐⭐⭐ 不合格狀態：全紅顯示 + 顯示次數 ⭐⭐⭐
+    overallStatus = `<span class="critical-warning">❌ 評核不合格 ${failedCount > 0 ? `(第 ${failedCount} 次)` : ''}</span>`;
+    overallClass = 'failed'; // ⭐ 新增 failed class
+} else if (hasCriticalPending) {
+    overallStatus = '<span class="critical-warning">⚠️ 尚有 Critical 步驟未通過</span>';
+    overallClass = '';
+} else if (!allCriticalPassed) {
+    overallStatus = '<span class="critical-warning">❌ Critical 步驟不合格</span>';
+    overallClass = '';
+} else if (completionRate < 100) {
+    overallStatus = `⚠️ 完成率 ${completionRate}%`;
+    overallClass = '';
+} else {
+    overallStatus = '⏳ 待完成';
+    overallClass = '';
+}
+                
                 itemsHtml.push(`
                     <div class="item-card ${overallClass}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
                         <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
@@ -5406,6 +5561,64 @@ async function showCategoryEvaluation(categoryId) {
 
                         <div class="item-card-content">
                             <div class="score-info">
+                            <!-- ⭐⭐⭐ 新增：評核記錄區域 ⭐⭐⭐ -->
+${record && (record.evaluatedBy || record.completedBy) ? `
+    <div style="background: #f0f4ff; padding: 15px; border-radius: 10px; margin-top: 15px; border-left: 4px solid #1e90ff;">
+        <div style="font-weight: bold; color: #1e90ff; margin-bottom: 10px;">📝 評核記錄</div>
+        
+        ${record.evaluatedBy ? `
+            <div style="margin-bottom: 8px;">
+                <strong>👤 評核者：</strong>
+                <span id="evaluatorName_${item.docId}">載入中...</span>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <strong>📅 評核時間：</strong>
+                ${new Date(record.evaluatedAt).toLocaleString('zh-TW')}
+            </div>
+        ` : ''}
+        
+        ${record.status === 'completed' && record.completedBy ? `
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e0e0e0;">
+                <div style="margin-bottom: 8px;">
+                    <strong>✅ 完成確認者：</strong>
+                    <span id="completerName_${item.docId}">載入中...</span>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <strong>📅 完成時間：</strong>
+                    ${new Date(record.completedAt).toLocaleString('zh-TW')}
+                </div>
+            </div>
+        ` : ''}
+        
+        ${record.failedAttempts > 0 ? `
+            <div style="margin-top: 10px; padding: 10px; background: #fff5f5; border-radius: 6px; text-align: center;">
+                <strong style="color: #ff4757;">⚠️ 不合格次數：${record.failedAttempts} 次</strong>
+            </div>
+        ` : ''}
+    </div>
+    <script>
+        // ⭐ 異步載入評核者姓名
+        (async function() {
+            try {
+                ${record.evaluatedBy ? `
+                    const evaluatorDoc = await db.collection('accounts').doc('${record.evaluatedBy}').get();
+                    if (evaluatorDoc.exists) {
+                        document.getElementById('evaluatorName_${item.docId}').textContent = evaluatorDoc.data().name;
+                    }
+                ` : ''}
+                
+                ${record.completedBy ? `
+                    const completerDoc = await db.collection('accounts').doc('${record.completedBy}').get();
+                    if (completerDoc.exists) {
+                        document.getElementById('completerName_${item.docId}').textContent = completerDoc.data().name;
+                    }
+                ` : ''}
+            } catch (error) {
+                console.error('載入人員名稱失敗:', error);
+            }
+        })();
+    </script>
+` : ''}
                                 <div class="score-title">📊 評核進度</div>
                                 <div class="score-details">
                                     <div class="score-item">
@@ -5685,10 +5898,40 @@ const overallStatusElement = card.querySelector('.score-info .score-item-value[s
 // ==================== 標記項目完成 ====================
 async function markItemComplete(itemId) {
     try {
-        // 先檢查是否有 Critical 步驟未通過
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
         
+        // ⭐⭐⭐ 新增：檢查是否有不合格步驟 ⭐⭐⭐
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .limit(1)
+            .get();
+        
+        let currentRecord = null;
+        let currentFailedCount = 0;
+        
+        if (!recordsSnapshot.empty) {
+            currentRecord = recordsSnapshot.docs[0].data();
+            currentFailedCount = currentRecord.failedAttempts || 0;
+            
+            // ⭐ 檢查是否有步驟不合格
+            const checklistStatus = currentRecord.checklistStatus || {};
+            const hasAnyFailed = Object.values(checklistStatus).includes('fail');
+            
+            if (hasAnyFailed) {
+                // ⭐⭐⭐ 不合格次數 +1 ⭐⭐⭐
+                await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
+                    failedAttempts: currentFailedCount + 1,
+                    lastFailedAt: new Date().toISOString()
+                });
+                
+                showToast(`⚠️ 評核不合格（第 ${currentFailedCount + 1} 次），請重新評核！`, 'warning');
+                showCategoryEvaluation(currentCategoryId);
+                return; // ⭐ 不合格：停止執行，不標記完成
+            }
+        }
+             
         if (item.hasChecklist) {
             const recordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
