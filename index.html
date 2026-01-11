@@ -5714,7 +5714,7 @@ const overallStatusElement = card.querySelector('.score-info .score-item-value[s
 // ==================== 標記項目完成 ====================
 async function markItemComplete(itemId) {
     try {
-        // 先檢查是否有 Critical 步驟未通過
+        // 先檢查是否有 Critical 步驟
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
         
@@ -5729,21 +5729,41 @@ async function markItemComplete(itemId) {
                 const record = recordsSnapshot.docs[0].data();
                 const checklistStatus = record.checklistStatus || {};
                 
-    // 檢查是否有 Critical 步驟不合格（排除章節標題）
-const hasCriticalFailed = item.checklist.some((step, index) => {
-    return !step.isSubtitle && step.critical && checklistStatus[index] === 'fail';
-});
-
-// ...
-
-// 檢查是否所有 Critical 步驟都通過（排除章節標題）
-const allCriticalPassed = item.checklist.every((step, index) => {
-    if (step.isSubtitle || !step.critical) return true;
-    return checklistStatus[index] === 'pass';
-});
+                // ⭐⭐⭐ 新增：檢查是否有 Critical 步驟不合格 ⭐⭐⭐
+                const hasCriticalFailed = item.checklist.some((step, index) => {
+                    return !step.isSubtitle && step.critical && checklistStatus[index] === 'fail';
+                });
+                
+                if (hasCriticalFailed) {
+                    showToast('❌ 有 Critical 步驟不合格，無法標記完成', 'error');
+                    return;
+                }
+                
+                // 檢查是否所有 Critical 步驟都通過（排除章節標題）
+                const allCriticalPassed = item.checklist.every((step, index) => {
+                    if (step.isSubtitle || !step.critical) return true;
+                    return checklistStatus[index] === 'pass';
+                });
                 
                 if (!allCriticalPassed) {
                     showToast('❌ 尚有 Critical 步驟未評核，無法標記完成', 'error');
+                    return;
+                }
+                
+                // ⭐⭐⭐ 新增：即使全部 Critical 合格，但總完成率未達 100% 也不能標記完成 ⭐⭐⭐
+                const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                let passedSteps = 0;
+                
+                item.checklist.forEach((step, index) => {
+                    if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                        passedSteps++;
+                    }
+                });
+                
+                const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
+                
+                if (completionRate < 100) {
+                    showToast(`❌ 完成率只有 ${completionRate}%，必須達到 100% 才能標記完成`, 'error');
                     return;
                 }
             } else {
