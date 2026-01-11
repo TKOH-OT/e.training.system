@@ -3324,18 +3324,19 @@ async function loadAccounts() {
                     const levelBadge = `<span class="badge badge-${account.level}">${account.level}</span>`;
 
                     accountListHtml.push(`
-                        <div class="account-item">
-                            <div class="account-info">
-                                <div class="name">👤 ${account.name} ${roleBadge} ${levelBadge}</div>
-                                <div class="details">
-                                    📋 帳號: ${account.id} | 📅 入職日期: ${account.joinDate || '未設定'}
-                                </div>
-                            </div>
-                            <div class="account-actions">
-                                <button class="btn btn-danger btn-small" onclick="deleteAccount('${account.docId}', '${account.name}')">🗑️ 刪除</button>
-                            </div>
-                        </div>
-                    `);
+    <div class="account-item">
+        <div class="account-info">
+            <div class="name">👤 ${account.name} ${roleBadge} ${levelBadge}</div>
+            <div class="details">
+                📋 帳號: ${account.id} | 📅 入職日期: ${account.joinDate || '未設定'}
+            </div>
+        </div>
+        <div class="account-actions">
+            <button class="btn btn-warning btn-small" onclick="showEditAccountModal('${account.docId}', '${account.name}', '${account.joinDate || ''}')">✏️ 編輯</button>
+            <button class="btn btn-danger btn-small" onclick="deleteAccount('${account.docId}', '${account.name}')">🗑️ 刪除</button>
+        </div>
+    </div>
+`);
                 });
             }
         });
@@ -4710,7 +4711,7 @@ for (const category of categories) {
         records[record.itemId] = record;
     });
 
-   let completedCount = 0;
+    let completedCount = 0;
     let totalCount = items.length;
 
     // ⭐⭐⭐ 關鍵修正：逐一檢查每個項目嘅完成狀態 ⭐⭐⭐
@@ -4718,33 +4719,37 @@ for (const category of categories) {
         const item = itemObj;
         const record = records[itemObj.docId];
         
+        // ========== 訓練記錄類型 ==========
         if (item.recordType === 'training' && item.hasChecklist && record) {
-            // 訓練記錄：檢查所有步驟係咪都完成
             const stepRecords = record.stepRecords || {};
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             let allStepsCompleted = true;
             
-            actualSteps.forEach((step, index) => {
-                const originalIndex = item.checklist.indexOf(step);
-                const stepRecord = stepRecords[originalIndex];
-                
-                if (!stepRecord?.trainingDate || 
-                    !stepRecord?.traineeSignature || 
-                    !stepRecord?.mentorSignature) {
-                    allStepsCompleted = false;
+            item.checklist.forEach((step, index) => {
+                if (!step.isSubtitle) {
+                    const stepRecord = stepRecords[index];
+                    if (!stepRecord?.trainingDate || 
+                        !stepRecord?.traineeSignature || 
+                        !stepRecord?.mentorSignature) {
+                        allStepsCompleted = false;
+                    }
                 }
             });
             
             if (allStepsCompleted) {
                 completedCount++;
             }
-        } else if (item.recordType === 'checklist' && item.hasChecklist && record) {
-            // Checklist：檢查 Critical 步驟同完成率
+        }
+        // ========== Checklist 評核類型 ==========
+        else if (item.hasChecklist && record) {
+            // ⭐⭐⭐ 關鍵修正：檢查 3 個條件 ⭐⭐⭐
+            // 1. 所有 Critical 步驟都合格
             const allCriticalPassed = item.checklist.every((step, index) => {
                 if (step.isSubtitle || !step.critical) return true;
                 return record.checklistStatus && record.checklistStatus[index] === 'pass';
             });
             
+            // 2. 計算完成率
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             let passedSteps = 0;
             
@@ -4753,50 +4758,58 @@ for (const category of categories) {
                     passedSteps++;
                 }
             });
-        
-          const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
             
-            if (allCriticalPassed && completionRate === 100 && record.status === 'completed') {
+            const completionRate = actualSteps.length > 0 
+                ? Math.round((passedSteps / actualSteps.length) * 100) 
+                : 0;
+            
+            // 3. ⭐⭐⭐ 關鍵：檢查 status === 'completed' ⭐⭐⭐
+            const isMarkedComplete = record.status === 'completed';
+            
+            // ⭐⭐⭐ 三個條件都滿足先算完成 ⭐⭐⭐
+            if (allCriticalPassed && completionRate === 100 && isMarkedComplete) {
                 completedCount++;
             }
-            
-        } else if (!item.recordType && !item.hasChecklist && record && record.status === 'completed') {
-            // 舊版項目
+        }
+        // ========== 舊版項目（無 recordType）==========
+        else if (!item.recordType && !item.hasChecklist && record && record.status === 'completed') {
             completedCount++;
         }
     });
 
+    // ⭐⭐⭐ 計算百分比 ⭐⭐⭐
     const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     const isCompleted = percentage === 100;
 
     const circumference = 2 * Math.PI * 60;
     const offset = circumference - (percentage / 100) * circumference;
 
-                    progressHtml.push(`
-                        <div class="training-card ${isCompleted ? 'completed' : 'in-progress'}" 
-                             onclick="showCategoryEvaluation('${category.docId}')">
-                            <div class="card-icon">${category.emoji}</div>
-                            <div class="card-title">${category.name}</div>
-                            <div class="card-progress">
-                                <svg class="progress-ring" width="150" height="150" viewBox="0 0 150 150">
-    <circle class="progress-ring-bg" cx="75" cy="75" r="60" 
-        fill="none" stroke-width="12"/>
-    <circle class="progress-ring-circle" cx="75" cy="75" r="60" 
-        fill="none" stroke-width="12"
-        stroke-dasharray="${circumference}" 
-        stroke-dashoffset="${offset}"
-        stroke-linecap="round"/>
-</svg>
-                                <div class="progress-text">
-                                    <div class="progress-percent">${percentage}%</div>
-                                    <div class="progress-label">${completedCount}/${totalCount} 項目完成</div>
-                                </div>
-                            </div>
-                            <div class="card-stats">${completedCount}/${totalCount} 項目已完成</div>
-                            ${isCompleted ? '<div class="card-success-badge">✅ 全部完成！</div>' : ''}
-                        </div>
-                    `);
-                }
+    // ⭐⭐⭐ 生成卡片 HTML ⭐⭐⭐
+    progressHtml.push(`
+        <div class="training-card ${isCompleted ? 'completed' : 'in-progress'}" 
+             onclick="showCategoryEvaluation('${category.docId}')">
+            <div class="card-icon">${category.emoji}</div>
+            <div class="card-title">${category.name}</div>
+            <div class="card-progress">
+                <svg class="progress-ring" width="150" height="150" viewBox="0 0 150 150">
+                    <circle class="progress-ring-bg" cx="75" cy="75" r="60" 
+                        fill="none" stroke-width="12"/>
+                    <circle class="progress-ring-circle" cx="75" cy="75" r="60" 
+                        fill="none" stroke-width="12"
+                        stroke-dasharray="${circumference}" 
+                        stroke-dashoffset="${offset}"
+                        stroke-linecap="round"/>
+                </svg>
+                <div class="progress-text">
+                    <div class="progress-percent">${percentage}%</div>
+                    <div class="progress-label">${completedCount}/${totalCount} 項目完成</div>
+                </div>
+            </div>
+            <div class="card-stats">${completedCount}/${totalCount} 項目已完成</div>
+            ${isCompleted ? '<div class="card-success-badge">✅ 全部完成！</div>' : ''}
+        </div>
+    `);
+}
 
                 if (progressHtml.length === 0) {
                     progressHtml.push('<p class="no-data-message">📭 尚無培訓項目</p>');
@@ -9974,6 +9987,93 @@ async function saveNewQuizPassword(docId) {
         
     } catch (error) {
         console.error('更新密碼失敗:', error);
+        showToast('❌ 更新失敗', 'error');
+    }
+}
+
+        // ==================== 編輯帳號 ====================
+async function showEditAccountModal(docId, name, currentJoinDate) {
+    try {
+        const accountDoc = await db.collection('accounts').doc(docId).get();
+        const account = accountDoc.data();
+        
+        const modalBody = `
+            <div class="input-group">
+                <label>👤 姓名</label>
+                <input type="text" value="${name}" disabled style="background: #f0f0f0;">
+            </div>
+            
+            <div class="input-group">
+                <label>📅 入職日期</label>
+                <input type="date" id="editJoinDate" value="${currentJoinDate}">
+            </div>
+            
+            <div class="input-group">
+                <label>🔑 新密碼（留空表示不修改）</label>
+                <input type="password" id="editPassword" placeholder="輸入新密碼">
+            </div>
+            
+            <div class="input-group">
+                <label>🔐 確認新密碼</label>
+                <input type="password" id="editPasswordConfirm" placeholder="再次輸入新密碼">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="saveEditedAccount('${docId}')">✅ 儲存</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal(`✏️ 編輯帳號 - ${name}`, modalBody);
+        
+    } catch (error) {
+        console.error('載入帳號失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+async function saveEditedAccount(docId) {
+    const joinDate = document.getElementById('editJoinDate').value;
+    const newPassword = document.getElementById('editPassword').value.trim();
+    const confirmPassword = document.getElementById('editPasswordConfirm').value.trim();
+    
+    if (!joinDate) {
+        showToast('❌ 請選擇入職日期', 'error');
+        return;
+    }
+    
+    // 如果要修改密碼
+    if (newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) {
+            showToast('❌ 兩次輸入的密碼不一致', 'error');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            showToast('❌ 密碼長度至少 6 個字元', 'error');
+            return;
+        }
+    }
+    
+    try {
+        const updateData = {
+            joinDate: joinDate,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // 如果有輸入新密碼，就更新
+        if (newPassword) {
+            updateData.password = newPassword;
+        }
+        
+        await db.collection('accounts').doc(docId).update(updateData);
+        
+        showToast('✅ 帳號資料已更新', 'success');
+        closeModal();
+        loadAccounts();
+        
+    } catch (error) {
+        console.error('更新帳號失敗:', error);
         showToast('❌ 更新失敗', 'error');
     }
 }
