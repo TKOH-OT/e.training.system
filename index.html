@@ -4786,8 +4786,8 @@ for (const category of categories) {
 
     // ⭐⭐⭐ 生成卡片 HTML ⭐⭐⭐
     progressHtml.push(`
-        <div class="training-card ${isCompleted ? 'completed' : 'in-progress'}" 
-             onclick="showCategoryEvaluation('${category.docId}')">
+    <div class="training-card ${isCompleted ? 'completed' : 'in-progress'}" 
+         onclick="handleCategoryClick('${category.docId}')">
             <div class="card-icon">${category.emoji}</div>
             <div class="card-title">${category.name}</div>
             <div class="card-progress">
@@ -4988,13 +4988,183 @@ document.getElementById('importantTimeline').style.display = 'block';
                 const item = itemDoc.data();
                 
                 currentCategoryId = item.categoryId;
-                showCategoryEvaluation(item.categoryId);
+                (item.categoryId);
             } catch (error) {
                 console.error('快速評核失敗:', error);
                 showToast('❌ 載入失敗', 'error');
             }
         }
 
+        // ==================== 處理培訓分類點擊（根據角色分流）====================
+async function handleCategoryClick(categoryId) {
+    if (currentUser.role === 'staff') {
+        // 員工：彈窗詢問
+        await showTrainingOptionsForStaff(categoryId);
+    } else {
+        // 主管 & Admin：直接進入評核頁面
+        await showCategoryEvaluation(categoryId);
+    }
+}
+
+// ==================== 員工點擊培訓分類時的彈窗（參考 Quiz）====================
+async function showTrainingOptionsForStaff(categoryId) {
+    try {
+        const categoryDoc = await db.collection('trainingCategories').doc(categoryId).get();
+        const category = categoryDoc.data();
+        
+        // ⭐ 計算完成進度
+        const itemsSnapshot = await db.collection('trainingItems')
+            .where('categoryId', '==', categoryId)
+            .get();
+        
+        const items = [];
+        itemsSnapshot.forEach(doc => {
+            const item = doc.data();
+            
+            // ⭐ 過濾 PCA 級別項目
+            if (category.trainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+                if (item.pcaLevel !== currentUser.level) {
+                    return;
+                }
+            }
+            
+            items.push({ docId: doc.id, ...item });
+        });
+        
+        const totalCount = items.length;
+        
+        // ⭐ 取得員工的培訓記錄
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentUser.docId)
+            .get();
+        
+        const records = {};
+        recordsSnapshot.forEach(doc => {
+            const record = doc.data();
+            records[record.itemId] = record;
+        });
+        
+        // ⭐ 計算完成數量
+        let completedCount = 0;
+        
+        items.forEach(item => {
+            const record = records[item.docId];
+            
+            if (item.recordType === 'training' && item.hasChecklist && record) {
+                const stepRecords = record.stepRecords || {};
+                const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                let allStepsCompleted = true;
+                
+                item.checklist.forEach((step, index) => {
+                    if (!step.isSubtitle) {
+                        const stepRecord = stepRecords[index];
+                        if (!stepRecord?.trainingDate || 
+                            !stepRecord?.traineeSignature || 
+                            !stepRecord?.mentorSignature) {
+                            allStepsCompleted = false;
+                        }
+                    }
+                });
+                
+                if (allStepsCompleted) completedCount++;
+                
+            } else if (item.hasChecklist && record) {
+                const allCriticalPassed = item.checklist.every((step, index) => {
+                    if (step.isSubtitle || !step.critical) return true;
+                    return record.checklistStatus && record.checklistStatus[index] === 'pass';
+                });
+                
+                const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                let passedSteps = 0;
+                
+                item.checklist.forEach((step, index) => {
+                    if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
+                        passedSteps++;
+                    }
+                });
+                
+                const completionRate = actualSteps.length > 0 
+                    ? Math.round((passedSteps / actualSteps.length) * 100) 
+                    : 0;
+                
+                const isMarkedComplete = record.status === 'completed';
+                
+                if (allCriticalPassed && completionRate === 100 && isMarkedComplete) {
+                    completedCount++;
+                }
+            }
+        });
+        
+        const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        
+        // ⭐⭐⭐ 彈窗內容（參考 Quiz）⭐⭐⭐
+        let modalBody = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3em; margin-bottom: 10px;">${category.emoji}</div>
+                <h3 style="color: #ffa502;">${category.name}</h3>
+                <p style="color: #666; margin-top: 10px;">
+                    完成進度：${completedCount}/${totalCount} 項目 (${completionRate}%)
+                </p>
+            </div>
+        `;
+        
+        if (completedCount === 0) {
+            // ⭐ 未開始評核
+            modalBody += `
+                <div style="background: #f8f9fa; padding: 25px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
+                    <div style="font-size: 2em; margin-bottom: 10px;">📋</div>
+                    <p style="color: #666; margin: 0; font-size: 1.05em;">你尚未開始此分類的評核</p>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn-success" onclick="closeModalAndNavigate('${categoryId}')">📝 開始評核</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+                </div>
+            `;
+        } else if (completionRate === 100) {
+            // ⭐ 全部完成
+            modalBody += `
+                <div style="background: #d4edda; padding: 25px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #2ed573;">
+                    <div style="font-size: 2.5em; margin-bottom: 10px;">✅</div>
+                    <h3 style="color: #155724; margin-bottom: 10px;">恭喜！</h3>
+                    <p style="color: #155724; margin: 0; font-size: 1.05em;">你已完成此分類的所有評核項目</p>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn-info" onclick="closeModalAndNavigate('${categoryId}')">📊 查看記錄</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+                </div>
+            `;
+        } else {
+            // ⭐ 進行中
+            modalBody += `
+                <div style="background: #fff3cd; padding: 25px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
+                    <div style="font-size: 2.5em; margin-bottom: 10px;">⏳</div>
+                    <h3 style="color: #856404; margin-bottom: 10px;">評核進行中</h3>
+                    <p style="color: #856404; margin: 0; font-size: 1.05em;">
+                        完成率：${completionRate}%
+                    </p>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn-info" onclick="closeModalAndNavigate('${categoryId}')">📊 查看記錄</button>
+                    <button class="btn btn-success" onclick="closeModalAndNavigate('${categoryId}')">📝 繼續評核</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+                </div>
+            `;
+        }
+        
+        showModal('📋 培訓評核', modalBody);
+        
+    } catch (error) {
+        console.error('載入失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 關閉彈窗並進入評核頁面 ====================
+function closeModalAndNavigate(categoryId) {
+    closeModal();
+    showCategoryEvaluation(categoryId);
+}
+        
 // ==================== 顯示分類評核（員工評核模式）====================
 async function showCategoryEvaluation(categoryId) {
     currentCategoryId = categoryId;
@@ -5096,7 +5266,7 @@ async function showCategoryEvaluation(categoryId) {
                     const stepCompleted = trainingDate && traineeSignature && mentorSignature;
 
                     return `
-                        <div class="checklist-item ${stepCompleted ? 'completed' : ''}" style="margin-bottom: 20px;">
+    <div class="checklist-item ${stepCompleted ? 'completed' : ''}">
                             <div class="checklist-step-header">
                                 <div class="checklist-step-name">
                                     <span class="step-number">Step ${stepCounter}:</span>
