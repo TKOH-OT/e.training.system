@@ -7639,18 +7639,34 @@ async function saveStepSignature(itemId, stepIndex, type) {
     }
 }
 
-        // ==================== 評核步驟簽名（Checklist 專用）====================
+// ==================== 評核步驟簽名（Checklist 專用）====================
 function editChecklistSignature(itemId, stepIndex, type, currentValue) {
-    const label = type === 'staff' ? '員工' : 'Supervisor';
+    // ⭐⭐⭐ 員工帳號禁止簽名 ⭐⭐⭐
+    if (currentUser.role === 'staff') {
+        showToast('❌ 只有主管可以簽署評核步驟', 'error');
+        return;
+    }
     
-    // ⭐ Supervisor 自動填入登入者姓名
+    const label = type === 'staff' ? '員工' : 'Supervisor';
     const defaultValue = type === 'supervisor' && !currentValue ? currentUser.name : currentValue;
+    
+    // ⭐⭐⭐ 新增：一鍵簽署全部步驟按鈕 ⭐⭐⭐
+    const batchSignButton = `
+        <button class="btn btn-warning" style="width: 100%; margin-top: 10px;" 
+                onclick="showBatchSignChecklist('${itemId}', '${type}')">
+            ✍️ 一鍵簽署全部步驟
+        </button>
+        <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px; font-size: 0.85em; text-align: center;">
+            💡 提示：可以一次為所有步驟簽署【${label}】簽名
+        </div>
+    `;
     
     const modalBody = `
         <div class="input-group">
             <label>✍️ ${label}簽名</label>
             <input type="text" id="signatureInput" value="${defaultValue}" placeholder="請輸入簽名" autofocus>
         </div>
+        ${batchSignButton}
         <div class="modal-buttons">
             <button class="btn btn-success" onclick="saveChecklistSignature('${itemId}', ${stepIndex}, '${type}')">✅ 確定</button>
             <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
@@ -7660,6 +7676,78 @@ function editChecklistSignature(itemId, stepIndex, type, currentValue) {
     showModal(`✍️ ${label}簽名`, modalBody);
 }
 
+// ⭐⭐⭐ 新增：一鍵簽署評核步驟全部步驟 ⭐⭐⭐
+async function showBatchSignChecklist(itemId, type) {
+    const signature = document.getElementById('signatureInput').value.trim();
+    
+    if (!signature) {
+        showToast('❌ 請先輸入簽名', 'error');
+        return;
+    }
+
+    if (!confirm(`❓ 確定要為所有評核步驟簽署【${type === 'staff' ? '員工' : 'Supervisor'}】簽名嗎？\n\n簽名：${signature}`)) {
+        return;
+    }
+
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .limit(1)
+            .get();
+
+        let stepRecords = {};
+        if (!recordsSnapshot.empty) {
+            const record = recordsSnapshot.docs[0].data();
+            stepRecords = record.stepRecords || {};
+        }
+
+        const fieldName = type === 'staff' ? 'staffSignature' : 'supervisorSignature';
+
+        // 為所有實際步驟（非章節標題）簽名
+        let signedCount = 0;
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                if (!stepRecords[index]) {
+                    stepRecords[index] = {};
+                }
+                stepRecords[index][fieldName] = signature;
+                signedCount++;
+            }
+        });
+
+        const recordData = {
+            userId: currentStaffId,
+            itemId: itemId,
+            stepRecords: stepRecords,
+            updatedBy: currentUser.docId,
+            updatedAt: new Date().toISOString()
+        };
+
+        if (recordsSnapshot.empty) {
+            recordData.checklistStatus = {};
+            recordData.remarks = {};
+            await db.collection('trainingRecords').add(recordData);
+        } else {
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
+        }
+
+        const label = type === 'staff' ? '員工' : 'Supervisor';
+        showToast(`✅ 已成功為 ${signedCount} 個步驟簽署【${label}】簽名！`, 'success');
+        closeModal();
+        
+        // 刷新頁面
+        showCategoryEvaluation(currentCategoryId);
+        
+    } catch (error) {
+        console.error('一鍵簽署失敗:', error);
+        showToast('❌ 批量簽署失敗', 'error');
+    }
+}
+        
 // ==================== 儲存評核步驟簽名 ====================
 async function saveChecklistSignature(itemId, stepIndex, type) {
     const signature = document.getElementById('signatureInput').value.trim();
