@@ -4872,29 +4872,9 @@ items.forEach(itemObj => {
         completedCount++;
     }
 });
-        
-        // 訓練記錄：所有步驟都完成才算完成
-        if (completedSteps === actualSteps.length) {
-            completedCount++;
-        }
-    }
-    // ⭐⭐⭐ 以下是 Checklist 類型的判斷 ⭐⭐⭐
-    else if (item.recordType === 'checklist' && item.hasChecklist && record) {
-        const allCriticalPassed = item.checklist.every((step, index) => {
-            if (step.isSubtitle || !step.critical) return true;
-            return record.checklistStatus && record.checklistStatus[index] === 'pass';
-        });
-        
-        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-        let passedSteps = 0;
-        
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
-                passedSteps++;
-            }
-        });
-        
-        const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
+              
+const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+const isCompleted = percentage === 100;
         
         if (allCriticalPassed && completionRate === 100 && record.status === 'completed') {
             completedCount++;
@@ -5472,6 +5452,15 @@ async function showCategoryEvaluation(categoryId) {
                     `;
                 }).join('');
 
+                // ⭐⭐⭐ 新增：檢查是否有不合格步驟 ⭐⭐⭐
+let hasFailedSteps = false;
+
+item.checklist.forEach((step, index) => {
+    if (!step.isSubtitle && checklistStatus[index] === 'fail') {
+        hasFailedSteps = true;
+    }
+});
+                
 let overallStatus = '';
 let overallClass = '';
 
@@ -5901,7 +5890,7 @@ async function markItemComplete(itemId) {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
         
-        // ⭐⭐⭐ 新增：檢查是否有不合格步驟 ⭐⭐⭐
+        // ⭐ 只查詢一次記錄
         const recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
@@ -5920,7 +5909,6 @@ async function markItemComplete(itemId) {
             const hasAnyFailed = Object.values(checklistStatus).includes('fail');
             
             if (hasAnyFailed) {
-                // ⭐⭐⭐ 不合格次數 +1 ⭐⭐⭐
                 await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
                     failedAttempts: currentFailedCount + 1,
                     lastFailedAt: new Date().toISOString()
@@ -5928,54 +5916,33 @@ async function markItemComplete(itemId) {
                 
                 showToast(`⚠️ 評核不合格（第 ${currentFailedCount + 1} 次），請重新評核！`, 'warning');
                 showCategoryEvaluation(currentCategoryId);
-                return; // ⭐ 不合格：停止執行，不標記完成
-            }
-        }
-             
-        if (item.hasChecklist) {
-            const recordsSnapshot = await db.collection('trainingRecords')
-                .where('userId', '==', currentStaffId)
-                .where('itemId', '==', itemId)
-                .limit(1)
-                .get();
-            
-            if (!recordsSnapshot.empty) {
-                const record = recordsSnapshot.docs[0].data();
-                const checklistStatus = record.checklistStatus || {};
-                
-    // 檢查是否有 Critical 步驟不合格（排除章節標題）
-const hasCriticalFailed = item.checklist.some((step, index) => {
-    return !step.isSubtitle && step.critical && checklistStatus[index] === 'fail';
-});
-
-// ...
-
-// 檢查是否所有 Critical 步驟都通過（排除章節標題）
-const allCriticalPassed = item.checklist.every((step, index) => {
-    if (step.isSubtitle || !step.critical) return true;
-    return checklistStatus[index] === 'pass';
-});
-                
-                if (!allCriticalPassed) {
-                    showToast('❌ 尚有 Critical 步驟未評核，無法標記完成', 'error');
-                    return;
-                }
-            } else {
-                showToast('❌ 請先完成評核，才能標記完成', 'error');
                 return;
             }
         }
         
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .limit(1)
-            .get();
-
+        // ⭐ 檢查 Critical 步驟（用返同一個 record）
+        if (item.hasChecklist && currentRecord) {
+            const checklistStatus = currentRecord.checklistStatus || {};
+            
+            const allCriticalPassed = item.checklist.every((step, index) => {
+                if (step.isSubtitle || !step.critical) return true;
+                return checklistStatus[index] === 'pass';
+            });
+            
+            if (!allCriticalPassed) {
+                showToast('❌ 尚有 Critical 步驟未評核，無法標記完成', 'error');
+                return;
+            }
+        } else if (item.hasChecklist && !currentRecord) {
+            showToast('❌ 請先完成評核，才能標記完成', 'error');
+            return;
+        }
+        
+        // ⭐ 最後更新狀態（用返同一個 recordsSnapshot）
         const recordData = {
             status: 'completed',
-            evaluatedBy: currentUser.docId,
-            evaluatedAt: new Date().toISOString()
+            completedBy: currentUser.docId,  // ⭐ 修正：用 completedBy
+            completedAt: new Date().toISOString()
         };
 
         if (recordsSnapshot.empty) {
@@ -5988,6 +5955,7 @@ const allCriticalPassed = item.checklist.every((step, index) => {
 
         showToast('✅ 項目已標記完成', 'success');
         showCategoryEvaluation(currentCategoryId);
+        
     } catch (error) {
         console.error('標記完成失敗:', error);
         showToast('❌ 操作失敗', 'error');
