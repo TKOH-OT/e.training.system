@@ -2996,6 +2996,41 @@
         <!-- 動態生成結果詳情 -->
     </div>
 </div>
+
+        <!-- 評核記錄列表頁面（獨立頁面）-->
+<div id="evaluationRecordsListPage" class="page">
+    <div class="dashboard-header">
+        <div class="dashboard-title" id="evalRecordsTitle">📋 評核記錄</div>
+        <div class="dashboard-subtitle" id="evalRecordsSubtitle">Evaluation Records</div>
+    </div>
+    
+    <div style="text-align: right; margin-bottom: 20px;">
+        <button class="btn btn-secondary" onclick="backToEvaluationFromRecords()">🔙 返回</button>
+    </div>
+    
+    <!-- 統計摘要 -->
+    <div id="evalRecordsSummary" style="background: white; padding: 25px; border-radius: 15px; margin-bottom: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.1);">
+        <!-- 動態生成統計資訊 -->
+    </div>
+    
+    <!-- 記錄列表 -->
+    <div id="evalRecordsContent" style="display: grid; gap: 20px;">
+        <!-- 動態生成記錄卡片 -->
+    </div>
+</div>
+
+<!-- 評核記錄詳情頁面（獨立頁面）-->
+<div id="evaluationRecordDetailPage" class="page">
+    <div class="top-bar">
+        <h2 id="evalRecordDetailTitle">📋 評核記錄詳情</h2>
+        <button class="btn btn-secondary" onclick="backToEvalRecordsList()">🔙 返回列表</button>
+    </div>
+    
+    <div id="evalRecordDetailContent">
+        <!-- 動態生成詳細內容 -->
+    </div>
+</div>
+        
     </div>  
 
     <!-- 彈出視窗 -->
@@ -4839,37 +4874,40 @@ for (const category of categories) {
                 completedCount++;
             }
         }
-        // ========== Checklist 評核類型 ==========
-        else if (item.hasChecklist && record) {
-            // ⭐⭐⭐ 關鍵修正：檢查 3 個條件 ⭐⭐⭐
-            // 1. 所有 Critical 步驟都合格
-            const allCriticalPassed = item.checklist.every((step, index) => {
-                if (step.isSubtitle || !step.critical) return true;
-                return record.checklistStatus && record.checklistStatus[index] === 'pass';
-            });
-            
-            // 2. 計算完成率
-            const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-            let passedSteps = 0;
-            
-            item.checklist.forEach((step, index) => {
-                if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
-                    passedSteps++;
-                }
-            });
-            
-            const completionRate = actualSteps.length > 0 
-                ? Math.round((passedSteps / actualSteps.length) * 100) 
-                : 0;
-            
-            // 3. ⭐⭐⭐ 關鍵：檢查 status === 'completed' ⭐⭐⭐
-            const isMarkedComplete = record.status === 'completed';
-            
-            // ⭐⭐⭐ 三個條件都滿足先算完成 ⭐⭐⭐
-            if (allCriticalPassed && completionRate === 100 && isMarkedComplete) {
-                completedCount++;
-            }
+// ========== Checklist 評核類型 ==========
+else if (item.hasChecklist && record) {
+    const allCriticalPassed = item.checklist.every((step, index) => {
+        if (step.isSubtitle || !step.critical) return true;
+        return record.checklistStatus && record.checklistStatus[index] === 'pass';
+    });
+    
+    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+    let passedSteps = 0;
+    
+    item.checklist.forEach((step, index) => {
+        if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
+            passedSteps++;
         }
+    });
+    
+    const completionRate = actualSteps.length > 0 
+        ? Math.round((passedSteps / actualSteps.length) * 100) 
+        : 0;
+    
+    // ⭐⭐⭐ 向下兼容舊記錄：100% 完成 + 所有 Critical 合格 = 視為合格 ⭐⭐⭐
+    let isPassed = false;
+    if (record.isPassed === false) {
+        // 明確標記為不合格
+        isPassed = false;
+    } else if (allCriticalPassed && completionRate === 100 && record.status === 'completed') {
+        // 100% 完成且所有 Critical 合格 = 合格（兼容舊記錄）
+        isPassed = true;
+    }
+    
+    if (isPassed) {
+        completedCount++;
+    }
+}
         // ========== 舊版項目（無 recordType）==========
         else if (!item.recordType && !item.hasChecklist && record && record.status === 'completed') {
             completedCount++;
@@ -6104,13 +6142,25 @@ function showCompletedItemOptions(itemId, isPassed) {
     showModal('📋 評核完成', modalBody);
 }
 
-        // ⭐⭐⭐ 新增：顯示評核記錄列表（類似 Quiz Records）⭐⭐⭐
+// ⭐⭐⭐ 新增：顯示評核記錄列表（獨立頁面）⭐⭐⭐
 async function viewEvaluationRecordsList(itemId) {
     closeModal();
+    showPage('evaluationRecordsListPage');
     
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
+        
+        const categoryDoc = await db.collection('trainingCategories').doc(item.categoryId).get();
+        const category = categoryDoc.data();
+        
+        // 更新標題
+        document.getElementById('evalRecordsTitle').textContent = `📋 ${item.name}`;
+        document.getElementById('evalRecordsSubtitle').textContent = `${category.emoji} ${category.name} - 評核記錄`;
+        
+        // 儲存當前項目 ID（用於返回）
+        window.currentEvalItemId = itemId;
+        window.currentEvalCategoryId = item.categoryId;
         
         // ⭐ 載入該員工嘅所有評核記錄
         const recordsSnapshot = await db.collection('trainingRecords')
@@ -6121,9 +6171,54 @@ async function viewEvaluationRecordsList(itemId) {
             .get();
         
         if (recordsSnapshot.empty) {
-            showToast('⚠️ 尚無評核記錄', 'warning');
+            document.getElementById('evalRecordsSummary').style.display = 'none';
+            document.getElementById('evalRecordsContent').innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 15px;">
+                    <div style="font-size: 4em; margin-bottom: 15px;">📭</div>
+                    <div style="font-size: 1.3em; color: #999;">尚無評核記錄</div>
+                </div>
+            `;
             return;
         }
+        
+        // ⭐ 生成統計摘要
+        let totalRecords = 0;
+        let passedRecords = 0;
+        let failedRecords = 0;
+        
+        recordsSnapshot.forEach(doc => {
+            const record = doc.data();
+            totalRecords++;
+            if (record.isPassed === true) {
+                passedRecords++;
+            } else if (record.isPassed === false) {
+                failedRecords++;
+            }
+        });
+        
+        const passRate = totalRecords > 0 ? Math.round((passedRecords / totalRecords) * 100) : 0;
+        
+        document.getElementById('evalRecordsSummary').innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5em; font-weight: bold;">${totalRecords}</div>
+                    <div style="margin-top: 8px; opacity: 0.95;">總評核次數</div>
+                </div>
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #2ed573 0%, #26d07c 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5em; font-weight: bold;">${passedRecords}</div>
+                    <div style="margin-top: 8px; opacity: 0.95;">合格次數</div>
+                </div>
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #ff4757 0%, #e84118 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5em; font-weight: bold;">${failedRecords}</div>
+                    <div style="margin-top: 8px; opacity: 0.95;">不合格次數</div>
+                </div>
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5em; font-weight: bold;">${passRate}%</div>
+                    <div style="margin-top: 8px; opacity: 0.95;">合格率</div>
+                </div>
+            </div>
+        `;
+        document.getElementById('evalRecordsSummary').style.display = 'block';
         
         // ⭐ 生成記錄卡片列表
         let recordsHtml = '';
@@ -6146,8 +6241,7 @@ async function viewEvaluationRecordsList(itemId) {
             });
             
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-            const isPassed = record.isPassed || false;
-            const attemptCount = record.attemptCount || recordCount;
+            const isPassed = record.isPassed !== false && completionRate === 100; // ⭐ 向下兼容
             const totalFailCount = record.totalFailCount || 0;
             
             // 格式化日期
@@ -6159,76 +6253,65 @@ async function viewEvaluationRecordsList(itemId) {
             const evaluator = record.evaluatedByName || '未知';
             
             recordsHtml += `
-                <div class="quiz-record-card ${isPassed ? 'passed' : 'failed'}" 
+                <div class="audit-history-card-modern ${isPassed ? 'passed' : 'failed'}" 
                      onclick="viewEvaluationResultDetail('${doc.id}', '${itemId}')"
-                     style="margin-bottom: 20px; border-left: 5px solid ${isPassed ? '#2ed573' : '#ff4757'};">
+                     style="cursor: pointer; transition: all 0.3s;">
                     
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                         <div style="flex: 1;">
-                            <h3 style="margin-bottom: 8px; color: #333;">
+                            <h3 style="margin-bottom: 8px; color: #333; font-size: 1.3em;">
                                 ${isPassed ? '✅ 評核合格' : '❌ 評核不合格'}
                                 ${totalFailCount > 1 ? ` (第 ${totalFailCount} 次)` : ''}
                             </h3>
-                            <div style="color: #666; font-size: 0.95em; line-height: 1.6;">
+                            <div style="color: #666; font-size: 1em; line-height: 1.8;">
                                 📅 ${evalDate}<br>
                                 👤 評核者：${evaluator}
                             </div>
                         </div>
                         
                         <div style="text-align: right;">
-                            <div style="font-size: 3em; font-weight: bold; color: ${isPassed ? '#2ed573' : '#ff4757'}; line-height: 1;">
+                            <div style="font-size: 3.5em; font-weight: bold; color: ${isPassed ? '#2ed573' : '#ff4757'}; line-height: 1;">
                                 ${completionRate}%
                             </div>
-                            <div style="color: #666; margin-top: 5px;">
+                            <div style="color: #666; margin-top: 5px; font-size: 1em;">
                                 ${passedSteps} / ${actualSteps.length} 步驟
                             </div>
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
                         <div style="text-align: center;">
-                            <div style="font-size: 1.8em; font-weight: bold; color: #2ed573;">
+                            <div style="font-size: 2em; font-weight: bold; color: #2ed573;">
                                 ${passedSteps}
                             </div>
-                            <div style="color: #666; font-size: 0.85em;">✅ 合格</div>
+                            <div style="color: #666; font-size: 0.95em; margin-top: 5px;">✅ 合格</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.8em; font-weight: bold; color: #ff4757;">
+                            <div style="font-size: 2em; font-weight: bold; color: #ff4757;">
                                 ${actualSteps.length - passedSteps}
                             </div>
-                            <div style="color: #666; font-size: 0.85em;">❌ 不合格</div>
+                            <div style="color: #666; font-size: 0.95em; margin-top: 5px;">❌ 不合格</div>
                         </div>
                     </div>
                     
                     ${record.evaluationSignatures ? `
-                        <div style="margin-top: 15px; padding: 12px; background: white; border-radius: 8px; font-size: 0.9em;">
-                            <strong>✍️ 簽署資訊：</strong><br>
-                            👤 員工：${record.evaluationSignatures.staff}<br>
-                            👔 評核者：${record.evaluationSignatures.supervisor}
+                        <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 10px; font-size: 0.95em; border-left: 4px solid #ffa502;">
+                            <strong style="color: #ffa502;">✍️ 簽署資訊：</strong><br>
+                            <div style="margin-top: 10px; line-height: 1.8;">
+                                👤 員工：${record.evaluationSignatures.staff}<br>
+                                👔 評核者：${record.evaluationSignatures.supervisor}
+                            </div>
                         </div>
                     ` : ''}
                     
-                    <div style="text-align: center; margin-top: 15px; padding: 10px; background: white; border-radius: 8px; font-size: 0.9em; color: #ffa502;">
+                    <div style="text-align: center; margin-top: 20px; padding: 12px; background: white; border-radius: 10px; font-size: 1em; color: #ffa502; border: 2px dashed #ffa502;">
                         👆 點擊查看完整評核詳情
                     </div>
                 </div>
             `;
         });
         
-        // ⭐ 顯示 Modal
-        showModal(`📋 ${item.name} - 評核記錄`, `
-            <div style="max-height: 70vh; overflow-y: auto;">
-                <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-                    <strong style="color: #ffa502; font-size: 1.1em;">
-                        📊 共有 ${recordsSnapshot.size} 筆評核記錄
-                    </strong>
-                </div>
-                ${recordsHtml}
-            </div>
-            <div class="modal-buttons" style="margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="closeModal()">❌ 關閉</button>
-            </div>
-        `);
+        document.getElementById('evalRecordsContent').innerHTML = recordsHtml;
         
     } catch (error) {
         console.error('載入評核記錄失敗:', error);
@@ -6236,8 +6319,13 @@ async function viewEvaluationRecordsList(itemId) {
     }
 }
         
-// ⭐⭐⭐ 新增：查看評核記錄詳情（Quiz 風格）⭐⭐⭐
+// ⭐⭐⭐ 新增：查看評核記錄詳情（獨立頁面，完整顯示）⭐⭐⭐
 async function viewEvaluationResultDetail(recordId, itemId) {
+    showPage('evaluationRecordDetailPage');
+    
+    // 儲存當前記錄 ID（用於返回）
+    window.currentEvalRecordId = recordId;
+    
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
@@ -6258,32 +6346,39 @@ async function viewEvaluationResultDetail(recordId, itemId) {
         });
         
         const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-        const isPassed = record.isPassed || false;
+        const isPassed = record.isPassed !== false && completionRate === 100; // ⭐ 向下兼容
         const attemptCount = record.attemptCount || 1;
         const totalFailCount = record.totalFailCount || 0;
         
-        // ⭐⭐⭐ 參考 Quiz 的結果摘要樣式 ⭐⭐⭐
+        // 更新標題
+        const evalDate = record.evaluatedAt ? 
+            new Date(record.evaluatedAt).toLocaleDateString('zh-TW') : 
+            '未知日期';
+        document.getElementById('evalRecordDetailTitle').textContent = 
+            `📋 評核記錄 - ${evalDate}`;
+        
+        // ⭐⭐⭐ 結果摘要樣式（參考 Quiz）⭐⭐⭐
         let resultHtml = `
             <div class="quiz-result-summary ${isPassed ? 'passed' : 'failed'}">
-                <div style="font-size: 1.5em; margin-bottom: 10px;">
-                    ${isPassed ? '🎉 恭喜合格！' : '💪 繼續努力！'}
+                <div style="font-size: 1.8em; margin-bottom: 15px;">
+                    ${isPassed ? '🎉 評核合格！' : '💪 評核不合格'}
                 </div>
                 <div class="quiz-score-display">${completionRate}%</div>
-                <div style="font-size: 1.2em; margin: 10px 0;">
+                <div style="font-size: 1.3em; margin: 15px 0;">
                     ${passedSteps} / ${actualSteps.length} 步驟合格
                 </div>
                 <div class="quiz-status-badge">
                     ${isPassed ? '✅ 評核通過' : `❌ 評核不合格 (第 ${attemptCount} 次嘗試)`}
                 </div>
                 ${totalFailCount > 0 ? `
-                    <div style="margin-top: 15px; font-size: 0.95em; opacity: 0.95;">
+                    <div style="margin-top: 20px; font-size: 1em; opacity: 0.95;">
                         📊 累計不合格次數：${totalFailCount} 次
                     </div>
                 ` : ''}
                 ${record.evaluationSignatures ? `
-                    <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.2); border-radius: 8px;">
-                        <div style="font-size: 0.9em; opacity: 0.95;">
-                            ✍️ 簽署資訊：<br>
+                    <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
+                        <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
+                            <strong>✍️ 簽署資訊：</strong><br>
                             👤 員工：${record.evaluationSignatures.staff}<br>
                             👔 評核者：${record.evaluationSignatures.supervisor}<br>
                             📅 評核日期：${new Date(record.evaluationSignatures.signedAt).toLocaleString('zh-TW')}
@@ -6298,7 +6393,7 @@ async function viewEvaluationResultDetail(recordId, itemId) {
         item.checklist.forEach((step, index) => {
             if (step.isSubtitle) {
                 resultHtml += `
-                    <div style="margin: 20px 0 10px 0;">
+                    <div style="margin: 30px 0 15px 0;">
                         <span class="step-subtitle">${step.step}</span>
                     </div>
                 `;
@@ -6332,15 +6427,15 @@ async function viewEvaluationResultDetail(recordId, itemId) {
                                 <span class="quiz-question-number">Step ${stepCounter}</span>
                                 ${step.critical ? '<span class="badge badge-critical">⚠️ Critical</span>' : ''}
                             </div>
-                            <div style="color: ${statusColor}; font-weight: bold;">
+                            <div style="color: ${statusColor}; font-weight: bold; font-size: 1.1em;">
                                 ${statusText}
                             </div>
                         </div>
-                        <div class="quiz-question-text">${step.step}</div>
+                        <div class="quiz-question-text" style="font-size: 1.1em;">${step.step}</div>
                         ${remark ? `
-                            <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-left: 4px solid #ffa502; border-radius: 8px;">
-                                <strong style="color: #ffa502;">💬 評核意見：</strong>
-                                <div style="margin-top: 8px; color: #333;">${remark}</div>
+                            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-left: 4px solid #ffa502; border-radius: 10px;">
+                                <strong style="color: #ffa502; font-size: 1.05em;">💬 評核意見：</strong>
+                                <div style="margin-top: 10px; color: #333; line-height: 1.6;">${remark}</div>
                             </div>
                         ` : ''}
                     </div>
@@ -6348,15 +6443,7 @@ async function viewEvaluationResultDetail(recordId, itemId) {
             }
         });
         
-        // ⭐⭐⭐ 使用 Modal 顯示（類似 Quiz）⭐⭐⭐
-        showModal(`📋 ${item.name} - 評核記錄`, `
-            <div style="max-height: 70vh; overflow-y: auto;">
-                ${resultHtml}
-            </div>
-            <div class="modal-buttons" style="margin-top: 20px;">
-                <button class="btn btn-secondary" onclick="closeModal()">❌ 關閉</button>
-            </div>
-        `);
+        document.getElementById('evalRecordDetailContent').innerHTML = resultHtml;
         
     } catch (error) {
         console.error('載入評核記錄失敗:', error);
@@ -10966,6 +11053,23 @@ async function saveEditedAccount(docId) {
     } catch (error) {
         console.error('更新帳號失敗:', error);
         showToast('❌ 更新失敗', 'error');
+    }
+}
+
+        // ⭐⭐⭐ 新增：評核記錄頁面返回導航 ⭐⭐⭐
+function backToEvaluationFromRecords() {
+    if (window.currentEvalCategoryId) {
+        showCategoryEvaluation(window.currentEvalCategoryId);
+    } else {
+        showTrainingProgress(currentStaffId);
+    }
+}
+
+function backToEvalRecordsList() {
+    if (window.currentEvalItemId) {
+        viewEvaluationRecordsList(window.currentEvalItemId);
+    } else {
+        backToEvaluationFromRecords();
     }
 }
     </script>
