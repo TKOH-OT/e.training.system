@@ -3111,16 +3111,19 @@ async function verifyUserBeforeSign() {
                 <input type="password" id="signLoginPw" placeholder="請輸入密碼">
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-success" onclick="confirmSignatureLogin(resolve)">✅ 登入簽名</button>
-                <button class="btn btn-secondary" onclick="closeModal(); reject()">❌ 取消</button>
+                <button class="btn btn-success" onclick="confirmSignatureLogin()">✅ 登入簽名</button>
+                <button class="btn btn-secondary" onclick="cancelSignatureLogin()">❌ 取消</button>
             </div>
         `;
         showModal('🔐 簽名登入驗證', modalBody);
-        window.resolveSignPromise = resolve; // 暫存 Promise callback
+
+        // 🌍 用 global 暫存 resolve/reject，方便其他函數取用
+        window.signatureLoginResolve = resolve;
+        window.signatureLoginReject = reject;
     });
 }
 
-async function confirmSignatureLogin(resolve) {
+async function confirmSignatureLogin() {
     const id = document.getElementById('signLoginId').value.trim();
     const pw = document.getElementById('signLoginPw').value.trim();
 
@@ -3149,7 +3152,12 @@ async function confirmSignatureLogin(resolve) {
 
     closeModal();
     showToast(`✅ 已登入 ${account.name} 簽名`, 'success');
-    resolve(account.name); // 回傳簽署者名稱
+    if (window.signatureLoginResolve) window.signatureLoginResolve(account.name);
+}
+
+function cancelSignatureLogin() {
+    closeModal();
+    if (window.signatureLoginReject) window.signatureLoginReject();
 }
         
         // ==================== 登入系統 ====================
