@@ -5558,6 +5558,59 @@ const checklistHtml = item.checklist.map((step, index) => {
                                 <div class="checklist-header">📋 評核步驟 Checklist</div>
                                 ${checklistHtml}
                             </div>
+                            <!-- ============ 📋 評核簽名區 ============ -->
+<div class="training-record-container" style="margin-top: 25px;">
+  <div class="training-record-header">✍️ 評核簽名</div>
+
+  <div class="training-record-row">
+    <div class="training-record-label">👤 被評核者簽名:</div>
+    <div>
+      ${hasEditPermission ? `
+        <div class="signature-box ${record.evaluationSignatures?.staff ? 'signed' : ''}"
+             onclick="editChecklistSignature('${item.docId}', 0, 'staff', '${record.evaluationSignatures?.staff || ''}')">
+          ${record.evaluationSignatures?.staff || '點擊簽名'}
+        </div>
+      ` : `
+        <div class="signature-box ${record.evaluationSignatures?.staff ? 'signed' : ''}">
+          ${record.evaluationSignatures?.staff || '尚未簽名'}
+        </div>
+      `}
+    </div>
+  </div>
+
+  <div class="training-record-row">
+    <div class="training-record-label">👔 評核者簽名 (Supervisor):</div>
+    <div>
+      ${hasEditPermission ? `
+        <div class="signature-box ${record.evaluationSignatures?.supervisor ? 'signed' : ''}"
+             onclick="editChecklistSignature('${item.docId}', 0, 'supervisor', '${record.evaluationSignatures?.supervisor || ''}')">
+          ${record.evaluationSignatures?.supervisor || '點擊簽名'}
+        </div>
+      ` : `
+        <div class="signature-box ${record.evaluationSignatures?.supervisor ? 'signed' : ''}">
+          ${record.evaluationSignatures?.supervisor || '尚未簽名'}
+        </div>
+      `}
+    </div>
+  </div>
+
+  <div style="margin-top: 10px; text-align: center; font-size: 0.9em; color: #888;">
+    📅 評核日期：${record.evaluationSignatures?.signedAt ? new Date(record.evaluationSignatures.signedAt).toLocaleDateString() : '未簽署'}
+  </div>
+</div>
+
+<!-- ============ 📊 評核結果區 ============ -->
+<div class="score-info" style="margin-top: 20px;">
+  <div class="score-title">📊 評核結果總結</div>
+  <div style="text-align:center; margin-top:10px;">
+    ${record.isPassed 
+        ? `<span class="score-item-value pass">✅ 合格</span>` 
+        : `<span class="score-item-value fail">❌ 不合格，需重做</span>`}
+  </div>
+  <div style="margin-top:8px; font-size:0.9em; color:#666;">
+    嘗試次數：${record.attemptCount || 1}
+  </div>
+</div>
                         </div>
                     </div>
                 `);
@@ -5833,84 +5886,95 @@ if (overallStatusElement) {
             }
         }
 
-// ==================== 標記項目完成 ====================
+// ==================== 標記項目完成（新版：Checklist 評核 + 簽名記錄）====================
 async function markItemComplete(itemId) {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
-        
+
+        // 🟩【1】Checklist 類別專用邏輯
         if (item.hasChecklist && item.recordType === 'checklist') {
             const recordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
                 .where('itemId', '==', itemId)
                 .limit(1)
                 .get();
-            
+
             if (recordsSnapshot.empty) {
                 showToast('❌ 請先完成評核，才能標記完成', 'error');
                 return;
             }
-            
+
             const record = recordsSnapshot.docs[0].data();
+            const recordRef = recordsSnapshot.docs[0].ref;
             const checklistStatus = record.checklistStatus || {};
-            
-            // ⭐⭐⭐ 檢查是否有 Critical 步驟不合格 ⭐⭐⭐
+
+            // 🟨 計算完成率 & Critical 合格情況
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-            const hasCriticalFailed = item.checklist.some((step, index) => {
-                return !step.isSubtitle && step.critical && checklistStatus[index] === 'fail';
-            });
-            
-            // ⭐⭐⭐ 計算完成率 ⭐⭐⭐
+            const hasCriticalFailed = item.checklist.some((step, index) =>
+                !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
+            );
+
             let passedSteps = 0;
-            item.checklist.forEach((step, index) => {
-                if (!step.isSubtitle && checklistStatus[index] === 'pass') {
-                    passedSteps++;
-                }
+            actualSteps.forEach((_, index) => {
+                if (checklistStatus[index] === 'pass') passedSteps++;
             });
+
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-            
-            // ⭐⭐⭐ 新邏輯：允許標記完成，但記錄為不合格 ⭐⭐⭐
-            const recordData = {
-                status: 'completed',
-                isPassed: !hasCriticalFailed && completionRate === 100, // ⭐ 新增：判斷是否合格
-                completionRate: completionRate,
-                hasCriticalFailed: hasCriticalFailed, // ⭐ 記錄是否有 Critical 不合格
-                evaluatedBy: currentUser.docId,
-                evaluatedAt: new Date().toISOString()
+
+            // 🟨 即使有 fail，仍可標記完成
+            const isPassed = !hasCriticalFailed && completionRate === 100;
+            const newAttemptCount = record.isPassed ? (record.attemptCount || 1) : (record.attemptCount || 0) + 1;
+            const attemptResult = isPassed ? 'pass' : 'fail';
+
+            // 🟩 要求：完成即要求簽名
+            const staffName = await verifyUserBeforeSign().catch(() => null);
+            if (!staffName) return; // 使用者取消驗證
+            const supervisorName = currentUser.name; // 主管帳號簽名
+            const signedAt = new Date().toISOString();
+
+            const evaluationSignatures = {
+                staff: staffName,
+                supervisor: supervisorName,
+                signedAt: signedAt
             };
-            
-            // ⭐⭐⭐ 如果不合格，記錄不合格次數 ⭐⭐⭐
-            if (!recordData.isPassed) {
-                const currentFailCount = record.totalFailCount || 0;
-                recordData.totalFailCount = currentFailCount + 1;
-            }
-            
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
-            
-            // ⭐⭐⭐ 根據結果顯示不同訊息 ⭐⭐⭐
-            if (hasCriticalFailed) {
-                showToast(`⚠️ 已標記完成（Critical 步驟不合格 - 第 ${recordData.totalFailCount} 次）`, 'warning');
-            } else if (completionRate < 100) {
-                showToast(`⚠️ 已標記完成（完成率 ${completionRate}% - 第 ${recordData.totalFailCount} 次）`, 'warning');
+
+            const updateData = {
+                status: 'completed',
+                isPassed,
+                finalResult: attemptResult,
+                attemptCount: newAttemptCount,
+                completionRate,
+                hasCriticalFailed,
+                evaluationSignatures,
+                evaluatedBy: currentUser.docId,
+                evaluatedAt: signedAt
+            };
+
+            await recordRef.update(updateData);
+
+            if (isPassed) {
+                showToast(`✅ 已完成評核（合格）`, 'success');
             } else {
-                showToast('✅ 項目已標記完成（合格）', 'success');
+                showToast(`⚠️ 已完成評核（不合格，第 ${newAttemptCount} 次）`, 'warning');
             }
-            
-        } else {
-            // ⭐ 訓練記錄類型或舊版項目
+
+        }
+        // 🟦【2】Training 類別保持不變
+        else {
             const recordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
                 .where('itemId', '==', itemId)
                 .limit(1)
                 .get();
-            
+
             const recordData = {
                 status: 'completed',
                 isPassed: true,
                 evaluatedBy: currentUser.docId,
                 evaluatedAt: new Date().toISOString()
             };
-            
+
             if (recordsSnapshot.empty) {
                 recordData.userId = currentStaffId;
                 recordData.itemId = itemId;
@@ -5918,12 +5982,13 @@ async function markItemComplete(itemId) {
             } else {
                 await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
             }
-            
-            showToast('✅ 項目已標記完成', 'success');
+
+            showToast('✅ 訓練記錄已標記完成', 'success');
         }
-        
+
+        // 🟩 更新畫面
         showCategoryEvaluation(currentCategoryId);
-        
+
     } catch (error) {
         console.error('標記完成失敗:', error);
         showToast('❌ 操作失敗', 'error');
