@@ -299,6 +299,43 @@
             50% { opacity: 0.7; }
         }
 
+        /* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
+.item-card.eval-failed {
+    background: linear-gradient(135deg, #ff4757 0%, #e84118 100%) !important;
+    color: white !important;
+    animation: pulseRed 2s infinite;
+}
+
+.item-card.eval-failed .card-title,
+.item-card.eval-failed .card-stats,
+.item-card.eval-failed .progress-percent,
+.item-card.eval-failed .progress-label,
+.item-card.eval-failed .item-card-name {
+    color: white !important;
+}
+
+.item-card.eval-failed .progress-ring-circle {
+    stroke: white !important;
+}
+
+.item-card.eval-failed .progress-ring-bg {
+    stroke: rgba(255,255,255,0.3) !important;
+}
+
+.item-card.eval-failed .badge {
+    background: rgba(255,255,255,0.3) !important;
+    color: white !important;
+}
+
+@keyframes pulseRed {
+    0%, 100% { 
+        box-shadow: 0 5px 20px rgba(255, 71, 87, 0.4);
+    }
+    50% { 
+        box-shadow: 0 10px 40px rgba(255, 71, 87, 0.6);
+    }
+}
+        
         .badge-WM { background: #c23616; color: white; }
         .badge-APN { background: #ff6b81; color: white; }
         .badge-RN { background: #00d2ff; color: white; }
@@ -5459,34 +5496,45 @@ const checklistHtml = item.checklist.map((step, index) => {
     `;
 }).join('');
 
-                let overallStatus = '';
-                let overallClass = '';
+let overallStatus = '';
+let overallClass = '';
+let cardStatusClass = ''; // ⭐ 新增這行
 
-                const criticalSteps = item.checklist.filter(s => !s.isSubtitle && s.critical);
-                const hasCriticalPending = criticalSteps.some((step) => {
-                    const stepIndex = item.checklist.indexOf(step);
-                    return !checklistStatus[stepIndex] || checklistStatus[stepIndex] === 'pending';
-                });
+const criticalSteps = item.checklist.filter(s => !s.isSubtitle && s.critical);
+const hasCriticalPending = criticalSteps.some((step) => {
+    const stepIndex = item.checklist.indexOf(step);
+    return !checklistStatus[stepIndex] || checklistStatus[stepIndex] === 'pending';
+});
 
-                if (allCriticalPassed && completionRate === 100 && record?.status === 'completed') {
-                    overallStatus = '✅ 已完成';
-                    overallClass = 'completed';
-                } else if (hasCriticalPending) {
-                    overallStatus = '<span class="critical-warning">⚠️ 尚有 Critical 步驟未通過</span>';
-                    overallClass = '';
-                } else if (!allCriticalPassed) {
-                    overallStatus = '<span class="critical-warning">❌ Critical 步驟不合格</span>';
-                    overallClass = '';
-                } else if (completionRate < 100) {
-                    overallStatus = `⚠️ 完成率 ${completionRate}%`;
-                    overallClass = '';
-                } else {
-                    overallStatus = '⏳ 待完成';
-                    overallClass = '';
+// ⭐⭐⭐ 新增：判斷是否不合格 ⭐⭐⭐
+const isEvalFailed = record?.status === 'completed' && 
+                      record?.isPassed === false;
+
+if (isEvalFailed) {
+    cardStatusClass = 'eval-failed'; // ⭐ 整個卡片變紅
+    const failCount = record.totalFailCount || 1;
+    overallStatus = `<span class="critical-warning">❌ 評核不合格（第 ${failCount} 次）</span>`;
+    overallClass = 'failed';
+} else if (allCriticalPassed && completionRate === 100 && record?.status === 'completed') {
+    overallStatus = '✅ 已完成';
+    overallClass = 'completed';
+    cardStatusClass = 'completed';
+} else if (hasCriticalPending) {
+    overallStatus = '<span class="critical-warning">⚠️ 尚有 Critical 步驟未通過</span>';
+    overallClass = '';
+} else if (!allCriticalPassed) {
+    overallStatus = '<span class="critical-warning">❌ Critical 步驟不合格</span>';
+    overallClass = '';
+} else if (completionRate < 100) {
+    overallStatus = `⚠️ 完成率 ${completionRate}%`;
+    overallClass = '';
+} else {
+    overallStatus = '⏳ 待完成';
+    overallClass = '';
                 }
 
-                itemsHtml.push(`
-                    <div class="item-card ${overallClass}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
+itemsHtml.push(`
+    <div class="item-card ${overallClass} ${cardStatusClass}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
                         <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
                         
                         <div class="item-card-header">
@@ -5565,25 +5613,37 @@ const checklistHtml = item.checklist.map((step, index) => {
   <div class="training-record-row">
     <div class="training-record-label">👤 被評核者簽名:</div>
     <div>
-      <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}"
-           onclick="editChecklistSignature('${item.docId}', 0, 'staff', '${record?.evaluationSignatures?.staff || ''}')">
-          ${record?.evaluationSignatures?.staff || '點擊簽名'}
-      </div>
+      ${(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? `
+        <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}"
+             onclick="editChecklistSignature('${item.docId}', 0, 'staff')">
+            ${record?.evaluationSignatures?.staff || '點擊簽名'}
+        </div>
+      ` : `
+        <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}">
+            ${record?.evaluationSignatures?.staff || '尚未簽名'}
+        </div>
+      `}
     </div>
   </div>
 
   <div class="training-record-row">
     <div class="training-record-label">👔 評核者簽名 (Supervisor):</div>
     <div>
-      <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}"
-           onclick="editChecklistSignature('${item.docId}', 0, 'supervisor', '${record?.evaluationSignatures?.supervisor || ''}')">
-          ${record?.evaluationSignatures?.supervisor || '點擊簽名'}
-      </div>
+      ${(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? `
+        <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}"
+             onclick="editChecklistSignature('${item.docId}', 0, 'supervisor')">
+            ${record?.evaluationSignatures?.supervisor || '點擊簽名'}
+        </div>
+      ` : `
+        <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}">
+            ${record?.evaluationSignatures?.supervisor || '尚未簽名'}
+        </div>
+      `}
     </div>
   </div>
 
   <div style="margin-top: 10px; text-align: center; font-size: 0.9em; color: #888;">
-    📅 評核日期：${record?.evaluationSignatures?.signedAt ? new Date(record.evaluationSignatures.signedAt).toLocaleDateString() : '未簽署'}
+    📅 評核日期：${record?.evaluationSignatures?.signedAt ? new Date(record.evaluationSignatures.signedAt).toLocaleString('zh-TW') : '未簽署'}
   </div>
 </div>
 
@@ -6044,17 +6104,150 @@ function showCompletedItemOptions(itemId, isPassed) {
     showModal('📋 評核完成', modalBody);
 }
 
-// ⭐ 查看評核記錄
-function viewCompletedItemResult(itemId) {
-    closeModal();
-    // 保持當前卡片展開，滾動到該卡片
-    const card = document.getElementById(`eval_item_${itemId}`);
-    if (card) {
-        card.classList.add('expanded');
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // ⭐⭐⭐ 新增：查看評核記錄詳情（Quiz 風格）⭐⭐⭐
+async function viewEvaluationResultDetail(itemId) {
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .limit(1)
+            .get();
+        
+        if (recordsSnapshot.empty) {
+            showToast('⚠️ 尚無評核記錄', 'warning');
+            return;
+        }
+        
+        const record = recordsSnapshot.docs[0].data();
+        const checklistStatus = record.checklistStatus || {};
+        const remarks = record.remarks || {};
+        
+        // 計算數據
+        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+        let passedSteps = 0;
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                passedSteps++;
+            }
+        });
+        
+        const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
+        const isPassed = record.isPassed || false;
+        const attemptCount = record.attemptCount || 1;
+        const totalFailCount = record.totalFailCount || 0;
+        
+        // ⭐⭐⭐ 參考 Quiz 的結果摘要樣式 ⭐⭐⭐
+        let resultHtml = `
+            <div class="quiz-result-summary ${isPassed ? 'passed' : 'failed'}">
+                <div style="font-size: 1.5em; margin-bottom: 10px;">
+                    ${isPassed ? '🎉 恭喜合格！' : '💪 繼續努力！'}
+                </div>
+                <div class="quiz-score-display">${completionRate}%</div>
+                <div style="font-size: 1.2em; margin: 10px 0;">
+                    ${passedSteps} / ${actualSteps.length} 步驟合格
+                </div>
+                <div class="quiz-status-badge">
+                    ${isPassed ? '✅ 評核通過' : `❌ 評核不合格 (第 ${attemptCount} 次嘗試)`}
+                </div>
+                ${totalFailCount > 0 ? `
+                    <div style="margin-top: 15px; font-size: 0.95em; opacity: 0.95;">
+                        📊 累計不合格次數：${totalFailCount} 次
+                    </div>
+                ` : ''}
+                ${record.evaluationSignatures ? `
+                    <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.2); border-radius: 8px;">
+                        <div style="font-size: 0.9em; opacity: 0.95;">
+                            ✍️ 簽署資訊：<br>
+                            👤 員工：${record.evaluationSignatures.staff}<br>
+                            👔 評核者：${record.evaluationSignatures.supervisor}<br>
+                            📅 評核日期：${new Date(record.evaluationSignatures.signedAt).toLocaleString('zh-TW')}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+        // ⭐⭐⭐ 顯示每個步驟的詳細結果 ⭐⭐⭐
+        let stepCounter = 0;
+        item.checklist.forEach((step, index) => {
+            if (step.isSubtitle) {
+                resultHtml += `
+                    <div style="margin: 20px 0 10px 0;">
+                        <span class="step-subtitle">${step.step}</span>
+                    </div>
+                `;
+            } else {
+                stepCounter++;
+                const status = checklistStatus[index] || 'pending';
+                const remark = remarks[index] || '';
+                const stepFailCount = (record.failureCount && record.failureCount[index]) || 0;
+                
+                let statusClass = '';
+                let statusText = '';
+                let statusColor = '';
+                
+                if (status === 'pass') {
+                    statusClass = 'correct';
+                    statusText = '✅ 合格';
+                    statusColor = '#2ed573';
+                } else if (status === 'fail') {
+                    statusClass = 'incorrect';
+                    statusText = `❌ 不合格${stepFailCount > 0 ? ` (第 ${stepFailCount} 次)` : ''}`;
+                    statusColor = '#ff4757';
+                } else {
+                    statusText = '⏳ 未評核';
+                    statusColor = '#999';
+                }
+                
+                resultHtml += `
+                    <div class="quiz-question-card">
+                        <div class="quiz-question-header">
+                            <div>
+                                <span class="quiz-question-number">Step ${stepCounter}</span>
+                                ${step.critical ? '<span class="badge badge-critical">⚠️ Critical</span>' : ''}
+                            </div>
+                            <div style="color: ${statusColor}; font-weight: bold;">
+                                ${statusText}
+                            </div>
+                        </div>
+                        <div class="quiz-question-text">${step.step}</div>
+                        ${remark ? `
+                            <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-left: 4px solid #ffa502; border-radius: 8px;">
+                                <strong style="color: #ffa502;">💬 評核意見：</strong>
+                                <div style="margin-top: 8px; color: #333;">${remark}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+        });
+        
+        // ⭐⭐⭐ 使用 Modal 顯示（類似 Quiz）⭐⭐⭐
+        showModal(`📋 ${item.name} - 評核記錄`, `
+            <div style="max-height: 70vh; overflow-y: auto;">
+                ${resultHtml}
+            </div>
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 關閉</button>
+            </div>
+        `);
+        
+    } catch (error) {
+        console.error('載入評核記錄失敗:', error);
+        showToast('❌ 載入失敗', 'error');
     }
 }
-
+        
+// ⭐ 查看評核記錄（修改版）
+function viewCompletedItemResult(itemId) {
+    closeModal();
+    // ⭐⭐⭐ 唔再展開卡片，直接彈出詳細結果 ⭐⭐⭐
+    viewEvaluationResultDetail(itemId);
+}
+        
 // ⭐ 重新評核
 function reopenItemEvaluation(itemId) {
     closeModal();
@@ -7957,36 +8150,28 @@ async function saveStepSignature(itemId, stepIndex, type, signerName) {
     showCategoryEvaluation(currentCategoryId);
 }
         
-        // ==================== 評核步驟簽名（Checklist 專用）====================
-function editChecklistSignature(itemId, stepIndex, type, currentValue) {
+// ==================== 評核步驟簽名（Checklist 專用 - 改用 Login 驗證）====================
+async function editChecklistSignature(itemId, stepIndex, type) {
     const label = type === 'staff' ? '員工' : 'Supervisor';
     
-    // ⭐ Supervisor 自動填入登入者姓名
-    const defaultValue = type === 'supervisor' && !currentValue ? currentUser.name : currentValue;
-    
-    const modalBody = `
-        <div class="input-group">
-            <label>✍️ ${label}簽名</label>
-            <input type="text" id="signatureInput" value="${defaultValue}" placeholder="請輸入簽名" autofocus>
-        </div>
-        <div class="modal-buttons">
-            <button class="btn btn-success" onclick="saveChecklistSignature('${itemId}', ${stepIndex}, '${type}')">✅ 確定</button>
-            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
-        </div>
-    `;
-
-    showModal(`✍️ ${label}簽名`, modalBody);
+    try {
+        // ⭐⭐⭐ 改用 Login 驗證 ⭐⭐⭐
+        const signerName = await verifyUserBeforeSign().catch(() => null);
+        if (!signerName) return; // 使用者取消驗證
+        
+        // 直接儲存簽名
+        await saveChecklistSignature(itemId, stepIndex, type, signerName);
+        
+    } catch (error) {
+        console.error('簽名失敗:', error);
+        showToast('❌ 簽名失敗', 'error');
+    }
 }
 
-// ==================== 儲存評核步驟簽名 ====================
-async function saveChecklistSignature(itemId, stepIndex, type) {
-    const signature = document.getElementById('signatureInput').value.trim();
+// ==================== 儲存評核步驟簽名（改用傳入的簽名）====================
+async function saveChecklistSignature(itemId, stepIndex, type, signature) {
+    // ⭐ signature 已經係 verifyUserBeforeSign() 返回的姓名
     
-    if (!signature) {
-        showToast('❌ 請輸入簽名', 'error');
-        return;
-    }
-
     try {
         const recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
@@ -8026,8 +8211,7 @@ async function saveChecklistSignature(itemId, stepIndex, type) {
             await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
         }
 
-        showToast('✅ 簽名已儲存', 'success');
-        closeModal();
+        showToast(`✅ ${signature} 已簽名`, 'success');
         
         // ⭐ 刷新卡片
         await refreshCurrentItemCard(itemId);
