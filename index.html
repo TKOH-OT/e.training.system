@@ -5972,17 +5972,29 @@ const allCriticalPassed = item.checklist.every((step, index) => {
 let overallStatus = '';
 let overallClass = '';
 
-// ⭐⭐⭐ 新增：檢查 isPassed 欄位 ⭐⭐⭐
+// ⭐⭐⭐ 修正：統一判斷邏輯（同 showCategoryEvaluation 一致）⭐⭐⭐
 if (record?.status === 'completed') {
-    if (record.isPassed === false) {
-        // ⭐ 已完成但不合格
+    let isPassed = false;
+    
+    // 1️⃣ 新數據：明確標記為合格
+    if (record.isPassed === true) {
+        isPassed = true;
+    } 
+    // 2️⃣ 舊數據兼容：沒有明確標記，但符合條件
+    else if (record.isPassed !== false && allCriticalPassed && completionRate === 100) {
+        isPassed = true;
+    }
+    // 3️⃣ record.isPassed === false 時，isPassed 保持 false
+    
+    if (!isPassed) {
+        // ❌ 不合格
         const failCount = record.totalFailCount || 1;
         overallStatus = `<span class="critical-warning">❌ 評核不合格（第 ${failCount} 次）</span>`;
         overallClass = 'failed';
         card.classList.add('failed');
         card.classList.remove('completed');
-    } else if (allCriticalPassed && completionRate === 100) {
-        // ✅ 已完成且合格
+    } else {
+        // ✅ 合格
         overallStatus = '✅ 已完成（合格）';
         overallClass = 'completed';
         card.classList.add('completed');
