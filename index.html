@@ -5231,6 +5231,12 @@ async function showCategoryEvaluation(categoryId) {
     <div class="training-record-label">👔 Supervisor 加簽:</div>
     <div>
         ${hasEditPermission ? `
+            <div style="margin-bottom: 6px;">
+                <button class="btn btn-success btn-small"
+                    onclick="openBatchSignModal('${item.docId}', 'supervisor')">
+                    🖊️ Supervisor 一鍵多簽
+                </button>
+            </div>
             <div class="signature-box ${stepRecord.supervisorSignature ? 'signed' : ''}" 
                  onclick="editStepSignature('${item.docId}', ${index}, 'supervisor', '${stepRecord.supervisorSignature || ''}')">
                 ${stepRecord.supervisorSignature || '點擊輸入簽名'}
@@ -6101,17 +6107,17 @@ function closeModal() {
     if (modal) modal.classList.remove('active');
 }
 
-// ==================== 一鍵多簽彈窗（改良版：登入 + 步驟選擇） ====================
+// ==================== 一鍵多簽彈窗（支援 Supervisor） ====================
 async function openBatchSignModal(itemId, type = "trainee") {
     try {
-        // 先進行簽名登入驗證
+        // 🔐 先進行簽名登入驗證（依然保留安全機制）
         const signerName = await verifyUserBeforeSign().catch(() => null);
         if (!signerName) return;
 
-        // 登入完成 → 顯示步驟選擇清單
+        // 登入成功 → 顯示步驟選擇清單
         await openBatchSignSelection(itemId, type, signerName);
     } catch (err) {
-        console.error("打開一鍵多簽視窗錯誤:", err);
+        console.error("打開一鍵多簽錯誤:", err);
         showToast("❌ 無法開啟一鍵簽署", "error");
     }
 }
@@ -6121,14 +6127,13 @@ async function openBatchSignSelection(itemId, type, signerName) {
     const itemDoc = await db.collection("trainingItems").doc(itemId).get();
     const item = itemDoc.data();
 
-    const label =
+    let roleLabel =
         type === "trainee"
             ? "新同事"
             : type === "mentor"
             ? "陪帶同事"
             : "Supervisor";
 
-    // 載入現有記錄，判斷哪些已簽名
     const recordsSnapshot = await db
         .collection("trainingRecords")
         .where("userId", "==", currentStaffId)
@@ -6146,7 +6151,8 @@ async function openBatchSignSelection(itemId, type, signerName) {
 
     item.checklist.forEach((step, i) => {
         if (step.isSubtitle) {
-            checklistHtml += `<div class="subtitle" style="margin: 15px 0 10px; font-weight: bold; color: #ffa502;">${step.step}</div>`;
+            checklistHtml += `
+                <div style="margin: 15px 0 10px; font-weight: bold; color: #ffa502;">${step.step}</div>`;
         } else {
             count++;
             const signed = existingRecords[i]?.[`${type}Signature`];
@@ -6163,58 +6169,67 @@ async function openBatchSignSelection(itemId, type, signerName) {
 
     const modalHTML = `
         <div style="padding-bottom:10px;">
-            <strong>✍️ ${label}：</strong>${signerName}
+            <strong>✍️ ${roleLabel}：</strong>${signerName}
         </div>
         ${checklistHtml}
-        <div class="modal-buttons" style="margin-top:15px;display:flex;gap:10px;">
+        <div class="modal-buttons" style="display:flex;gap:10px;margin-top:15px;">
             <button class="btn btn-success" style="flex:1"
                 onclick="confirmBatchSignSelected('${itemId}','${type}','${signerName}')">✅ 確定簽署</button>
             <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">❌ 取消</button>
         </div>
     `;
-    showModal(`✍️ ${label} 一鍵多簽`, modalHTML);
+    showModal(`✍️ ${roleLabel} 一鍵多簽`, modalHTML);
 }
-
-// ==================== 確認簽署（更新選中步驟） ====================
+        
+// ==================== 確定簽署（不跳返主畫面） ====================
 async function confirmBatchSignSelected(itemId, type, signerName) {
-    const checked = [...document.querySelectorAll(".checkbox-step input:checked")];
-    if (checked.length === 0) {
-        showToast("❌ 請至少選擇一個步驟", "error");
-        return;
-    }
+    try {
+        const checked = [...document.querySelectorAll(".checkbox-step input:checked")];
+        if (checked.length === 0) {
+            showToast("❌ 請至少選擇一個步驟", "error");
+            return;
+        }
 
-    const recordsSnapshot = await db
-        .collection("trainingRecords")
-        .where("userId", "==", currentStaffId)
-        .where("itemId", "==", itemId)
-        .limit(1)
-        .get();
+        const recordsSnapshot = await db
+            .collection("trainingRecords")
+            .where("userId", "==", currentStaffId)
+            .where("itemId", "==", itemId)
+            .limit(1)
+            .get();
 
-    let record = recordsSnapshot.empty ? { stepRecords: {} } : recordsSnapshot.docs[0].data();
-    const recordId = recordsSnapshot.empty ? null : recordsSnapshot.docs[0].id;
+        let record = recordsSnapshot.empty ? { stepRecords: {} } : recordsSnapshot.docs[0].data();
+        const recordId = recordsSnapshot.empty ? null : recordsSnapshot.docs[0].id;
 
-    checked.forEach((cb) => {
-        const index = cb.value;
-        if (!record.stepRecords[index]) record.stepRecords[index] = {};
-        record.stepRecords[index][`${type}Signature`] = signerName;
-        record.stepRecords[index][`${type}SignedAt`] = new Date().toISOString();
-    });
-
-    if (recordId) {
-        await db.collection("trainingRecords").doc(recordId).update({ stepRecords: record.stepRecords });
-    } else {
-        await db.collection("trainingRecords").add({
-            userId: currentStaffId,
-            itemId,
-            stepRecords: record.stepRecords,
+        checked.forEach((cb) => {
+            const index = cb.value;
+            if (!record.stepRecords[index]) record.stepRecords[index] = {};
+            record.stepRecords[index][`${type}Signature`] = signerName;
+            record.stepRecords[index][`${type}SignedAt`] = new Date().toISOString();
         });
+
+        if (recordId) {
+            await db.collection("trainingRecords").doc(recordId).update({ stepRecords: record.stepRecords });
+        } else {
+            await db.collection("trainingRecords").add({
+                userId: currentStaffId,
+                itemId,
+                stepRecords: record.stepRecords,
+            });
+        }
+
+        showToast(`✅ 成功簽署 ${checked.length} 個步驟`, "success");
+
+        // ✅ 只關閉彈窗，不跳回主畫面
+        closeModal();
+
+        // ✅ 即時刷新畫面顯示
+        await showCategoryEvaluation(currentCategoryId);
+    } catch (err) {
+        console.error("多簽過程失敗:", err);
+        showToast("❌ 簽名失敗", "error");
     }
-
-    showToast(`✅ 成功簽署 ${checked.length} 個步驟`, "success");
-    closeModal();
-    showCategoryEvaluation(currentCategoryId);
 }
-
+        
 // ==================== Toast 訊息提示 ====================
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
