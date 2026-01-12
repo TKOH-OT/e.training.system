@@ -5962,91 +5962,94 @@ if (overallStatusElement) {
             }
         }
 
-// ==================== 標記項目完成（新版：Checklist 評核 + 簽名記錄）====================
+// ==================== 標記項目完成（新版：支援多次評核 + 保留歷史）====================
 async function markItemComplete(itemId) {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
 
-        let isPassed = false; // ⭐ 提前聲明變數
+        let isPassed = false;
 
-// 🟩【1】Checklist 類別專用邏輯
-if (item.hasChecklist && item.recordType === 'checklist') {
-    const recordsSnapshot = await db.collection('trainingRecords')
-        .where('userId', '==', currentStaffId)
-        .where('itemId', '==', itemId)
-        .limit(1)
-        .get();
+        // 🟩【1】Checklist 類別專用邏輯
+        if (item.hasChecklist && item.recordType === 'checklist') {
+            const recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'pending') // ⭐ 只查詢 pending 狀態
+                .limit(1)
+                .get();
 
-    if (recordsSnapshot.empty) {
-        showToast('❌ 請先完成評核，才能標記完成', 'error');
-        return;
-    }
+            if (recordsSnapshot.empty) {
+                showToast('❌ 請先完成評核，才能標記完成', 'error');
+                return;
+            }
 
-    const record = recordsSnapshot.docs[0].data();
-    const recordRef = recordsSnapshot.docs[0].ref;
-    const checklistStatus = record.checklistStatus || {};
+            const record = recordsSnapshot.docs[0].data();
+            const recordRef = recordsSnapshot.docs[0].ref;
+            const checklistStatus = record.checklistStatus || {};
 
-    // 🟨 計算完成率 & Critical 合格情況
-    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-    const hasCriticalFailed = item.checklist.some((step, index) =>
-        !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
-    );
+            // 🟨 計算完成率 & Critical 合格情況
+            const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+            const hasCriticalFailed = item.checklist.some((step, index) =>
+                !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
+            );
 
-    let passedSteps = 0;
-    actualSteps.forEach((_, index) => {
-        if (checklistStatus[index] === 'pass') passedSteps++;
-    });
+            let passedSteps = 0;
+            actualSteps.forEach((_, index) => {
+                if (checklistStatus[index] === 'pass') passedSteps++;
+            });
 
-    const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
+            const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
-    // 🟨 即使有 fail，仍可標記完成
-    isPassed = !hasCriticalFailed && completionRate === 100;
-    
-    // ⭐ 新增：計算嘗試次數
-    const previousAttemptCount = record.attemptCount || 0;
-    const newAttemptCount = isPassed ? previousAttemptCount : previousAttemptCount + 1;
-    
-    // ⭐ 新增：更新總不合格次數
-    const totalFailCount = isPassed ? (record.totalFailCount || 0) : (record.totalFailCount || 0) + 1;
+            isPassed = !hasCriticalFailed && completionRate === 100;
+            
+            // ⭐ 取得所有歷史記錄以計算次數
+            const allRecordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'completed')
+                .get();
+            
+            const attemptNumber = allRecordsSnapshot.size + 1; // 第幾次嘗試
 
-    // 🟩🟩🟩 修改：分別要求員工和主管簽名 🟩🟩🟩
-    const staffName = await verifyUserBeforeSign().catch(() => null);
-    if (!staffName) return; // 員工取消驗證
-    
-    const supervisorName = await verifyUserBeforeSign().catch(() => null);
-    if (!supervisorName) return; // 主管取消驗證
-    
-    const signedAt = new Date().toISOString();
+            // 🟩🟩🟩 修改：分別要求員工和主管簽名
+            const staffName = await verifyUserBeforeSign().catch(() => null);
+            if (!staffName) return;
+            
+            const supervisorName = await verifyUserBeforeSign().catch(() => null);
+            if (!supervisorName) return;
+            
+            const signedAt = new Date().toISOString();
 
-    const evaluationSignatures = {
-        staff: staffName,
-        supervisor: supervisorName,
-        signedAt: signedAt
-    };
+            const evaluationSignatures = {
+                staff: staffName,
+                supervisor: supervisorName,
+                signedAt: signedAt
+            };
 
-    const updateData = {
-        status: 'completed',
-        isPassed,
-        attemptCount: newAttemptCount,
-        totalFailCount: totalFailCount,
-        completionRate,
-        hasCriticalFailed,
-        evaluationSignatures,
-        evaluatedBy: currentUser.docId,
-        evaluatedByName: currentUser.name,
-        evaluatedAt: signedAt
-    };
+            // ⭐⭐⭐ 關鍵修改：直接更新現有記錄為完成狀態，唔再計算 attemptCount ⭐⭐⭐
+            const updateData = {
+                status: 'completed',
+                isPassed,
+                completionRate,
+                hasCriticalFailed,
+                evaluationSignatures,
+                evaluatedBy: currentUser.docId,
+                evaluatedByName: currentUser.name,
+                evaluatedAt: signedAt,
+                attemptNumber: attemptNumber, // ⭐ 記錄第幾次評核
+                completedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
 
-    await recordRef.update(updateData);
+            await recordRef.update(updateData);
 
-    if (isPassed) {
-        showToast(`✅ 已完成評核（合格）`, 'success');
-    } else {
-        showToast(`⚠️ 已完成評核（不合格，第 ${newAttemptCount} 次）`, 'warning');
-    }
+            if (isPassed) {
+                showToast(`✅ 已完成評核（合格）- 第 ${attemptNumber} 次評核`, 'success');
+            } else {
+                showToast(`⚠️ 已完成評核（不合格）- 第 ${attemptNumber} 次評核`, 'warning');
+            }
 
-}
+        }
         // 🟦【2】Training 類別保持不變
         else {
             const recordsSnapshot = await db.collection('trainingRecords')
@@ -6059,7 +6062,8 @@ if (item.hasChecklist && item.recordType === 'checklist') {
                 status: 'completed',
                 isPassed: true,
                 evaluatedBy: currentUser.docId,
-                evaluatedAt: new Date().toISOString()
+                evaluatedAt: new Date().toISOString(),
+                completedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
             if (recordsSnapshot.empty) {
@@ -6070,11 +6074,11 @@ if (item.hasChecklist && item.recordType === 'checklist') {
                 await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
             }
 
-            isPassed = true; // ⭐ Training 類別永遠合格
+            isPassed = true;
             showToast('✅ 訓練記錄已標記完成', 'success');
         }
 
-        // ⭐⭐⭐ 顯示完成選項畫面 ⭐⭐⭐
+        // ⭐⭐⭐ 顯示完成選項畫面
         showCompletedItemOptions(itemId, isPassed);
         
     } catch (error) {
@@ -6141,11 +6145,11 @@ async function viewEvaluationRecordsList(itemId) {
         
         // ⭐ 載入該員工嘅所有評核記錄
         const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .where('status', '==', 'completed')
-            .orderBy('evaluatedAt', 'desc')
-            .get();
+    .where('userId', '==', currentStaffId)
+    .where('itemId', '==', itemId)
+    .where('status', '==', 'completed')
+    .orderBy('completedAt', 'desc') // ⭐ 改用 completedAt 排序
+    .get();
         
         if (recordsSnapshot.empty) {
             document.getElementById('evalRecordsSummary').style.display = 'none';
@@ -6435,31 +6439,28 @@ function viewCompletedItemResult(itemId) {
     viewEvaluationResultDetail(itemId);
 }
         
-// ⭐ 重新評核（不刪除記錄，只重設狀態為 pending）
+// ⭐ 重新評核（唔再刪除記錄，建立全新嘅 pending 記錄）
 async function reopenItemEvaluation(itemId) {
-    if (!confirm('❓ 確定要重新評核此項目嗎？\n\n⚠️ 這會清除「已完成」標記，但保留所有評核資料。')) {
+    if (!confirm('❓ 確定要重新評核此項目嗎？\n\n✅ 這會開始新的評核，所有歷史記錄會保留。')) {
         return;
     }
 
     try {
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .limit(1)
-            .get();
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
 
-        if (!recordsSnapshot.empty) {
-            // ⭐ 只重設狀態，唔刪除記錄
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
-                status: 'pending',
-                isPassed: false,
-                completionRate: null,
-                evaluationSignatures: firebase.firestore.FieldValue.delete(),
-                updatedAt: new Date().toISOString()
-            });
-        }
+        // ⭐⭐⭐ 唔再重設舊記錄，直接建立新記錄 ⭐⭐⭐
+        await db.collection('trainingRecords').add({
+            userId: currentStaffId,
+            itemId: itemId,
+            status: 'pending',
+            checklistStatus: {},
+            remarks: {},
+            failureCount: {},
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-        showToast('✅ 已重設為待評核狀態', 'success');
+        showToast('✅ 已開始新的評核，歷史記錄已保留', 'success');
         closeModal();
         showCategoryEvaluation(currentCategoryId);
         
