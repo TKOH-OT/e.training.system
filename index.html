@@ -5165,6 +5165,77 @@ document.getElementById('importantTimeline').style.display = 'block';
             }
         }
 
+             // ==================== 更新 Checklist 步驟狀態 ====================
+async function updateChecklistStepStatus(itemId, stepIndex, status) {
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+
+        // ⭐⭐⭐ 只查詢 pending 記錄 ⭐⭐⭐
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+
+        let checklistStatus = {};
+        let remarks = {};
+        let failureCount = {};
+
+        if (!recordsSnapshot.empty) {
+            const record = recordsSnapshot.docs[0].data();
+            checklistStatus = record.checklistStatus || {};
+            remarks = record.remarks || {};
+            failureCount = record.failureCount || {};
+        }
+
+        // 更新步驟狀態
+        checklistStatus[stepIndex] = status;
+
+        // ⭐ 如果標記為「不合格」，累加次數
+        if (status === 'fail') {
+            failureCount[stepIndex] = (failureCount[stepIndex] || 0) + 1;
+        } else if (status === 'pending') {
+            // 重設時，清除不合格次數
+            failureCount[stepIndex] = 0;
+        }
+
+        const recordData = {
+            userId: currentStaffId,
+            itemId: itemId,
+            checklistStatus: checklistStatus,
+            remarks: remarks,
+            failureCount: failureCount,
+            status: 'pending',
+            evaluatedBy: currentUser.docId,
+            evaluatedAt: new Date().toISOString()
+        };
+
+        if (recordsSnapshot.empty) {
+            await db.collection('trainingRecords').add(recordData);
+        } else {
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
+        }
+
+        // ⭐⭐⭐ 即時刷新卡片狀態 ⭐⭐⭐
+        await refreshCurrentItemCard(itemId);
+
+        // ⭐⭐⭐ 提示訊息 ⭐⭐⭐
+        if (status === 'pass') {
+            showToast('✅ 已標記為合格', 'success');
+        } else if (status === 'fail') {
+            showToast('❌ 已標記為不合格', 'warning');
+        } else {
+            showToast('🔄 已重設狀態', 'success');
+        }
+
+    } catch (error) {
+        console.error('更新步驟狀態失敗:', error);
+        showToast('❌ 更新失敗: ' + error.message, 'error');
+    }
+}
+        
 // ==================== 顯示分類評核（員工評核模式）====================
 async function showCategoryEvaluation(categoryId) {
     currentCategoryId = categoryId;
@@ -5960,78 +6031,7 @@ async function saveRemark(itemId, stepIndex) {
                 showToast('❌ 儲存失敗', 'error');
             }
         }
-
-        // ==================== 更新 Checklist 步驟狀態 ====================
-async function updateChecklistStepStatus(itemId, stepIndex, status) {
-    try {
-        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
-        const item = itemDoc.data();
-
-        // ⭐⭐⭐ 只查詢 pending 記錄 ⭐⭐⭐
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .where('status', '==', 'pending')
-            .limit(1)
-            .get();
-
-        let checklistStatus = {};
-        let remarks = {};
-        let failureCount = {};
-
-        if (!recordsSnapshot.empty) {
-            const record = recordsSnapshot.docs[0].data();
-            checklistStatus = record.checklistStatus || {};
-            remarks = record.remarks || {};
-            failureCount = record.failureCount || {};
-        }
-
-        // 更新步驟狀態
-        checklistStatus[stepIndex] = status;
-
-        // ⭐ 如果標記為「不合格」，累加次數
-        if (status === 'fail') {
-            failureCount[stepIndex] = (failureCount[stepIndex] || 0) + 1;
-        } else if (status === 'pending') {
-            // 重設時，清除不合格次數
-            failureCount[stepIndex] = 0;
-        }
-
-        const recordData = {
-            userId: currentStaffId,
-            itemId: itemId,
-            checklistStatus: checklistStatus,
-            remarks: remarks,
-            failureCount: failureCount,
-            status: 'pending',
-            evaluatedBy: currentUser.docId,
-            evaluatedAt: new Date().toISOString()
-        };
-
-        if (recordsSnapshot.empty) {
-            await db.collection('trainingRecords').add(recordData);
-        } else {
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
-        }
-
-        // ⭐⭐⭐ 即時刷新卡片狀態 ⭐⭐⭐
-        await refreshCurrentItemCard(itemId);
-
-        // ⭐⭐⭐ 提示訊息 ⭐⭐⭐
-        if (status === 'pass') {
-            showToast('✅ 已標記為合格', 'success');
-        } else if (status === 'fail') {
-            showToast('❌ 已標記為不合格', 'warning');
-        } else {
-            showToast('🔄 已重設狀態', 'success');
-        }
-
-    } catch (error) {
-        console.error('更新步驟狀態失敗:', error);
-        showToast('❌ 更新失敗: ' + error.message, 'error');
-    }
-}
-        
+    
 // ==================== 標記評核完成（修正 isPassed 作用域）====================
 async function markItemComplete(itemId) {
     try {
