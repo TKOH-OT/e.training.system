@@ -5421,20 +5421,20 @@ const checklistHtml = item.checklist.map((step, index) => {
                 ` : ''}
             </div>
             
-            <!-- ⭐⭐⭐ 不合格次數顯示區域 ⭐⭐⭐ -->
-            <div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                ${stepFailCount > 0 ? `
-                    <span class="badge badge-critical" style="animation: pulse 2s infinite;">
-                        ⚠️ 此步驟已不合格 ${stepFailCount} 次
-                    </span>
-                ` : ''}
-                
-                ${totalFailCount > 0 && record?.status === 'completed' && !record?.isPassed ? `
-                    <span class="badge badge-warning" style="background: #ff9500; animation: pulse 2s infinite;">
-                        📊 整體評核已不合格 ${totalFailCount} 次
-                    </span>
-                ` : ''}
-            </div>
+<!-- ⭐⭐⭐ 不合格次數顯示區域 ⭐⭐⭐ -->
+<div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+    ${stepFailCount > 0 && record?.status === 'completed' ? `
+        <span class="badge badge-critical" style="animation: pulse 2s infinite;">
+            ⚠️ 此步驟已不合格 ${stepFailCount} 次
+        </span>
+    ` : ''}
+    
+    ${totalFailCount > 0 && record?.status === 'completed' && !record?.isPassed ? `
+        <span class="badge badge-warning" style="background: #ff9500; animation: pulse 2s infinite;">
+            📊 整體評核已不合格 ${totalFailCount} 次
+        </span>
+    ` : ''}
+</div>
             
             <div style="margin: 8px 0; color: ${status === 'fail' ? '#ff4757' : '#666'}; font-weight: ${status === 'fail' ? 'bold' : 'normal'};">
                 ${statusText}
@@ -5618,21 +5618,36 @@ const checklistHtml = item.checklist.map((step, index) => {
 }
 
 // ==================== 切換評核項目卡片展開/收起 ====================
-function toggleEvalItemCard(itemId) {
+async function toggleEvalItemCard(itemId) {
+    // ⭐⭐⭐ 檢查是否已完成 ⭐⭐⭐
+    const recordsSnapshot = await db.collection('trainingRecords')
+        .where('userId', '==', currentStaffId)
+        .where('itemId', '==', itemId)
+        .limit(1)
+        .get();
+
+    if (!recordsSnapshot.empty) {
+        const record = recordsSnapshot.docs[0].data();
+        
+        // ⭐ 如果已標記完成，顯示選項畫面
+        if (record.status === 'completed') {
+            showCompletedItemOptions(itemId, record.isPassed || false);
+            return;
+        }
+    }
+
+    // ⭐ 未完成：正常展開卡片
     const card = document.getElementById(`eval_item_${itemId}`);
     const allCards = document.querySelectorAll('#evaluationContent .item-card');
     
-    // ⭐ 如果已經展開，就不做任何事（移除收起功能）
     if (card.classList.contains('expanded')) {
-        return; // 什麼都不做，只能用按鈕收起
+        return;
     }
     
-    // 先收起所有卡片
     allCards.forEach(c => c.classList.remove('expanded'));
-    // 展開當前卡片
     card.classList.add('expanded');
 }
-
+        
 // ==================== 收起評核項目卡片 ====================
 function collapseItemCard(itemId) {
     const card = document.getElementById(`eval_item_${itemId}`);
@@ -5881,6 +5896,8 @@ async function markItemComplete(itemId) {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
 
+        let isPassed = false; // ⭐ 提前聲明變數
+
         // 🟩【1】Checklist 類別專用邏輯
         if (item.hasChecklist && item.recordType === 'checklist') {
             const recordsSnapshot = await db.collection('trainingRecords')
@@ -5912,7 +5929,7 @@ async function markItemComplete(itemId) {
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
             // 🟨 即使有 fail，仍可標記完成
-            const isPassed = !hasCriticalFailed && completionRate === 100;
+            isPassed = !hasCriticalFailed && completionRate === 100;
             
             // ⭐ 新增：計算嘗試次數
             const previousAttemptCount = record.attemptCount || 0;
@@ -5936,13 +5953,13 @@ async function markItemComplete(itemId) {
             const updateData = {
                 status: 'completed',
                 isPassed,
-                attemptCount: newAttemptCount, // ⭐ 儲存嘗試次數
-                totalFailCount: totalFailCount, // ⭐ 儲存總不合格次數
+                attemptCount: newAttemptCount,
+                totalFailCount: totalFailCount,
                 completionRate,
                 hasCriticalFailed,
                 evaluationSignatures,
                 evaluatedBy: currentUser.docId,
-                evaluatedByName: currentUser.name, // ⭐ 新增：批改者姓名
+                evaluatedByName: currentUser.name,
                 evaluatedAt: signedAt
             };
 
@@ -5978,16 +5995,76 @@ async function markItemComplete(itemId) {
                 await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
             }
 
+            isPassed = true; // ⭐ Training 類別永遠合格
             showToast('✅ 訓練記錄已標記完成', 'success');
         }
 
-        // 🟩 更新畫面
-        showCategoryEvaluation(currentCategoryId);
-
+        // ⭐⭐⭐ 顯示完成選項畫面 ⭐⭐⭐
+        showCompletedItemOptions(itemId, isPassed);
+        
     } catch (error) {
         console.error('標記完成失敗:', error);
         showToast('❌ 操作失敗', 'error');
     }
+}
+
+// ⭐⭐⭐ 完成選項畫面（定義喺外面）⭐⭐⭐
+function showCompletedItemOptions(itemId, isPassed) {
+    const modalBody = `
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 3em; margin-bottom: 15px;">
+                ${isPassed ? '🎉' : '💪'}
+            </div>
+            <h3 style="color: ${isPassed ? '#2ed573' : '#ff4757'};">
+                ${isPassed ? '✅ 評核已完成（合格）' : '⚠️ 評核已完成（不合格）'}
+            </h3>
+            <p style="color: #666; margin-top: 10px;">
+                ${isPassed ? '恭喜通過此項目評核！' : '請繼續努力，重新進行評核'}
+            </p>
+        </div>
+        
+        <div class="modal-buttons" style="flex-direction: column;">
+            <button class="btn btn-info" style="width: 100%;" 
+                    onclick="viewCompletedItemResult('${itemId}')">
+                📊 查看評核記錄
+            </button>
+            ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
+                <button class="btn btn-warning" style="width: 100%; margin-top: 10px;" 
+                        onclick="reopenItemEvaluation('${itemId}')">
+                    🔄 重新評核
+                </button>
+            ` : ''}
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 10px;" 
+                    onclick="closeModalAndRefresh()">
+                ❌ 關閉
+            </button>
+        </div>
+    `;
+    
+    showModal('📋 評核完成', modalBody);
+}
+
+// ⭐ 查看評核記錄
+function viewCompletedItemResult(itemId) {
+    closeModal();
+    // 保持當前卡片展開，滾動到該卡片
+    const card = document.getElementById(`eval_item_${itemId}`);
+    if (card) {
+        card.classList.add('expanded');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+// ⭐ 重新評核
+function reopenItemEvaluation(itemId) {
+    closeModal();
+    markItemIncomplete(itemId);
+}
+
+// ⭐ 關閉並刷新
+function closeModalAndRefresh() {
+    closeModal();
+    showCategoryEvaluation(currentCategoryId);
 }
         
         // ==================== 標記項目未完成（重設）====================
@@ -7964,11 +8041,29 @@ async function saveChecklistSignature(itemId, stepIndex, type) {
 // ⭐⭐⭐ 更新簽名框及完成狀態（支援 3 種類型）⭐⭐⭐
 async function refreshSignatureBox(itemId, stepIndex, type, signature) {
     try {
-        const signatureBoxes = document.querySelectorAll(`#eval_item_${itemId} .signature-box`);
-        
+        // ⭐ 重新載入最新記錄
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .limit(1)
+            .get();
+
+        if (recordsSnapshot.empty) return;
+
+        const record = recordsSnapshot.docs[0].data();
+        const stepRecords = record.stepRecords || {};
+        const stepRecord = stepRecords[stepIndex] || {};
+
+        // ⭐ 讀取最新簽名
+        const latestSignature = stepRecord[`${type}Signature`] || signature;
+
+        const card = document.getElementById(`eval_item_${itemId}`);
+        if (!card) return;
+
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
-        
+
+        // ⭐ 計算實際步驟索引
         let actualBoxIndex = 0;
         for (let i = 0; i <= stepIndex; i++) {
             if (!item.checklist[i].isSubtitle) {
@@ -7976,45 +8071,51 @@ async function refreshSignatureBox(itemId, stepIndex, type, signature) {
                 actualBoxIndex++;
             }
         }
+
+        // ⭐ 找到所有簽名框
+        const allSignatureBoxes = card.querySelectorAll('.signature-box');
         
-        // ⭐⭐⭐ 根據類型計算 boxIndex ⭐⭐⭐
-        let boxIndex = 0;
+        let targetBoxIndex = 0;
         if (item.recordType === 'training') {
-            // 訓練記錄：日期、新同事、陪帶同事、Supervisor（3個簽名框）
+            // 訓練記錄：每步驟有 3 個簽名框（新同事、陪帶、Supervisor）
             if (type === 'trainee') {
-                boxIndex = (actualBoxIndex * 3) + 0;
+                targetBoxIndex = (actualBoxIndex * 3) + 0;
             } else if (type === 'mentor') {
-                boxIndex = (actualBoxIndex * 3) + 1;
+                targetBoxIndex = (actualBoxIndex * 3) + 1;
             } else if (type === 'supervisor') {
-                boxIndex = (actualBoxIndex * 3) + 2;
+                targetBoxIndex = (actualBoxIndex * 3) + 2;
             }
         } else {
-            // 評核步驟：員工、Supervisor（2個簽名框）
+            // Checklist：每步驟有 2 個簽名框（員工、Supervisor）
             if (type === 'staff') {
-                boxIndex = (actualBoxIndex * 2) + 0;
+                targetBoxIndex = (actualBoxIndex * 2) + 0;
             } else if (type === 'supervisor') {
-                boxIndex = (actualBoxIndex * 2) + 1;
+                targetBoxIndex = (actualBoxIndex * 2) + 1;
             }
         }
+
+        const targetBox = allSignatureBoxes[targetBoxIndex];
         
-        if (signatureBoxes[boxIndex]) {
-            signatureBoxes[boxIndex].textContent = signature || '點擊輸入簽名';
-            if (signature) {
-                signatureBoxes[boxIndex].classList.add('signed');
+        if (targetBox) {
+            targetBox.textContent = latestSignature || '點擊輸入簽名';
+            
+            if (latestSignature) {
+                targetBox.classList.add('signed');
             } else {
-                signatureBoxes[boxIndex].classList.remove('signed');
+                targetBox.classList.remove('signed');
             }
         }
-        
+
         // ⭐ 更新完成狀態
         if (item.recordType === 'training') {
             await refreshTrainingStepStatus(itemId, stepIndex);
         } else {
             await refreshCurrentItemCard(itemId);
         }
-        
+
     } catch (error) {
         console.error('更新簽名框失敗:', error);
+        // 如果失敗就重新載入整個畫面
         showCategoryEvaluation(currentCategoryId);
     }
 }
