@@ -7374,21 +7374,9 @@ async function saveStepTrainingDate(itemId, stepIndex) {
 
 // ⭐⭐⭐ 編輯單一步驟的簽名（訓練記錄：支援 3 種簽名）⭐⭐⭐
 async function editStepSignature(itemId, stepIndex, type, currentValue) {
-    try {
-        const signerName = await verifyUserBeforeSign().catch(() => null);
-        if (!signerName) return; // 用戶取消登入或驗證失敗
-
-        await saveStepSignature(itemId, stepIndex, type, signerName);
-
-        // ✅ 顯示成功提示
-        showToast("✅ 簽名成功", "success");
-
-        // ✅ 不 reload，不跳主畫面，只刷新當前評估內容
-        await showCategoryEvaluation(currentCategoryId);
-    } catch (err) {
-        console.error("簽名失敗:", err);
-        showToast("❌ 簽名時發生錯誤", "error");
-    }
+    const signerName = await verifyUserBeforeSign().catch(() => null);
+    if (!signerName) return; // 用戶取消
+    saveStepSignature(itemId, stepIndex, type, signerName);
 }
 
 // ⭐⭐⭐ 修改函數簽名，增加 type 參數 ⭐⭐⭐
@@ -7683,16 +7671,19 @@ async function batchSignAllSteps(itemId, type = "trainee") {
     }
 }
 
-// ==================== 清除所有簽名（改良版：不會跳返主畫面） ====================
+        // ==================== 清除所有簽名（新函數） ====================
 async function clearAllSignatures(itemId, type = "trainee") {
-    const roleLabel =
-        type === "trainee"
-            ? "新同事"
-            : type === "mentor"
-            ? "陪帶同事"
-            : "Supervisor";
-
-    if (!confirm(`⚠️ 確定要清除此項目的所有「${roleLabel}」簽名？`)) return;
+    if (
+        !confirm(
+            `⚠️ 確定要清除此項目的所有「${type === "trainee"
+                ? "新同事"
+                : type === "mentor"
+                ? "陪帶同事"
+                : "Supervisor"
+            }」簽名？`
+        )
+    )
+        return;
 
     try {
         const recordsSnapshot = await db
@@ -7716,17 +7707,17 @@ async function clearAllSignatures(itemId, type = "trainee") {
             delete step[`${type}SignedAt`];
         });
 
-        await db.collection("trainingRecords").doc(recordId).update({ stepRecords });
+        await db
+            .collection("trainingRecords")
+            .doc(recordId)
+            .update({ stepRecords });
 
-        // ✅ 關閉彈窗，但不跳主畫面
         closeModal();
-
-        // ✅ 顯示提示 + 局部更新
-        showToast(`🧹 已清除所有 ${roleLabel} 簽名`, "success");
-        await showCategoryEvaluation(currentCategoryId);
+        showToast("✅ 所有簽名已清除", "success");
+        showCategoryEvaluation(currentCategoryId);
     } catch (error) {
         console.error("清除簽名失敗:", error);
-        showToast("❌ 清除簽名失敗：" + error.message, "error");
+        showToast("❌ 清除簽名失敗: " + error.message, "error");
     }
 }
         
