@@ -5765,20 +5765,22 @@ async function toggleEvalItemCard(itemId) {
             }
         }
 
-        // ⭐⭐⭐ 關鍵邏輯：已完成記錄 → 顯示選項彈窗 ⭐⭐⭐
-        if (record && record.status === 'completed') {
-            showCompletedItemOptions(itemId, record.isPassed || false);
-            return;
-        }
-
-        // ⭐⭐⭐ 未完成或 pending → 展開卡片 ⭐⭐⭐
         const card = document.getElementById(`eval_item_${itemId}`);
         const allCards = document.querySelectorAll('#evaluationContent .item-card');
         
+        // ⭐⭐⭐ 關鍵修正：如果已經展開，就收起（允許操作按鈕）⭐⭐⭐
         if (card.classList.contains('expanded')) {
+            card.classList.remove('expanded');
             return;
         }
         
+        // ⭐⭐⭐ 已完成記錄 → 顯示選項彈窗（但唔阻止展開）⭐⭐⭐
+        if (record && record.status === 'completed') {
+            showCompletedItemOptions(itemId, record.isPassed || false);
+            // ❌ 唔再 return，繼續向下執行展開邏輯
+        }
+
+        // ⭐⭐⭐ 展開當前卡片，收起其他卡片 ⭐⭐⭐
         allCards.forEach(c => c.classList.remove('expanded'));
         card.classList.add('expanded');
         
