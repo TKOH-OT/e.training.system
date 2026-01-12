@@ -299,7 +299,7 @@
             50% { opacity: 0.7; }
         }
 
-/* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
+        /* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
 .item-card.eval-failed {
     background: linear-gradient(135deg, #ff4757 0%, #e84118 100%) !important;
     color: white !important;
@@ -335,40 +335,13 @@
         box-shadow: 0 10px 40px rgba(255, 71, 87, 0.6);
     }
 }
-
-/* ⭐⭐⭐ 評核合格狀態（新增）⭐⭐⭐ */
-.item-card.completed {
-    background: linear-gradient(135deg, #2ed573 0%, #26d07c 100%) !important;
-    color: white !important;
-}
-
-.item-card.completed .card-title,
-.item-card.completed .card-stats,
-.item-card.completed .progress-percent,
-.item-card.completed .progress-label,
-.item-card.completed .item-card-name {
-    color: white !important;
-}
-
-.item-card.completed .progress-ring-circle {
-    stroke: white !important;
-}
-
-.item-card.completed .progress-ring-bg {
-    stroke: rgba(255,255,255,0.3) !important;
-}
-
-.item-card.completed .badge {
-    background: rgba(255,255,255,0.3) !important;
-    color: white !important;
-}
-
-.badge-WM { background: #c23616; color: white; }
-.badge-APN { background: #ff6b81; color: white; }
-.badge-RN { background: #00d2ff; color: white; }
-.badge-PCA1, .badge-PCA2, .badge-PCA3, .badge-OTA { 
-    background: #2ed573; color: white; 
-}
+        
+        .badge-WM { background: #c23616; color: white; }
+        .badge-APN { background: #ff6b81; color: white; }
+        .badge-RN { background: #00d2ff; color: white; }
+        .badge-PCA1, .badge-PCA2, .badge-PCA3, .badge-OTA { 
+            background: #2ed573; color: white; 
+        }
 
         /* ==================== Dashboard 卡片式設計 ==================== */
         .dashboard-header {
@@ -3846,14 +3819,8 @@ if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
     <div class="item-card-badges">${badges}</div>
 </div>
                         
-                       <div class="item-card-progress">
-    <div style="text-align: center;">
-        <div style="font-size: 4em; margin-bottom: 10px;">${statusIcon || '📋'}</div>
-        <div style="font-size: 1.2em; font-weight: bold; color: ${cardStatusClass === 'eval-failed' ? '#fff' : cardStatusClass === 'completed' ? '#fff' : '#333'};">
-            ${statusText || '待評核'}
-        </div>
-    </div>
-</div>
+                        <div class="item-card-progress">
+                            <svg class="item-progress-ring" width="120" height="120" viewBox="0 0 120 120">
                                 <circle class="item-progress-ring-bg" cx="60" cy="60" r="50" 
                                     fill="none" stroke-width="10"/>
                                 <circle class="item-progress-ring-circle" cx="60" cy="60" r="50" 
@@ -4909,8 +4876,35 @@ for (const category of categories) {
         }
 // ========== Checklist 評核類型 ==========
 else if (item.hasChecklist && record) {
-    // ⭐⭐⭐ 簡化邏輯：只檢查最新記錄嘅 isPassed 欄位 ⭐⭐⭐
-    if (record.status === 'completed' && record.isPassed === true) {
+    const allCriticalPassed = item.checklist.every((step, index) => {
+        if (step.isSubtitle || !step.critical) return true;
+        return record.checklistStatus && record.checklistStatus[index] === 'pass';
+    });
+    
+    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+    let passedSteps = 0;
+    
+    item.checklist.forEach((step, index) => {
+        if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
+            passedSteps++;
+        }
+    });
+    
+    const completionRate = actualSteps.length > 0 
+        ? Math.round((passedSteps / actualSteps.length) * 100) 
+        : 0;
+    
+    // ⭐⭐⭐ 向下兼容舊記錄：100% 完成 + 所有 Critical 合格 = 視為合格 ⭐⭐⭐
+    let isPassed = false;
+    if (record.isPassed === false) {
+        // 明確標記為不合格
+        isPassed = false;
+    } else if (allCriticalPassed && completionRate === 100 && record.status === 'completed') {
+        // 100% 完成且所有 Critical 合格 = 合格（兼容舊記錄）
+        isPassed = true;
+    }
+    
+    if (isPassed) {
         completedCount++;
     }
 }
@@ -5359,14 +5353,21 @@ async function showCategoryEvaluation(categoryId) {
         <div class="item-card-badges">${badges}</div>
     </div>
     
-<div class="item-card-progress">
-    <div style="text-align: center;">
-        <div style="font-size: 4em; margin-bottom: 10px;">${statusIcon || '📋'}</div>
-        <div style="font-size: 1.2em; font-weight: bold; color: ${cardStatusClass === 'eval-failed' ? '#fff' : cardStatusClass === 'completed' ? '#fff' : '#333'};">
-            ${statusText || '待評核'}
-        </div>
-    </div>
-</div>
+    <div class="item-card-progress">
+        <svg class="item-progress-ring" width="120" height="120" viewBox="0 0 120 120">
+                                    <circle class="item-progress-ring-bg" cx="60" cy="60" r="50" 
+                                        fill="none" stroke-width="10"/>
+                                    <circle class="item-progress-ring-circle" cx="60" cy="60" r="50" 
+                                        fill="none" stroke-width="10"
+                                        stroke-dasharray="${circumference}" 
+                                        stroke-dashoffset="${offset}"
+                                        stroke-linecap="round"/>
+                                </svg>
+                                <div class="item-progress-text">
+                                    <div class="item-progress-percent">${completionRate}%</div>
+                                    <div class="item-progress-label">${completedSteps}/${totalSteps}</div>
+                                </div>
+                            </div>
 
 <div class="item-card-actions">
     ${hasEditPermission ? `
@@ -5409,46 +5410,30 @@ async function showCategoryEvaluation(categoryId) {
                 return; // ⭐ 處理完訓練記錄後跳過
             }
 
-// ⭐ 以下是 Checklist 處理邏輯
-if (item.hasChecklist && item.checklist) {
-    const checklistStatus = record?.checklistStatus || {};
-    const remarks = record?.remarks || {};
+            // ⭐ 以下是 Checklist 處理邏輯
+            if (item.hasChecklist && item.checklist) {
+                const checklistStatus = record?.checklistStatus || {};
+                const remarks = record?.remarks || {};
 
-    let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
-    let passedSteps = 0;
+                let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
+                let passedSteps = 0;
 
-    item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle && checklistStatus[index] === 'pass') {
-            passedSteps++;
-        }
-    });
+                item.checklist.forEach((step, index) => {
+                    if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                        passedSteps++;
+                    }
+                });
 
-    const completionRate = Math.round((passedSteps / totalSteps) * 100);
+                const completionRate = Math.round((passedSteps / totalSteps) * 100);
+                
+                const circumference = 2 * Math.PI * 50;
+                const offset = circumference - (completionRate / 100) * circumference;
 
-    const allCriticalPassed = item.checklist.every((step, index) => {
-        if (step.isSubtitle || !step.critical) return true;
-        return checklistStatus[index] === 'pass';
-    });
+                const allCriticalPassed = item.checklist.every((step, index) => {
+                    if (step.isSubtitle || !step.critical) return true;
+                    return checklistStatus[index] === 'pass';
+                });
 
-    // ⭐⭐⭐ 新增：判斷卡片狀態及顏色 ⭐⭐⭐
-    let cardStatusClass = '';
-    let statusIcon = '';
-    let statusText = '';
-    
-    if (record?.status === 'completed') {
-        if (record.isPassed === false) {
-            // 🔴 不合格：紅色卡片
-            cardStatusClass = 'eval-failed';
-            statusIcon = '❌';
-            statusText = '不合格';
-        } else if (allCriticalPassed && completionRate === 100) {
-            // 🟢 合格：綠色卡片
-            cardStatusClass = 'completed';
-            statusIcon = '✅';
-            statusText = '已完成';
-        }
-    }
-    
                 let badges = '';
                 
                 if (item.hasDeadline) {
@@ -5587,46 +5572,53 @@ if (isEvalFailed) {
                 }
 
 itemsHtml.push(`
-    <div class="item-card ${cardStatusClass}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
-        <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
-        
-        <div class="item-card-header">
-            <div class="item-card-title-section">
-                <div class="item-card-name" style="font-size: 1.8em; 
-                                                   font-weight: 900; 
-                                                   color: #2c3e50; 
-                                                   line-height: 1.3;
-                                                   text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-                                                   letter-spacing: 0.5px;
-                                                   background: linear-gradient(135deg, #ff9500 0%, #ff6b35 100%);
-                                                   -webkit-background-clip: text;
-                                                   -webkit-text-fill-color: transparent;
-                                                   background-clip: text;
-                                                   padding: 5px 0;
-                                                   margin-bottom: 10px;
-                                                   text-align: center;">
-                    ${item.name}
-                </div>
-                <div class="item-card-badges">${badges}</div>
-            </div>
-            
-            <div class="item-card-progress">
-                <div style="text-align: center;">
-                    <div style="font-size: 4em; margin-bottom: 10px;">${statusIcon || '📋'}</div>
-                    <div style="font-size: 1.2em; font-weight: bold; color: ${cardStatusClass === 'eval-failed' ? '#fff' : cardStatusClass === 'completed' ? '#fff' : '#333'};">
-                        ${statusText || '待評核'}
-                    </div>
-                </div>
-            </div>
+    <div class="item-card ${overallClass} ${cardStatusClass}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
+                        <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
+                        
+                        <div class="item-card-header">
+                            <div class="item-card-title-section">
+ <div class="item-card-name" style="font-size: 1.8em; 
+                                   font-weight: 900; 
+                                   color: #2c3e50; 
+                                   line-height: 1.3;
+                                   text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+                                   letter-spacing: 0.5px;
+                                background: linear-gradient(135deg, #ff9500 0%, #ff6b35 100%);
+                                   -webkit-background-clip: text;
+                                   -webkit-text-fill-color: transparent;
+                                   background-clip: text;
+                                   padding: 5px 0;
+                                   margin-bottom: 10px;
+                                   text-align: center;">
+     ${item.name}
+</div>
+                                <div class="item-card-badges">${badges}</div>
+                            </div>
+                            
+                            <div class="item-card-progress">
+                                <svg class="item-progress-ring" width="120" height="120" viewBox="0 0 120 120">
+                                    <circle class="item-progress-ring-bg" cx="60" cy="60" r="50" 
+                                        fill="none" stroke-width="10"/>
+                                    <circle class="item-progress-ring-circle" cx="60" cy="60" r="50" 
+                                        fill="none" stroke-width="10"
+                                        stroke-dasharray="${circumference}" 
+                                        stroke-dashoffset="${offset}"
+                                        stroke-linecap="round"/>
+                                </svg>
+                                <div class="item-progress-text">
+                                    <div class="item-progress-percent">${completionRate}%</div>
+                                    <div class="item-progress-label">${passedSteps}/${totalSteps}</div>
+                                </div>
+                            </div>
 
-            <div class="item-card-actions">
-                ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
-                    <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markItemComplete('${item.docId}')">✅ 標記完成</button>
-                    <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); markItemIncomplete('${item.docId}')">🔄 重設項目</button>
-                ` : ''}
-            </div>
-        </div>
-        
+                            <div class="item-card-actions">
+                                ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
+                                    <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markItemComplete('${item.docId}')">✅ 標記完成</button>
+                                    <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); markItemIncomplete('${item.docId}')">🔄 重設項目</button>
+                                ` : ''}
+                            </div>
+                        </div>
+
                         <div class="item-card-content">
                             <div class="score-info">
                                 <div class="score-title">📊 評核進度</div>
