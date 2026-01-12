@@ -6095,32 +6095,72 @@ async function markItemComplete(itemId) {
             document.getElementById('modal').classList.add('active');
         }
 
-        function closeModal() {
-            document.getElementById('modal').classList.remove('active');
+// ==================== 關閉 Modal ====================
+function closeModal() {
+    const modal = document.getElementById('modal');
+    if (modal) modal.classList.remove('active');
+}
+
+// ==================== 一鍵多簽彈窗 (修正版) ====================
+function openBatchSignModal(itemId, type) {
+    const label =
+        type === "trainee"
+            ? "新同事"
+            : type === "mentor"
+            ? "陪帶同事"
+            : "Supervisor";
+
+    const modalBody = `
+        <div class="input-group">
+            <label>✍️ ${label}簽名名稱</label>
+            <input type="text" id="batchSignName" placeholder="請輸入簽名名稱" autofocus>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn btn-success" onclick="batchSignAllSteps('${itemId}', '${type}')">
+                ✅ 一鍵簽署全部步驟
+            </button>
+            <button class="btn btn-danger" onclick="clearAllSignatures('${itemId}', '${type}')">
+                🧹 清除全部簽名
+            </button>
+            <button class="btn btn-secondary" onclick="closeModal()">
+                ❌ 取消
+            </button>
+        </div>
+    `;
+    showModal(`✍️ ${label} 一鍵多簽 / 清除`, modalBody);
+}
+
+// ==================== Toast 訊息提示 ====================
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// ==================== Modal 點擊空白區關閉 ====================
+const modalEl = document.getElementById('modal');
+if (modalEl) {
+    modalEl.addEventListener('click', (e) => {
+        if (e.target.id === 'modal') {
+            closeModal();
         }
+    });
+}
 
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
+// ==================== 登入輸入欄 Enter 監聽 ====================
+const loginPwInput = document.getElementById('loginPw');
+if (loginPwInput) {
+    loginPwInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            login();
         }
-
-        document.getElementById('modal').addEventListener('click', (e) => {
-            if (e.target.id === 'modal') {
-                closeModal();
-            }
-        });
-
-        document.getElementById('loginPw').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                login();
-            }
-        });
+    });
+}
 
         // ==================== AUDIT SYSTEM ====================
 let currentAuditLocation = '';
@@ -7471,76 +7511,116 @@ async function confirmBatchSign(itemId, signature, type = 'trainee') {
     }
 }
         
-        // ⭐⭐⭐ 新增：一鍵簽署全部步驟（新同事專用）⭐⭐⭐
-async function batchSignAllSteps(itemId) {
-    const signature = document.getElementById('signatureInput').value.trim();
-    
-    if (!signature) {
-        showToast('❌ 請先輸入簽名', 'error');
+// ==================== 一鍵簽署全部步驟（修正版） ====================
+async function batchSignAllSteps(itemId, type = "trainee") {
+    const signerName = document.getElementById("batchSignName").value.trim();
+    if (!signerName) {
+        showToast("❌ 請輸入簽名名稱", "error");
         return;
     }
 
-    if (!confirm(`❓ 確定要使用「${signature}」簽署所有步驟嗎？`)) {
-        return;
-    }
+    if (!confirm(`❓ 確定以「${signerName}」簽署所有步驟？`)) return;
 
     try {
-        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
-        const item = itemDoc.data();
-
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
+        const recordsSnapshot = await db
+            .collection("trainingRecords")
+            .where("userId", "==", currentStaffId)
+            .where("itemId", "==", itemId)
             .limit(1)
             .get();
 
-        let stepRecords = {};
-        if (!recordsSnapshot.empty) {
-            const record = recordsSnapshot.docs[0].data();
-            stepRecords = record.stepRecords || {};
+        let recordId;
+        let recordData = {};
+
+        if (recordsSnapshot.empty) {
+            const newDoc = await db.collection("trainingRecords").add({
+                userId: currentStaffId,
+                itemId,
+                stepRecords: {},
+            });
+            recordId = newDoc.id;
+        } else {
+            recordId = recordsSnapshot.docs[0].id;
+            recordData = recordsSnapshot.docs[0].data();
         }
 
-        // 為所有實際步驟（非章節標題）簽名
+        if (!recordData.stepRecords) recordData.stepRecords = {};
+
+        const itemDoc = await db.collection("trainingItems").doc(itemId).get();
+        const item = itemDoc.data();
+
         let signedCount = 0;
         item.checklist.forEach((step, index) => {
             if (!step.isSubtitle) {
-                if (!stepRecords[index]) {
-                    stepRecords[index] = {};
-                }
-                // 只有未簽名的才簽
-                if (!stepRecords[index].traineeSignature) {
-                    stepRecords[index].traineeSignature = signature;
-                    signedCount++;
-                }
+                if (!recordData.stepRecords[index])
+                    recordData.stepRecords[index] = {};
+                recordData.stepRecords[index][`${type}Signature`] = signerName;
+                recordData.stepRecords[index][`${type}SignedAt`] =
+                    new Date().toISOString();
+                signedCount++;
             }
         });
 
-        const recordData = {
-            userId: currentStaffId,
-            itemId: itemId,
-            stepRecords: stepRecords,
-            updatedBy: currentUser.docId,
-            updatedAt: new Date().toISOString()
-        };
-
-        if (recordsSnapshot.empty) {
-            await db.collection('trainingRecords').add(recordData);
-        } else {
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
-        }
-
-        showToast(`✅ 已成功簽署 ${signedCount} 個步驟！`, 'success');
+        await db.collection("trainingRecords").doc(recordId).update(recordData);
         closeModal();
-        
-        // ⭐ 重新載入頁面以顯示所有簽名
+        showToast(`✅ 已一鍵簽署 ${signedCount} 個步驟！`, "success");
         showCategoryEvaluation(currentCategoryId);
-        
     } catch (error) {
-        console.error('一鍵簽署失敗:', error);
-        showToast('❌ 批量簽署失敗', 'error');
+        console.error("批量簽署失敗:", error);
+        showToast("❌ 批量簽署失敗: " + error.message, "error");
     }
 }
 
+        // ==================== 清除所有簽名（新函數） ====================
+async function clearAllSignatures(itemId, type = "trainee") {
+    if (
+        !confirm(
+            `⚠️ 確定要清除此項目的所有「${type === "trainee"
+                ? "新同事"
+                : type === "mentor"
+                ? "陪帶同事"
+                : "Supervisor"
+            }」簽名？`
+        )
+    )
+        return;
+
+    try {
+        const recordsSnapshot = await db
+            .collection("trainingRecords")
+            .where("userId", "==", currentStaffId)
+            .where("itemId", "==", itemId)
+            .limit(1)
+            .get();
+
+        if (recordsSnapshot.empty) {
+            showToast("⚠️ 尚無可清除的簽名記錄", "warning");
+            return;
+        }
+
+        const recordId = recordsSnapshot.docs[0].id;
+        const recordData = recordsSnapshot.docs[0].data();
+        const stepRecords = recordData.stepRecords || {};
+
+        Object.values(stepRecords).forEach((step) => {
+            delete step[`${type}Signature`];
+            delete step[`${type}SignedAt`];
+        });
+
+        await db
+            .collection("trainingRecords")
+            .doc(recordId)
+            .update({ stepRecords });
+
+        closeModal();
+        showToast("✅ 所有簽名已清除", "success");
+        showCategoryEvaluation(currentCategoryId);
+    } catch (error) {
+        console.error("清除簽名失敗:", error);
+        showToast("❌ 清除簽名失敗: " + error.message, "error");
+    }
+}
+        
 // ⭐⭐⭐ 新增：重設單一步驟簽名（支援 trainee / mentor / supervisor）⭐⭐⭐
 async function resetStepSignature(itemId, stepIndex, type) {
     // 動態顯示角色名稱
