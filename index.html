@@ -5183,10 +5183,16 @@ async function showCategoryEvaluation(categoryId) {
     </div>
 </div>
                                 
-      <div class="training-record-row">
+<div class="training-record-row">
     <div class="training-record-label">✍️ 新同事簽名:</div>
     <div>
         ${hasEditPermission ? `
+            <div style="margin-bottom: 6px;">
+                <button class="btn btn-success btn-small"
+                    onclick="openBatchSignModal('${item.docId}', 'trainee')">
+                    🖊️ 一鍵多簽
+                </button>
+            </div>
             <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
                  onclick="editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
                 ${traineeSignature || '點擊輸入簽名'}
@@ -5198,11 +5204,17 @@ async function showCategoryEvaluation(categoryId) {
         `}
     </div>
 </div>
-                                
+
 <div class="training-record-row">
     <div class="training-record-label">✍️ 陪帶同事簽名:</div>
     <div>
         ${hasEditPermission ? `
+            <div style="margin-bottom: 6px;">
+                <button class="btn btn-success btn-small"
+                    onclick="openBatchSignModal('${item.docId}', 'mentor')">
+                    🖊️ 陪帶一鍵多簽
+                </button>
+            </div>
             <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
                  onclick="editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
                 ${mentorSignature || '點擊輸入簽名'}
@@ -7085,7 +7097,7 @@ async function saveSignature(itemId, type) {
     }
 }
 
-// 標記訓練完成
+// ==================== 標記訓練完成（強化版）====================
 async function markTrainingComplete(itemId) {
     try {
         const recordsSnapshot = await db.collection('trainingRecords')
@@ -7095,31 +7107,56 @@ async function markTrainingComplete(itemId) {
             .get();
 
         if (recordsSnapshot.empty) {
-            showToast('❌ 請先填寫訓練記錄', 'error');
+            showToast('❌ 請先完成所有訓練步驟', 'error');
             return;
         }
 
         const record = recordsSnapshot.docs[0].data();
-        
-        if (!record.trainingDate || !record.traineeSignature || !record.mentorSignature) {
-            showToast('❌ 請完整填寫日期及雙方簽名', 'error');
+        const stepRecords = record.stepRecords || {};
+
+        let allSigned = true;
+        const signedUsers = new Set();
+
+        // ✅ 檢查每步是否齊
+        Object.values(stepRecords).forEach(step => {
+            if (!step.trainingDate || !step.traineeSignature || !step.mentorSignature || !step.supervisorSignature) {
+                allSigned = false;
+            } else {
+                // 收集所有簽署人
+                if (step.traineeSignature) signedUsers.add(step.traineeSignature);
+                if (step.mentorSignature) signedUsers.add(step.mentorSignature);
+                if (step.supervisorSignature) signedUsers.add(step.supervisorSignature);
+            }
+        });
+
+        if (!allSigned) {
+            showToast('⚠️ 存在步驟未完成或簽名未齊', 'warning');
             return;
         }
 
+        // ✅ 保存完成記錄 + 所有簽名人 + 時間
+        const completedAt = new Date();
+        const participants = Array.from(signedUsers).join(', ');
+
         await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
             status: 'completed',
-            completedBy: currentUser.docId,
-            completedAt: new Date().toISOString()
+            isPassed: true,
+            completedAt: completedAt.toISOString(),
+            completedBy: currentUser.name,
+            participants: participants
         });
 
-        showToast('✅ 訓練已標記完成', 'success');
+        showToast(`✅ 已標記完成\n👥 參與人員：${participants}`, 'success');
+
+        // ✅ 唔自動跳返主畫面，只更新畫面
         showCategoryEvaluation(currentCategoryId);
+
     } catch (error) {
         console.error('標記完成失敗:', error);
         showToast('❌ 操作失敗', 'error');
     }
 }
-
+        
 // 重設訓練記錄
 async function resetTraining(itemId) {
     if (!confirm('❓ 確定要重設此訓練記錄嗎？')) {
@@ -7504,13 +7541,15 @@ async function batchSignAllSteps(itemId) {
     }
 }
 
-        // ⭐⭐⭐ 新增：重設單一步驟簽名 ⭐⭐⭐
+// ⭐⭐⭐ 新增：重設單一步驟簽名（支援 trainee / mentor / supervisor）⭐⭐⭐
 async function resetStepSignature(itemId, stepIndex, type) {
-    const label = type === 'trainee' ? '新同事' : '陪帶同事';
-    
-    if (!confirm(`❓ 確定要清除【${label}】在此步驟的簽名嗎？`)) {
-        return;
-    }
+    // 動態顯示角色名稱
+    const label =
+        type === 'trainee' ? '新同事' :
+        type === 'mentor' ? '陪帶同事' :
+        type === 'supervisor' ? 'Supervisor' : '未知角色';
+
+    if (!confirm(`❓ 確定要清除【${label}】在此步驟的簽名嗎？`)) return;
 
     try {
         const recordsSnapshot = await db.collection('trainingRecords')
@@ -7526,6 +7565,7 @@ async function resetStepSignature(itemId, stepIndex, type) {
         }
 
         const record = recordsSnapshot.docs[0].data();
+        const recordId = recordsSnapshot.docs[0].id;
         let stepRecords = record.stepRecords || {};
 
         if (!stepRecords[stepIndex]) {
@@ -7534,19 +7574,29 @@ async function resetStepSignature(itemId, stepIndex, type) {
             return;
         }
 
-        const fieldName = type === 'trainee' ? 'traineeSignature' : 'mentorSignature';
-        
-        // 刪除簽名
-        delete stepRecords[stepIndex][fieldName];
+        // ✅ 決定要刪除嘅欄位名稱
+        const fieldNameMap = {
+            trainee: 'traineeSignature',
+            mentor: 'mentorSignature',
+            supervisor: 'supervisorSignature'
+        };
+        const fieldName = fieldNameMap[type];
 
-        // 如果整個步驟記錄都空了，就刪除整個步驟
-        if (!stepRecords[stepIndex].trainingDate && 
-            !stepRecords[stepIndex].traineeSignature && 
-            !stepRecords[stepIndex].mentorSignature) {
+        // 🔄 刪除該簽名及時間戳
+        delete stepRecords[stepIndex][fieldName];
+        delete stepRecords[stepIndex][`${type}SignedAt`];
+
+        // ✅ 如果整個步驟冇資料，就移除該 index
+        if (
+            !stepRecords[stepIndex].trainingDate &&
+            !stepRecords[stepIndex].traineeSignature &&
+            !stepRecords[stepIndex].mentorSignature &&
+            !stepRecords[stepIndex].supervisorSignature
+        ) {
             delete stepRecords[stepIndex];
         }
 
-        await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
+        await db.collection('trainingRecords').doc(recordId).update({
             stepRecords: stepRecords,
             updatedBy: currentUser.docId,
             updatedAt: new Date().toISOString()
@@ -7554,10 +7604,10 @@ async function resetStepSignature(itemId, stepIndex, type) {
 
         showToast(`✅ 已清除【${label}】簽名`, 'success');
         closeModal();
-        
-        // 刷新簽名框
+
+        // 即時刷新畫面上的簽名顯示
         await refreshSignatureBox(itemId, stepIndex, type, '');
-        
+
     } catch (error) {
         console.error('清除簽名失敗:', error);
         showToast('❌ 清除失敗', 'error');
