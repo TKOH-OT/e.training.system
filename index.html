@@ -7565,69 +7565,46 @@ async function resetStepSignature(itemId, stepIndex, type) {
 }
         
 // ==================== 儲存單一步驟的簽名（支援 3 種類型）====================
-async function saveStepSignature(itemId, stepIndex, type) {
-    const signature = document.getElementById('signatureInput').value.trim();
-    
-    if (!signature) {
-        showToast('❌ 請輸入簽名', 'error');
-        return;
-    }
+async function saveStepSignature(itemId, stepIndex, type, signerName) {
+    // signerName 直接由登入簽名回傳，唔再從 input 取值
+    if (!signerName) return;
 
-    try {
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .limit(1)
-            .get();
+    const recordsSnapshot = await db.collection('trainingRecords')
+        .where('userId', '==', currentStaffId)
+        .where('itemId', '==', itemId)
+        .limit(1)
+        .get();
 
-        let stepRecords = {};
-        
-        if (!recordsSnapshot.empty) {
-            const record = recordsSnapshot.docs[0].data();
-            stepRecords = record.stepRecords || {};
-        }
+    let recordId;
+    let recordData = {};
 
-        if (!stepRecords[stepIndex]) {
-            stepRecords[stepIndex] = {};
-        }
-        
-        // ⭐⭐⭐ 根據類型選擇欄位名稱 ⭐⭐⭐
-        let fieldName = '';
-        if (type === 'trainee') {
-            fieldName = 'traineeSignature';
-        } else if (type === 'mentor') {
-            fieldName = 'mentorSignature';
-        } else if (type === 'supervisor') {
-            fieldName = 'supervisorSignature';
-        }
-        
-        stepRecords[stepIndex][fieldName] = signature;
-
-        const recordData = {
+    if (recordsSnapshot.empty) {
+        // 無記錄時新建
+        const newDoc = await db.collection('trainingRecords').add({
             userId: currentStaffId,
-            itemId: itemId,
-            stepRecords: stepRecords,
-            updatedBy: currentUser.docId,
-            updatedAt: new Date().toISOString()
-        };
-
-        if (recordsSnapshot.empty) {
-            await db.collection('trainingRecords').add(recordData);
-        } else {
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
-        }
-
-        showToast('✅ 簽名已儲存', 'success');
-        closeModal();
-        
-        await refreshSignatureBox(itemId, stepIndex, type, signature);
-        
-    } catch (error) {
-        console.error('儲存簽名失敗:', error);
-        showToast('❌ 儲存失敗', 'error');
+            itemId,
+            stepRecords: {},
+        });
+        recordId = newDoc.id;
+    } else {
+        recordId = recordsSnapshot.docs[0].id;
+        recordData = recordsSnapshot.docs[0].data();
     }
-}
 
+    if (!recordData.stepRecords) recordData.stepRecords = {};
+    if (!recordData.stepRecords[stepIndex]) recordData.stepRecords[stepIndex] = {};
+
+    // 寫入簽名者名稱與簽署時間
+    recordData.stepRecords[stepIndex][`${type}Signature`] = signerName;
+    recordData.stepRecords[stepIndex][`${type}SignedAt`] = new Date().toISOString();
+
+    await db.collection('trainingRecords').doc(recordId).update(recordData);
+    showToast(`✅ ${signerName} 已簽名`, 'success');
+    
+    // 更新畫面
+    showCategoryEvaluation(currentCategoryId);
+}
+        
         // ==================== 評核步驟簽名（Checklist 專用）====================
 function editChecklistSignature(itemId, stepIndex, type, currentValue) {
     const label = type === 'staff' ? '員工' : 'Supervisor';
