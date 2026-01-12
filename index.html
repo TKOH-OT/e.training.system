@@ -3098,6 +3098,60 @@ async function initializeSystem() {
             initializeSystem();
         });
 
+        // ==================== 🔐 簽名前帳號驗證機制（新增） ====================
+async function verifyUserBeforeSign() {
+    return new Promise((resolve, reject) => {
+        const modalBody = `
+            <div class="input-group">
+                <label>👤 帳號</label>
+                <input type="text" id="signLoginId" placeholder="請輸入帳號">
+            </div>
+            <div class="input-group">
+                <label>🔒 密碼</label>
+                <input type="password" id="signLoginPw" placeholder="請輸入密碼">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="confirmSignatureLogin(resolve)">✅ 登入簽名</button>
+                <button class="btn btn-secondary" onclick="closeModal(); reject()">❌ 取消</button>
+            </div>
+        `;
+        showModal('🔐 簽名登入驗證', modalBody);
+        window.resolveSignPromise = resolve; // 暫存 Promise callback
+    });
+}
+
+async function confirmSignatureLogin(resolve) {
+    const id = document.getElementById('signLoginId').value.trim();
+    const pw = document.getElementById('signLoginPw').value.trim();
+
+    if (!id || !pw) {
+        showToast('❌ 請輸入帳號與密碼', 'error');
+        return;
+    }
+
+    const accountsSnapshot = await db.collection('accounts')
+        .where('id', '==', id)
+        .limit(1)
+        .get();
+
+    if (accountsSnapshot.empty) {
+        showToast('❌ 帳號不存在', 'error');
+        return;
+    }
+
+    const doc = accountsSnapshot.docs[0];
+    const account = doc.data();
+
+    if (account.password !== pw) {
+        showToast('❌ 密碼錯誤', 'error');
+        return;
+    }
+
+    closeModal();
+    showToast(`✅ 已登入 ${account.name} 簽名`, 'success');
+    resolve(account.name); // 回傳簽署者名稱
+}
+        
         // ==================== 登入系統 ====================
         async function login() {
             const id = document.getElementById('loginId').value.trim();
@@ -7134,54 +7188,10 @@ async function saveStepTrainingDate(itemId, stepIndex) {
 }
 
 // ⭐⭐⭐ 編輯單一步驟的簽名（訓練記錄：支援 3 種簽名）⭐⭐⭐
-function editStepSignature(itemId, stepIndex, type, currentValue) {
-    let label = '';
-    if (type === 'trainee') {
-        label = '新同事';
-    } else if (type === 'mentor') {
-        label = '陪帶同事';
-    } else if (type === 'supervisor') {
-        label = 'Supervisor';
-    }
-    
-    // ⭐ Supervisor & 陪帶同事自動填入登入者姓名
-    let defaultValue = currentValue;
-    if ((type === 'supervisor' || type === 'mentor') && !currentValue) {
-        defaultValue = currentUser.name;
-    }
-    
-    // ⭐⭐⭐ 支援一鍵多簽 ⭐⭐⭐
-    const batchSignButton = `
-        <button class="btn btn-warning" style="width: 100%; margin-top: 10px;" 
-                onclick="showBatchSignModal('${itemId}', '${type}')">
-            ✍️ 一鍵多簽（可選擇步驟）
-        </button>
-        <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border-radius: 6px; font-size: 0.85em; text-align: center;">
-            💡 提示：可以選擇要簽署哪些步驟
-        </div>
-    `;
-    
-    const resetButton = currentValue ? `
-        <button class="btn btn-danger" style="width: 100%; margin-top: 10px;" 
-                onclick="resetStepSignature('${itemId}', ${stepIndex}, '${type}')">
-            🗑️ 清除此簽名
-        </button>
-    ` : '';
-    
-    const modalBody = `
-        <div class="input-group">
-            <label>✍️ ${label}簽名</label>
-            <input type="text" id="signatureInput" value="${defaultValue}" placeholder="請輸入簽名" autofocus>
-        </div>
-        ${batchSignButton}
-        ${resetButton}
-        <div class="modal-buttons">
-            <button class="btn btn-success" onclick="saveStepSignature('${itemId}', ${stepIndex}, '${type}')">✅ 確定</button>
-            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
-        </div>
-    `;
-
-    showModal(`✍️ ${label}簽名`, modalBody);
+async function editStepSignature(itemId, stepIndex, type, currentValue) {
+    const signerName = await verifyUserBeforeSign().catch(() => null);
+    if (!signerName) return; // 用戶取消
+    saveStepSignature(itemId, stepIndex, type, signerName);
 }
 
 // ⭐⭐⭐ 修改函數簽名，增加 type 參數 ⭐⭐⭐
