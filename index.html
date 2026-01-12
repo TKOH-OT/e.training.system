@@ -3116,7 +3116,7 @@ function canEditTrainingRecord(categoryName, targetStaffLevel) {
             '🔥', '💧', '🌊', '❄️', '☀️', '🌙', '🤖', '🧽', '🗄️', '✔️'
         ];
 
-        // ==================== 初始化系統 ====================
+// ==================== 初始化系統 ====================
 async function initializeSystem() {
     if (systemInitialized) return;
     
@@ -3160,7 +3160,8 @@ async function initializeSystem() {
 
         systemInitialized = true;
         console.log('✅ 系統初始化完成');
-    
+        
+    } catch (error) {
         console.error('❌ 系統初始化失敗:', error);
         showToast('⚠️ 系統初始化中，請稍後再試', 'warning');
     }
