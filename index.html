@@ -5558,39 +5558,27 @@ const checklistHtml = item.checklist.map((step, index) => {
                                 <div class="checklist-header">📋 評核步驟 Checklist</div>
                                 ${checklistHtml}
                             </div>
-                            <!-- ============ 📋 評核簽名區 ============ -->
+<!-- ============ 📋 評核簽名區 ============ -->
 <div class="training-record-container" style="margin-top: 25px;">
   <div class="training-record-header">✍️ 評核簽名</div>
 
   <div class="training-record-row">
     <div class="training-record-label">👤 被評核者簽名:</div>
     <div>
-      ${hasEditPermission ? `
-        <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}"
-             onclick="editChecklistSignature('${item.docId}', 0, 'staff', '${record?.evaluationSignatures?.staff || ''}')">
+      <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}"
+           onclick="editChecklistSignature('${item.docId}', 0, 'staff', '${record?.evaluationSignatures?.staff || ''}')">
           ${record?.evaluationSignatures?.staff || '點擊簽名'}
-        </div>
-      ` : `
-        <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}">
-          ${record?.evaluationSignatures?.staff || '尚未簽名'}
-        </div>
-      `}
+      </div>
     </div>
   </div>
 
   <div class="training-record-row">
     <div class="training-record-label">👔 評核者簽名 (Supervisor):</div>
     <div>
-      ${hasEditPermission ? `
-        <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}"
-             onclick="editChecklistSignature('${item.docId}', 0, 'supervisor', '${record?.evaluationSignatures?.supervisor || ''}')">
+      <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}"
+           onclick="editChecklistSignature('${item.docId}', 0, 'supervisor', '${record?.evaluationSignatures?.supervisor || ''}')">
           ${record?.evaluationSignatures?.supervisor || '點擊簽名'}
-        </div>
-      ` : `
-        <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}">
-          ${record?.evaluationSignatures?.supervisor || '尚未簽名'}
-        </div>
-      `}
+      </div>
     </div>
   </div>
 
@@ -5653,7 +5641,7 @@ function collapseItemCard(itemId) {
     }
 }
         
-// ==================== 更新 Checklist 步驟狀態（不自動返回）====================
+// ==================== 更新 Checklist 步驟狀態（記錄不合格次數）====================
 async function updateChecklistStepStatus(itemId, stepIndex, status) {
     try {
         const recordsSnapshot = await db.collection('trainingRecords')
@@ -5664,7 +5652,7 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
 
         let checklistStatus = {};
         let remarks = {};
-        let failureCount = {}; // ⭐ 新增：記錄不合格次數
+        let failureCount = {}; // ⭐ 新增：記錄每步不合格次數
 
         if (!recordsSnapshot.empty) {
             const record = recordsSnapshot.docs[0].data();
@@ -5677,7 +5665,7 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
         if (status === 'fail') {
             failureCount[stepIndex] = (failureCount[stepIndex] || 0) + 1;
         } else if (status === 'pass') {
-            // 合格後清零
+            // 合格後清零該步驟嘅次數（但保留總次數）
             delete failureCount[stepIndex];
         }
 
@@ -5695,6 +5683,7 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
             failureCount: failureCount, // ⭐ 儲存不合格次數
             status: 'pending',
             evaluatedBy: currentUser.docId,
+            evaluatedByName: currentUser.name, // ⭐ 新增：批改者姓名
             evaluatedAt: new Date().toISOString()
         };
 
@@ -5924,8 +5913,13 @@ async function markItemComplete(itemId) {
 
             // 🟨 即使有 fail，仍可標記完成
             const isPassed = !hasCriticalFailed && completionRate === 100;
-            const newAttemptCount = record.isPassed ? (record.attemptCount || 1) : (record.attemptCount || 0) + 1;
-            const attemptResult = isPassed ? 'pass' : 'fail';
+            
+            // ⭐ 新增：計算嘗試次數
+            const previousAttemptCount = record.attemptCount || 0;
+            const newAttemptCount = isPassed ? previousAttemptCount : previousAttemptCount + 1;
+            
+            // ⭐ 新增：更新總不合格次數
+            const totalFailCount = isPassed ? (record.totalFailCount || 0) : (record.totalFailCount || 0) + 1;
 
             // 🟩 要求：完成即要求簽名
             const staffName = await verifyUserBeforeSign().catch(() => null);
@@ -5942,12 +5936,13 @@ async function markItemComplete(itemId) {
             const updateData = {
                 status: 'completed',
                 isPassed,
-                finalResult: attemptResult,
-                attemptCount: newAttemptCount,
+                attemptCount: newAttemptCount, // ⭐ 儲存嘗試次數
+                totalFailCount: totalFailCount, // ⭐ 儲存總不合格次數
                 completionRate,
                 hasCriticalFailed,
                 evaluationSignatures,
                 evaluatedBy: currentUser.docId,
+                evaluatedByName: currentUser.name, // ⭐ 新增：批改者姓名
                 evaluatedAt: signedAt
             };
 
