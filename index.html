@@ -8253,8 +8253,7 @@ async function confirmBatchSign(itemId, signature, type = 'trainee') {
         console.error('批量簽署失敗:', error);
         showToast('❌ 批量簽署失敗', 'error');
     }
-}
-}      
+}    
         
 // ==================== 一鍵簽署全部步驟（修正版） ====================
 async function batchSignAllSteps(itemId, type = "trainee") {
@@ -8563,7 +8562,8 @@ async function refreshSignatureBox(itemId, stepIndex, type, signature) {
         showCategoryEvaluation(currentCategoryId);
     }, 1500);
 }
-
+}
+        
         // ⭐⭐⭐ 新增：即時更新訓練步驟完成狀態 ⭐⭐⭐
 async function refreshTrainingStepStatus(itemId, stepIndex) {
     try {
