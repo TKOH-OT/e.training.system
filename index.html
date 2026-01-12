@@ -3160,7 +3160,7 @@ async function initializeSystem() {
 
         systemInitialized = true;
         console.log('✅ 系統初始化完成');
-    } catch (error) {
+    
         console.error('❌ 系統初始化失敗:', error);
         showToast('⚠️ 系統初始化中，請稍後再試', 'warning');
     }
@@ -8254,6 +8254,7 @@ async function confirmBatchSign(itemId, signature, type = 'trainee') {
         showToast('❌ 批量簽署失敗', 'error');
     }
 }
+}      
         
 // ==================== 一鍵簽署全部步驟（修正版） ====================
 async function batchSignAllSteps(itemId, type = "trainee") {
