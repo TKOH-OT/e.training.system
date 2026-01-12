@@ -4834,13 +4834,13 @@ for (const category of categories) {
     });
     items.sort((a, b) => (a.order || 0) - (b.order || 0));
 
-// ⭐⭐⭐ 關鍵修正：讀取所有記錄，智能選擇最新狀態 ⭐⭐⭐
+// ⭐⭐⭐ 關鍵修正：讀取所有記錄，智能選擇顯示狀態 ⭐⭐⭐
 const allRecordsSnapshot = await db.collection('trainingRecords')
-    .where('userId', '==', staffId)
+    .where('userId', '==', currentStaffId)
     .get();
 
-const records = {}; // 儲存每個項目的最新記錄
-const recordsByItem = {}; // 儲存每個項目的所有記錄
+const records = {};
+const recordsByItem = {};
 
 allRecordsSnapshot.forEach(doc => {
     const record = doc.data();
@@ -4856,13 +4856,11 @@ allRecordsSnapshot.forEach(doc => {
 Object.keys(recordsByItem).forEach(itemId => {
     const itemRecords = recordsByItem[itemId];
     
-    // 優先顯示 pending（正在評核中）
     const pendingRecord = itemRecords.find(r => r.status === 'pending');
     
     if (pendingRecord) {
         records[itemId] = pendingRecord;
     } else {
-        // 沒有 pending，顯示最新的 completed
         const completedRecords = itemRecords.filter(r => r.status === 'completed');
         if (completedRecords.length > 0) {
             completedRecords.sort((a, b) => {
@@ -6068,36 +6066,31 @@ if (overallStatusElement) {
             }
         }
 
-// ⭐⭐⭐ 修正後的 markItemComplete 函數 ⭐⭐⭐
+// ==================== 標記評核完成（改為新增記錄，唔係更新）====================
 async function markItemComplete(itemId) {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
 
-        let isPassed = false;
-
-        // 🟩【1】Checklist 類別專用邏輯
-        if (item.hasChecklist && item.recordType === 'checklist') {
-            const recordsSnapshot = await db.collection('trainingRecords')
+        if (item.recordType === 'checklist' && item.hasChecklist) {
+            // ⭐⭐⭐ 讀取當前 pending 記錄 ⭐⭐⭐
+            const pendingSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
                 .where('itemId', '==', itemId)
                 .where('status', '==', 'pending')
                 .limit(1)
                 .get();
 
-            if (recordsSnapshot.empty) {
+            if (pendingSnapshot.empty) {
                 showToast('❌ 請先完成評核，才能標記完成', 'error');
                 return;
             }
 
-            const record = recordsSnapshot.docs[0].data();
-            const recordRef = recordsSnapshot.docs[0].ref;
+            const record = pendingSnapshot.docs[0].data();
             const checklistStatus = record.checklistStatus || {};
 
-            // ⭐⭐⭐ 修正：排除章節標題後再計算 ⭐⭐⭐
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             
-            // ⭐⭐⭐ 修正：Critical 步驟檢查也要排除章節標題 ⭐⭐⭐
             const hasCriticalFailed = item.checklist.some((step, index) =>
                 !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
             );
@@ -6110,11 +6103,9 @@ async function markItemComplete(itemId) {
             });
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-
-            // ⭐⭐⭐ 關鍵修正：必須同時滿足兩個條件 ⭐⭐⭐
-            isPassed = !hasCriticalFailed && completionRate === 100;
+            const isPassed = !hasCriticalFailed && completionRate === 100;
             
-            // 取得歷史記錄以計算次數
+            // ⭐⭐⭐ 計算第幾次評核 ⭐⭐⭐
             const allRecordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
                 .where('itemId', '==', itemId)
@@ -6123,7 +6114,7 @@ async function markItemComplete(itemId) {
             
             const attemptNumber = allRecordsSnapshot.size + 1;
 
-            // 簽名驗證
+            // ⭐⭐⭐ 雙方簽名驗證 ⭐⭐⭐
             const staffName = await verifyUserBeforeSign().catch(() => null);
             if (!staffName) return;
             
@@ -6132,32 +6123,40 @@ async function markItemComplete(itemId) {
             
             const signedAt = new Date().toISOString();
 
-            const evaluationSignatures = {
-                staff: staffName,
-                supervisor: supervisorName,
-                signedAt: signedAt
-            };
-
-            // ⭐⭐⭐ 儲存完整的不合格資訊 ⭐⭐⭐
-            const updateData = {
+            // ⭐⭐⭐ 關鍵修改：新增記錄而非更新 ⭐⭐⭐
+            const newRecordData = {
+                userId: currentStaffId,
+                itemId: itemId,
+                categoryId: item.categoryId,
                 status: 'completed',
-                isPassed,
-                completionRate,
-                hasCriticalFailed,
-                evaluationSignatures,
+                isPassed: isPassed,
+                completionRate: completionRate,
+                hasCriticalFailed: hasCriticalFailed,
+                checklistStatus: checklistStatus,
+                remarks: record.remarks || {},
+                failureCount: record.failureCount || {},
+                evaluationSignatures: {
+                    staff: staffName,
+                    supervisor: supervisorName,
+                    signedAt: signedAt
+                },
                 evaluatedBy: currentUser.docId,
                 evaluatedByName: currentUser.name,
                 evaluatedAt: signedAt,
                 attemptNumber: attemptNumber,
-                completedAt: firebase.firestore.FieldValue.serverTimestamp()
+                completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
-            // ⭐⭐⭐ 新增：如果不合格，記錄總不合格次數 ⭐⭐⭐
             if (!isPassed) {
-                updateData.totalFailCount = attemptNumber;
+                newRecordData.totalFailCount = attemptNumber;
             }
 
-            await recordRef.update(updateData);
+            // ⭐⭐⭐ 新增 completed 記錄 ⭐⭐⭐
+            await db.collection('trainingRecords').add(newRecordData);
+
+            // ⭐⭐⭐ 刪除舊嘅 pending 記錄 ⭐⭐⭐
+            await db.collection('trainingRecords').doc(pendingSnapshot.docs[0].id).delete();
 
             if (isPassed) {
                 showToast(`✅ 已完成評核（合格）- 第 ${attemptNumber} 次評核`, 'success');
@@ -6189,12 +6188,11 @@ async function markItemComplete(itemId) {
                 await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
             }
 
-            isPassed = true;
             showToast('✅ 訓練記錄已標記完成', 'success');
         }
 
-        // 顯示完成選項畫面
-        showCompletedItemOptions(itemId, isPassed);
+        // ⭐⭐⭐ 顯示選項畫面（同Quiz一樣）⭐⭐⭐
+        showCompletedItemOptions(itemId, isPassed || true);
         
     } catch (error) {
         console.error('標記完成失敗:', error);
@@ -6554,7 +6552,7 @@ function viewCompletedItemResult(itemId) {
     viewEvaluationResultDetail(itemId);
 }
         
-// ⭐⭐⭐ 修正：刪除舊 pending，保留所有 completed ⭐⭐⭐
+// ==================== 重新評核（改為新增 pending）====================
 async function reopenItemEvaluation(itemId) {
     if (!confirm('❓ 確定要重新評核此項目嗎？\n\n✅ 這會開始新的評核，所有歷史記錄會保留。')) {
         return;
@@ -6585,10 +6583,8 @@ async function reopenItemEvaluation(itemId) {
         showToast('✅ 已開始新的評核，歷史記錄已保留', 'success');
         closeModal();
         
-        // 重新載入頁面
         await showCategoryEvaluation(currentCategoryId);
         
-        // 自動展開卡片
         setTimeout(() => {
             const card = document.getElementById(`eval_item_${itemId}`);
             if (card && !card.classList.contains('expanded')) {
