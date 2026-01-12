@@ -5566,13 +5566,13 @@ const checklistHtml = item.checklist.map((step, index) => {
     <div class="training-record-label">👤 被評核者簽名:</div>
     <div>
       ${hasEditPermission ? `
-        <div class="signature-box ${record.evaluationSignatures?.staff ? 'signed' : ''}"
-             onclick="editChecklistSignature('${item.docId}', 0, 'staff', '${record.evaluationSignatures?.staff || ''}')">
-          ${record.evaluationSignatures?.staff || '點擊簽名'}
+        <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}"
+             onclick="editChecklistSignature('${item.docId}', 0, 'staff', '${record?.evaluationSignatures?.staff || ''}')">
+          ${record?.evaluationSignatures?.staff || '點擊簽名'}
         </div>
       ` : `
-        <div class="signature-box ${record.evaluationSignatures?.staff ? 'signed' : ''}">
-          ${record.evaluationSignatures?.staff || '尚未簽名'}
+        <div class="signature-box ${record?.evaluationSignatures?.staff ? 'signed' : ''}">
+          ${record?.evaluationSignatures?.staff || '尚未簽名'}
         </div>
       `}
     </div>
@@ -5582,33 +5582,33 @@ const checklistHtml = item.checklist.map((step, index) => {
     <div class="training-record-label">👔 評核者簽名 (Supervisor):</div>
     <div>
       ${hasEditPermission ? `
-        <div class="signature-box ${record.evaluationSignatures?.supervisor ? 'signed' : ''}"
-             onclick="editChecklistSignature('${item.docId}', 0, 'supervisor', '${record.evaluationSignatures?.supervisor || ''}')">
-          ${record.evaluationSignatures?.supervisor || '點擊簽名'}
+        <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}"
+             onclick="editChecklistSignature('${item.docId}', 0, 'supervisor', '${record?.evaluationSignatures?.supervisor || ''}')">
+          ${record?.evaluationSignatures?.supervisor || '點擊簽名'}
         </div>
       ` : `
-        <div class="signature-box ${record.evaluationSignatures?.supervisor ? 'signed' : ''}">
-          ${record.evaluationSignatures?.supervisor || '尚未簽名'}
+        <div class="signature-box ${record?.evaluationSignatures?.supervisor ? 'signed' : ''}">
+          ${record?.evaluationSignatures?.supervisor || '尚未簽名'}
         </div>
       `}
     </div>
   </div>
 
   <div style="margin-top: 10px; text-align: center; font-size: 0.9em; color: #888;">
-    📅 評核日期：${record.evaluationSignatures?.signedAt ? new Date(record.evaluationSignatures.signedAt).toLocaleDateString() : '未簽署'}
+    📅 評核日期：${record?.evaluationSignatures?.signedAt ? new Date(record.evaluationSignatures.signedAt).toLocaleDateString() : '未簽署'}
   </div>
 </div>
 
-<!-- ============ 📊 評核結果區 ============ -->
+<!-- 評核結果區 -->
 <div class="score-info" style="margin-top: 20px;">
   <div class="score-title">📊 評核結果總結</div>
   <div style="text-align:center; margin-top:10px;">
-    ${record.isPassed 
+    ${record?.isPassed 
         ? `<span class="score-item-value pass">✅ 合格</span>` 
         : `<span class="score-item-value fail">❌ 不合格，需重做</span>`}
   </div>
   <div style="margin-top:8px; font-size:0.9em; color:#666;">
-    嘗試次數：${record.attemptCount || 1}
+    嘗試次數：${record?.attemptCount || 1}
   </div>
 </div>
                         </div>
