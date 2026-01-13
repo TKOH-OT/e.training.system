@@ -4468,11 +4468,11 @@ async function createTrainingItem() {
         categoryId: currentCategoryId,
         name: name,
         recordType: recordType,
-        hasChecklist: true, // ⭐ 兩種類型都有步驟
-        checklist: checklistSteps, // ⭐ 都儲存步驟內容
+        hasChecklist: true,
+        checklist: checklistSteps,
         hasDeadline: hasDeadline,
-        isImportant: isImportant,
-        passingScore: recordType === 'checklist' ? (parseInt(document.getElementById('passingScoreInput')?.value) || 80) : null, // ⭐ 新增合格分數
+        isImportant: isImportant, // ⭐ 加返逗號
+        passingScore: recordType === 'checklist' ? (parseInt(document.getElementById('passingScoreInput')?.value) || 80) : null,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
