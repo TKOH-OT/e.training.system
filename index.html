@@ -6847,52 +6847,53 @@ async function openBatchSignSelection(itemId, type, signerName) {
 
 // ==================== 確認簽署（更新選中步驟） ====================
 async function confirmBatchSignSelected(itemId, type, signerName) {
-    const checked = [...document.querySelectorAll(".checkbox-step input:checked")];
-    if (checked.length === 0) {
-        showToast("❌ 請至少選擇一個步驟", "error");
-        return;
-    }
+    try {
+        const checked = [...document.querySelectorAll(".checkbox-step input:checked")];
+        if (checked.length === 0) {
+            showToast("❌ 請至少選擇一個步驟", "error");
+            return;
+        }
 
-    const recordsSnapshot = await db
-        .collection("trainingRecords")
-        .where("userId", "==", currentStaffId)
-        .where("itemId", "==", itemId)
-        .limit(1)
-        .get();
+        const recordsSnapshot = await db
+            .collection("trainingRecords")
+            .where("userId", "==", currentStaffId)
+            .where("itemId", "==", itemId)
+            .limit(1)
+            .get();
 
-    let record = recordsSnapshot.empty ? { stepRecords: {} } : recordsSnapshot.docs[0].data();
-    const recordId = recordsSnapshot.empty ? null : recordsSnapshot.docs[0].id;
+        let record = recordsSnapshot.empty ? { stepRecords: {} } : recordsSnapshot.docs[0].data();
+        const recordId = recordsSnapshot.empty ? null : recordsSnapshot.docs[0].id;
 
-    checked.forEach((cb) => {
-        const index = cb.value;
-        if (!record.stepRecords[index]) record.stepRecords[index] = {};
-        record.stepRecords[index][`${type}Signature`] = signerName;
-        record.stepRecords[index][`${type}SignedAt`] = new Date().toISOString();
-    });
-
-    if (recordId) {
-        await db.collection("trainingRecords").doc(recordId).update({ stepRecords: record.stepRecords });
-    } else {
-        await db.collection("trainingRecords").add({
-            userId: currentStaffId,
-            itemId,
-            stepRecords: record.stepRecords,
+        checked.forEach((cb) => {
+            const index = cb.value;
+            if (!record.stepRecords[index]) record.stepRecords[index] = {};
+            record.stepRecords[index][`${type}Signature`] = signerName;
+            record.stepRecords[index][`${type}SignedAt`] = new Date().toISOString();
         });
-    }
 
-    showToast(`✅ 成功簽署 ${checked.length} 個步驟`, "success");
-    closeModal();
-    
-    // ⭐⭐⭐ 關鍵修復：逐個更新簽名框，避免重新載入頁面 ⭐⭐⭐
-    for (const cb of checked) {
-        const stepIndex = parseInt(cb.value);
-        await refreshSignatureBox(itemId, stepIndex, type, signerName);
+        if (recordId) {
+            await db.collection("trainingRecords").doc(recordId).update({ stepRecords: record.stepRecords });
+        } else {
+            await db.collection("trainingRecords").add({
+                userId: currentStaffId,
+                itemId,
+                stepRecords: record.stepRecords,
+            });
+        }
+
+        showToast(`✅ 成功簽署 ${checked.length} 個步驟`, "success");
+        closeModal();
+        
+        // ⭐⭐⭐ 關鍵修復：逐個更新簽名框，避免重新載入頁面 ⭐⭐⭐
+        for (const cb of checked) {
+            const stepIndex = parseInt(cb.value);
+            await refreshSignatureBox(itemId, stepIndex, type, signerName);
+        }
+        
+    } catch (error) {
+        console.error("批量簽署失敗:", error);
+        showToast("❌ 批量簽署失敗: " + error.message, "error");
     }
-    
-} catch (error) {
-    console.error("批量簽署失敗:", error);
-    showToast("❌ 批量簽署失敗: " + error.message, "error");
-}
 }
         
 // ==================== Toast 訊息提示 ====================
