@@ -6069,6 +6069,16 @@ async function markItemComplete(itemId) {
 
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             
+            // ⭐⭐⭐ 修復 Bug 1: 檢查是否有步驟選擇「不合格」⭐⭐⭐
+            const hasFailedSteps = item.checklist.some((step, index) =>
+                !step.isSubtitle && checklistStatus[index] === 'fail'
+            );
+            
+            if (hasFailedSteps) {
+                showToast('❌ 有步驟選擇「不合格」，無法標記完成！請先修正或重新評核', 'error');
+                return;
+            }
+            
             // ⭐⭐⭐ 修復 Bug 2: 檢查是否有未評核的步驟 ⭐⭐⭐
             const hasPendingSteps = item.checklist.some((step, index) =>
                 !step.isSubtitle && (!checklistStatus[index] || checklistStatus[index] === 'pending')
@@ -6084,12 +6094,10 @@ async function markItemComplete(itemId) {
                 !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
             );
             
-   // ⭐⭐⭐ 修正：Critical 不合格時，仍可提交但標記為「不合格」⭐⭐⭐
-// if (hasCriticalFailed) {
-//     showToast('❌ 有 Critical 步驟不合格，無法標記為合格！', 'error');
-//     return;
-// }
-// ⭐ 刪除這段檢查，讓評核可以繼續
+            if (hasCriticalFailed) {
+                showToast('❌ 有 Critical 步驟不合格，無法標記為合格！', 'error');
+                return;
+            }
 
             // 計算合格步驟數
             let passedSteps = 0;
@@ -6100,8 +6108,7 @@ async function markItemComplete(itemId) {
             });
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-            const // ⭐⭐⭐ 修正：只要 Critical 步驟全部合格，就算合格（普通步驟不合格不影響）⭐⭐⭐
-const isPassed = !hasCriticalFailed && completionRate === 100;isPassed = !hasCriticalFailed && completionRate === 100;
+            const isPassed = !hasCriticalFailed && completionRate === 100;
 
             // 雙方簽名驗證
             const allRecordsSnapshot = await db.collection('trainingRecords')
