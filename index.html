@@ -4210,8 +4210,8 @@ function showAddItemModal() {
             <strong>📋 評核步驟 Checklist:</strong> 需要逐步評估每個步驟是否合格/不合格，有 Critical 步驟控制
         </div>
 
-        <!-- ⭐ 新增：合格分數設定 -->
-        <div class="input-group" id="passingScoreGroup" style="display: none;">
+        <!-- ⭐ 新增：合格分數設定（初始隱藏，由 toggleRecordTypeOptions 控制）-->
+        <div class="input-group" id="passingScoreGroup" style="display: block;">
             <label>✅ 合格分數 (%)</label>
             <input type="number" id="passingScoreInput" min="0" max="100" value="80" placeholder="80">
             <div style="margin-top: 5px; color: #666; font-size: 0.9em;">
@@ -4295,15 +4295,6 @@ function showAddItemModal() {
                 </div>
             </div>
         </div>
-        ${item.recordType === 'checklist' ? `
-                <div class="input-group">
-                    <label>✅ 合格分數 (%)</label>
-                    <input type="number" id="editPassingScore" min="0" max="100" value="${item.passingScore || 80}" placeholder="80">
-                    <div style="margin-top: 5px; color: #666; font-size: 0.9em;">
-                        ⚠️ 無論設定幾多，所有 <strong style="color: #ff4757;">Critical 步驟</strong> 都必須合格才算通過！
-                    </div>
-                </div>
-            ` : ''}
         <div class="checkbox-group">
             <input type="checkbox" id="isImportantCheck">
             <label for="isImportantCheck">⭐ 加入重要評核時間表</label>
@@ -4317,6 +4308,11 @@ function showAddItemModal() {
     showModal('➕ 新增培訓項目', modalBody);
     checklistSteps = [];
     addNewChecklistStep();
+    
+    // ⭐⭐⭐ 新增：初始化時觸發一次 toggleRecordTypeOptions ⭐⭐⭐
+    setTimeout(() => {
+        toggleRecordTypeOptions();
+    }, 100);
 }
 
 // ⭐ 新增：切換記錄類型選項
@@ -8023,17 +8019,25 @@ async function markTrainingComplete(itemId) {
 
             const trainingCount = allCompletedRecords.size + 1; // 當前這次是第幾次
 
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
-                status: 'completed',
-                isPassed: true,
-                completedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                completedBy: currentUser.name,
-                participants: participants,
-                trainingCount: trainingCount // ⭐ 新增：訓練次數
-            });
+            // ⭐⭐⭐ 修復：建立新的 completed 記錄，保留 pending ⭐⭐⭐
+const newRecordData = {
+    userId: currentStaffId,
+    itemId: itemId,
+    status: 'completed',
+    isPassed: true,
+    stepRecords: record.stepRecords, // ⭐ 保留步驟記錄
+    completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    completedBy: currentUser.name,
+    participants: participants,
+    trainingCount: trainingCount,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+};
 
-            // ⭐⭐⭐ 刪除舊的 pending 記錄（如果存在多個）⭐⭐⭐
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).delete();
+// ⭐ 建立新記錄
+await db.collection('trainingRecords').add(newRecordData);
+
+// ⭐ 刪除舊的 pending 記錄
+await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).delete();
 
             showToast(`✅ 訓練記錄已完成（第 ${trainingCount} 次訓練）\n👥 參與人員：${participants}`, 'success');
             
