@@ -5378,9 +5378,10 @@ async function showCategoryEvaluation(categoryId) {
                                     <div class="training-record-label">📅 教授/講解日期:</div>
                                     <div>
                                         ${hasEditPermission ? `
-                                            <input type="date" id="trainingDate_${item.docId}_${index}" 
-                                                   value="${trainingDate}" 
-                                                   onchange="saveStepTrainingDate('${item.docId}', ${index})"
+                                           <input type="date" id="trainingDate_${item.docId}_${index}" 
+       value="${trainingDate}" 
+       onclick="event.stopPropagation()" 
+       onchange="event.stopPropagation(); saveStepTrainingDate('${item.docId}', ${index})"
                                                    style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; width: 100%;">
                                         ` : `
                                             <div style="padding: 8px; background: #f0f0f0; border-radius: 6px;">
@@ -5400,8 +5401,8 @@ async function showCategoryEvaluation(categoryId) {
         🖊️ 一鍵多簽
     </button>
 </div>
-                                            <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
-                                                 onclick="editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
+                                           <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
+     onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
                                                 ${traineeSignature || '點擊輸入簽名'}
                                             </div>
                                         ` : `
@@ -5422,8 +5423,8 @@ async function showCategoryEvaluation(categoryId) {
                                                     🖊️ 陪帶一鍵多簽
                                                 </button>
                                             </div>
-                                            <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
-                                                 onclick="editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
+                                           <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
+     onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
                                                 ${mentorSignature || '點擊輸入簽名'}
                                             </div>
                                         ` : `
@@ -5445,7 +5446,7 @@ async function showCategoryEvaluation(categoryId) {
                                                 </button>
                                             </div>
                                             <div class="signature-box ${stepRecord.supervisorSignature ? 'signed' : ''}" 
-                                                 onclick="editStepSignature('${item.docId}', ${index}, 'supervisor', '${stepRecord.supervisorSignature || ''}')">
+     onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'supervisor', '${stepRecord.supervisorSignature || ''}')">
                                                 ${stepRecord.supervisorSignature || '點擊輸入簽名'}
                                             </div>
                                         ` : `
@@ -6065,11 +6066,37 @@ async function markItemComplete(itemId) {
 
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             
-            // ⭐⭐⭐ 修正：Critical 判斷優先 ⭐⭐⭐
+            // ⭐⭐⭐ 修復 Bug 1: 檢查是否有步驟選擇「不合格」⭐⭐⭐
+            const hasFailedSteps = item.checklist.some((step, index) =>
+                !step.isSubtitle && checklistStatus[index] === 'fail'
+            );
+            
+            if (hasFailedSteps) {
+                showToast('❌ 有步驟選擇「不合格」，無法標記完成！請先修正或重新評核', 'error');
+                return;
+            }
+            
+            // ⭐⭐⭐ 修復 Bug 2: 檢查是否有未評核的步驟 ⭐⭐⭐
+            const hasPendingSteps = item.checklist.some((step, index) =>
+                !step.isSubtitle && (!checklistStatus[index] || checklistStatus[index] === 'pending')
+            );
+            
+            if (hasPendingSteps) {
+                showToast('❌ 尚有步驟未完成評核！請為所有步驟選擇「合格」或「不合格」', 'error');
+                return;
+            }
+            
+            // ⭐⭐⭐ 修復 Bug 3: 檢查 Critical 步驟是否不合格 ⭐⭐⭐
             const hasCriticalFailed = item.checklist.some((step, index) =>
                 !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
             );
+            
+            if (hasCriticalFailed) {
+                showToast('❌ 有 Critical 步驟不合格，無法標記為合格！', 'error');
+                return;
+            }
 
+            // 計算合格步驟數
             let passedSteps = 0;
             item.checklist.forEach((step, index) => {
                 if (!step.isSubtitle && checklistStatus[index] === 'pass') {
@@ -6078,22 +6105,9 @@ async function markItemComplete(itemId) {
             });
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-            
-            // ⭐⭐⭐ 關鍵修正：Critical 不合格 = 整體不合格 ⭐⭐⭐
             const isPassed = !hasCriticalFailed && completionRate === 100;
-            
-            // ⭐ 如果有 Critical 不合格，強制提示用戶
-            if (hasCriticalFailed) {
-                showToast('❌ 有 Critical 步驟不合格，無法標記為合格！', 'error');
-                return; // ⭐ 直接拒絕標記完成
-            }
-            
-            if (completionRate < 100) {
-                showToast('❌ 尚有步驟未完成評核！', 'error');
-                return;
-            }
 
-              // ⭐⭐⭐ 新增：強制雙方簽名（無論合格定不合格）⭐⭐⭐
+            // 雙方簽名驗證
             const allRecordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
                 .where('itemId', '==', itemId)
@@ -6102,12 +6116,11 @@ async function markItemComplete(itemId) {
             
             const attemptNumber = allRecordsSnapshot.size + 1;
 
-             // ⭐⭐⭐ 雙方簽名驗證（移到 Critical 檢查之後）⭐⭐⭐
             const staffName = await verifyUserBeforeSign().catch(() => null);
-            if (!staffName) return; // 取消簽名 = 無法標記完成
+            if (!staffName) return;
             
             const supervisorName = await verifyUserBeforeSign().catch(() => null);
-            if (!supervisorName) return; // 取消簽名 = 無法標記完成
+            if (!supervisorName) return;
             
             const signedAt = new Date().toISOString();
 
@@ -6116,9 +6129,9 @@ async function markItemComplete(itemId) {
                 itemId: itemId,
                 categoryId: item.categoryId,
                 status: 'completed',
-                isPassed: isPassed, // ⭐ 現在一定正確
+                isPassed: isPassed,
                 completionRate: completionRate,
-                hasCriticalFailed: hasCriticalFailed, // ⭐ 明確記錄
+                hasCriticalFailed: hasCriticalFailed,
                 checklistStatus: checklistStatus,
                 remarks: record.remarks || {},
                 failureCount: record.failureCount || {},
@@ -6148,6 +6161,7 @@ async function markItemComplete(itemId) {
                 showToast(`⚠️ 已完成評核（不合格）- 第 ${attemptNumber} 次評核`, 'warning');
             }
 
+            showCompletedItemOptions(itemId, isPassed);
         } else {
             // Training 類別保持不變
             const recordsSnapshot = await db.collection('trainingRecords')
@@ -6173,9 +6187,8 @@ async function markItemComplete(itemId) {
             }
 
             showToast('✅ 訓練記錄已標記完成', 'success');
+            showCompletedItemOptions(itemId, isPassed);
         }
-
-        showCompletedItemOptions(itemId, isPassed);
         
     } catch (error) {
         console.error('標記完成失敗:', error);
@@ -6869,7 +6882,16 @@ async function confirmBatchSignSelected(itemId, type, signerName) {
 
     showToast(`✅ 成功簽署 ${checked.length} 個步驟`, "success");
     closeModal();
-    showCategoryEvaluation(currentCategoryId);
+    
+    // ⭐⭐⭐ 關鍵修復：逐個更新簽名框，避免重新載入頁面 ⭐⭐⭐
+    for (const cb of checked) {
+        const stepIndex = parseInt(cb.value);
+        await refreshSignatureBox(itemId, stepIndex, type, signerName);
+    }
+    
+} catch (error) {
+    console.error("批量簽署失敗:", error);
+    showToast("❌ 批量簽署失敗: " + error.message, "error");
 }
 
 // ==================== Toast 訊息提示 ====================
@@ -7968,7 +7990,15 @@ async function resetTraining(itemId) {
 
 // ⭐⭐⭐ 儲存單一步驟的訓練日期（即時更新狀態）⭐⭐⭐
 async function saveStepTrainingDate(itemId, stepIndex) {
-    const date = document.getElementById(`trainingDate_${itemId}_${stepIndex}`).value;
+    const dateInput = document.getElementById(`trainingDate_${itemId}_${stepIndex}`);
+    if (!dateInput) return;
+    
+    const date = dateInput.value;
+    
+    // ⭐⭐⭐ 防止未選擇日期時觸發 ⭐⭐⭐
+    if (!date) {
+        return; // 無選擇日期，直接返回
+    }
     
     try {
         const recordsSnapshot = await db.collection('trainingRecords')
