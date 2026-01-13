@@ -8965,92 +8965,128 @@ async function saveStepSignature(itemId, stepIndex, type, signerName) {
     showCategoryEvaluation(currentCategoryId);
 }
         
-// ⭐⭐⭐ 更新簽名框及完成狀態（支援 3 種類型）⭐⭐⭐
+// ⭐⭐⭐ 修復：刷新單個簽名框（支援 trainee/mentor/supervisor）⭐⭐⭐
 async function refreshSignatureBox(itemId, stepIndex, type, signature) {
     try {
-        // ⭐ 重新載入最新記錄
+        console.log('🔄 refreshSignatureBox 呼叫:', { itemId, stepIndex, type, signature });
+
+        // ⭐ Step 1: 重新載入最新記錄
         const recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
             .limit(1)
             .get();
 
-        if (recordsSnapshot.empty) return;
+        if (recordsSnapshot.empty) {
+            console.warn('❌ 找不到訓練記錄');
+            return;
+        }
 
         const record = recordsSnapshot.docs[0].data();
         const stepRecords = record.stepRecords || {};
         const stepRecord = stepRecords[stepIndex] || {};
 
-        // ⭐ 讀取最新簽名
+        // ⭐ Step 2: 讀取最新簽名
         const latestSignature = stepRecord[`${type}Signature`] || signature;
+        console.log(`✅ 最新簽名 (${type}):`, latestSignature);
 
+        // ⭐ Step 3: 找到對應的卡片
         const card = document.getElementById(`eval_item_${itemId}`);
-        if (!card) return;
-
-        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
-        const item = itemDoc.data();
-
-        // ⭐⭐⭐ 修復 Bug 2：正確計算簽名框索引 ⭐⭐⭐
-        // 方法：直接用 stepIndex 在 checklist 內找出實際步驟編號
-        
-        // 計算 stepIndex 對應的實際步驟編號（排除 subtitle）
-        let actualStepNumber = 0;
-        for (let i = 0; i <= stepIndex; i++) {
-            if (!item.checklist[i].isSubtitle) {
-                actualStepNumber++;
-            }
-        }
-        
-        // ⭐ 計算當前步驟在所有實際步驟中的索引（從 0 開始）
-        const actualStepIndex = actualStepNumber - 1;
-
-        // ⭐ 找到對應的簽名框容器（每個步驟的 training-record-item）
-        const allRecordItems = card.querySelectorAll('.training-record-item');
-        const targetRecordItem = allRecordItems[actualStepIndex];
-        
-        if (!targetRecordItem) {
-            console.error(`找不到 training-record-item，索引：${actualStepIndex}`);
+        if (!card) {
+            console.error('❌ 找不到卡片:', `eval_item_${itemId}`);
             return;
         }
 
-        // ⭐ 在該容器內找到對應類型的簽名框
+        // ⭐ Step 4: 載入 item 資料（取得 checklist）
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        if (!itemDoc.exists) {
+            console.error('❌ 找不到 trainingItem:', itemId);
+            return;
+        }
+        const item = itemDoc.data();
+
+        // ⭐⭐⭐ Step 5: 計算實際步驟索引（排除 subtitle）⭐⭐⭐
+        let actualStepIndex = -1;
+        let count = 0;
+
+        for (let i = 0; i < item.checklist.length; i++) {
+            if (!item.checklist[i].isSubtitle) {
+                if (i === stepIndex) {
+                    actualStepIndex = count;
+                    break;
+                }
+                count++;
+            }
+        }
+
+        console.log(`📍 stepIndex: ${stepIndex} → actualStepIndex: ${actualStepIndex}`);
+
+        if (actualStepIndex === -1) {
+            console.error('❌ 無法計算 actualStepIndex');
+            return;
+        }
+
+        // ⭐⭐⭐ Step 6: 找到對應的 training-record-item（步驟容器）⭐⭐⭐
+        const allRecordItems = card.querySelectorAll('.training-record-item');
+        console.log(`🔍 找到 ${allRecordItems.length} 個 training-record-item`);
+
+        if (actualStepIndex >= allRecordItems.length) {
+            console.error(`❌ actualStepIndex (${actualStepIndex}) 超出範圍 (${allRecordItems.length})`);
+            return;
+        }
+
+        const targetRecordItem = allRecordItems[actualStepIndex];
+        console.log('✅ 找到目標步驟容器:', targetRecordItem);
+
+        // ⭐⭐⭐ Step 7: 在該容器內找到對應的簽名框 ⭐⭐⭐
         const allSignatureBoxes = targetRecordItem.querySelectorAll('.signature-box');
-        
+        console.log(`🔍 找到 ${allSignatureBoxes.length} 個簽名框`);
+
         let targetBoxIndex = -1;
         if (type === 'trainee') {
-            targetBoxIndex = 0; // 第 1 個簽名框
+            targetBoxIndex = 0;
         } else if (type === 'mentor') {
-            targetBoxIndex = 1; // 第 2 個簽名框
+            targetBoxIndex = 1;
         } else if (type === 'supervisor') {
-            targetBoxIndex = 2; // 第 3 個簽名框
+            targetBoxIndex = 2;
+        }
+
+        console.log(`📍 簽名框索引: ${targetBoxIndex}`);
+
+        if (targetBoxIndex === -1 || targetBoxIndex >= allSignatureBoxes.length) {
+            console.error(`❌ 找不到簽名框 (type: ${type}, index: ${targetBoxIndex})`);
+            return;
         }
 
         const targetBox = allSignatureBoxes[targetBoxIndex];
-        
-        if (targetBox) {
-            // ⭐ 更新簽名框內容
-            targetBox.textContent = latestSignature || '點擊輸入簽名';
-            
-            if (latestSignature) {
-                targetBox.classList.add('signed');
-            } else {
-                targetBox.classList.remove('signed');
-            }
+        console.log('✅ 找到目標簽名框:', targetBox);
+
+        // ⭐⭐⭐ Step 8: 更新簽名框內容 ⭐⭐⭐
+        if (latestSignature) {
+            targetBox.textContent = latestSignature;
+            targetBox.classList.add('signed');
+            console.log('✅ 簽名框已更新:', latestSignature);
         } else {
-            console.error(`找不到簽名框，類型：${type}，索引：${targetBoxIndex}`);
+            targetBox.textContent = '點擊輸入簽名';
+            targetBox.classList.remove('signed');
+            console.log('⚠️ 簽名框已清空');
         }
 
-        // ⭐ 更新完成狀態
+        // ⭐ Step 9: 更新完成狀態
         if (item.recordType === 'training') {
             await refreshTrainingStepStatus(itemId, stepIndex);
             await updateOverallProgress(itemId);
+            console.log('✅ 已更新訓練進度');
         } else {
             await refreshCurrentItemCard(itemId);
+            console.log('✅ 已刷新卡片');
         }
 
     } catch (error) {
-        console.error('更新簽名框失敗:', error);
+        console.error('❌ refreshSignatureBox 失敗:', error);
         showToast('⚠️ 簽名已儲存，但畫面更新失敗，請手動刷新', 'warning');
+        
+        // ⭐ 發生錯誤時，直接重新渲染整個頁面
         setTimeout(() => {
             showCategoryEvaluation(currentCategoryId);
         }, 1500);
