@@ -5875,7 +5875,10 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'superviso
 // ==================== 切換評核項目卡片展開/收起 ====================
 async function toggleEvalItemCard(itemId) {
     try {
-        // ⭐⭐⭐ 讀取所有記錄，優先 pending ⭐⭐⭐
+        // ⭐⭐⭐ 取得項目類型 ⭐⭐⭐
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
         const allRecordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
@@ -5889,11 +5892,9 @@ async function toggleEvalItemCard(itemId) {
                 records.push({ docId: doc.id, ...doc.data() });
             });
             
-            // 優先取 pending
             record = records.find(r => r.status === 'pending');
             
             if (!record) {
-                // 沒有 pending，取最新的 completed
                 const completedRecords = records.filter(r => r.status === 'completed');
                 if (completedRecords.length > 0) {
                     completedRecords.sort((a, b) => {
@@ -5909,19 +5910,21 @@ async function toggleEvalItemCard(itemId) {
         const card = document.getElementById(`eval_item_${itemId}`);
         const allCards = document.querySelectorAll('#evaluationContent .item-card');
         
-        // ⭐⭐⭐ 關鍵修正：如果已經展開，就收起（允許操作按鈕）⭐⭐⭐
         if (card.classList.contains('expanded')) {
             card.classList.remove('expanded');
             return;
         }
         
-        // ⭐⭐⭐ 已完成記錄 → 顯示選項彈窗（但唔阻止展開）⭐⭐⭐
+        // ⭐⭐⭐ 已完成記錄 → 顯示選項彈窗 ⭐⭐⭐
         if (record && record.status === 'completed') {
-            showCompletedItemOptions(itemId, record.isPassed || false);
-            // ❌ 唔再 return，繼續向下執行展開邏輯
+            // ⭐ 判斷類型：訓練記錄 vs 評核 Checklist
+            if (item.recordType === 'training') {
+                showTrainingCompletedOptions(itemId); // 訓練記錄選項
+            } else {
+                showCompletedItemOptions(itemId, record.isPassed || false); // 評核選項
+            }
         }
 
-        // ⭐⭐⭐ 展開當前卡片，收起其他卡片 ⭐⭐⭐
         allCards.forEach(c => c.classList.remove('expanded'));
         card.classList.add('expanded');
         
@@ -7969,6 +7972,7 @@ async function markTrainingComplete(itemId) {
             const recordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
                 .where('itemId', '==', itemId)
+                .where('status', '==', 'pending')
                 .limit(1)
                 .get();
 
@@ -7994,7 +7998,6 @@ async function markTrainingComplete(itemId) {
                         !stepRecord?.supervisorSignature) {
                         allStepsCompleted = false;
                     } else {
-                        // 收集所有簽署人
                         if (stepRecord.traineeSignature) signedUsers.add(stepRecord.traineeSignature);
                         if (stepRecord.mentorSignature) signedUsers.add(stepRecord.mentorSignature);
                         if (stepRecord.supervisorSignature) signedUsers.add(stepRecord.supervisorSignature);
@@ -8011,21 +8014,35 @@ async function markTrainingComplete(itemId) {
             const completedAt = new Date();
             const participants = Array.from(signedUsers).join(', ');
 
+            // ⭐⭐⭐ 計算訓練次數（查詢所有已完成的訓練記錄）⭐⭐⭐
+            const allCompletedRecords = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'completed')
+                .get();
+
+            const trainingCount = allCompletedRecords.size + 1; // 當前這次是第幾次
+
             await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
                 status: 'completed',
                 isPassed: true,
                 completedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 completedBy: currentUser.name,
-                participants: participants
+                participants: participants,
+                trainingCount: trainingCount // ⭐ 新增：訓練次數
             });
 
-            showToast(`✅ 訓練記錄已完成\n👥 參與人員：${participants}`, 'success');
-            showCategoryEvaluation(currentCategoryId);
+            // ⭐⭐⭐ 刪除舊的 pending 記錄（如果存在多個）⭐⭐⭐
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).delete();
+
+            showToast(`✅ 訓練記錄已完成（第 ${trainingCount} 次訓練）\n👥 參與人員：${participants}`, 'success');
+            
+            // ⭐⭐⭐ 顯示訓練完成選項（不同於評核）⭐⭐⭐
+            showTrainingCompletedOptions(itemId);
         }
         
         // ⭐⭐⭐ Checklist 類型（保留原邏輯）⭐⭐⭐
         else {
-            // 呼叫原有嘅 markItemComplete 函數
             await markItemComplete(itemId);
         }
 
@@ -8035,6 +8052,306 @@ async function markTrainingComplete(itemId) {
     }
 }
 
+        // ⭐⭐⭐ 新增：訓練記錄完成選項彈窗 ⭐⭐⭐
+function showTrainingCompletedOptions(itemId) {
+    const modalBody = `
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 3em; margin-bottom: 15px;">🎓</div>
+            <h3 style="color: #2ed573;">✅ 訓練記錄已完成！</h3>
+            <p style="color: #666; margin-top: 10px;">所有步驟及簽名已齊全</p>
+        </div>
+        
+        <div class="modal-buttons" style="flex-direction: column;">
+            <button class="btn btn-info" style="width: 100%;" 
+                    onclick="viewTrainingRecordsList('${itemId}')">
+                📊 查看訓練記錄
+            </button>
+            ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
+                <button class="btn btn-warning" style="width: 100%; margin-top: 10px;" 
+                        onclick="reopenTraining('${itemId}')">
+                    🔄 重新訓練
+                </button>
+            ` : ''}
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 10px;" 
+                    onclick="closeModalAndRefresh()">
+                ❌ 關閉
+            </button>
+        </div>
+    `;
+    
+    showModal('🎓 訓練完成', modalBody);
+}
+
+        // ⭐⭐⭐ 新增：查看訓練記錄列表（獨立頁面）⭐⭐⭐
+async function viewTrainingRecordsList(itemId) {
+    closeModal();
+    showPage('evaluationRecordsListPage'); // 複用評核記錄頁面
+    
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        const categoryDoc = await db.collection('trainingCategories').doc(item.categoryId).get();
+        const category = categoryDoc.data();
+        
+        // 更新標題
+        document.getElementById('evalRecordsTitle').textContent = `📝 ${item.name}`;
+        document.getElementById('evalRecordsSubtitle').textContent = `${category.emoji} ${category.name} - 訓練記錄`;
+        
+        // 儲存當前項目 ID（用於返回）
+        window.currentEvalItemId = itemId;
+        window.currentEvalCategoryId = item.categoryId;
+        
+        // ⭐ 載入該員工的所有訓練記錄
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'completed')
+            .orderBy('completedAt', 'desc')
+            .get();
+        
+        if (recordsSnapshot.empty) {
+            document.getElementById('evalRecordsSummary').style.display = 'none';
+            document.getElementById('evalRecordsContent').innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 15px;">
+                    <div style="font-size: 4em; margin-bottom: 15px;">📭</div>
+                    <div style="font-size: 1.3em; color: #999;">尚無訓練記錄</div>
+                </div>
+            `;
+            return;
+        }
+        
+        // ⭐ 生成統計摘要（訓練記錄版本）
+        const totalRecords = recordsSnapshot.size;
+        
+        document.getElementById('evalRecordsSummary').innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5em; font-weight: bold;">${totalRecords}</div>
+                    <div style="margin-top: 8px; opacity: 0.95;">總訓練次數</div>
+                </div>
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #2ed573 0%, #26d07c 100%); color: white; border-radius: 12px;">
+                    <div style="font-size: 2.5em; font-weight: bold;">✅</div>
+                    <div style="margin-top: 8px; opacity: 0.95;">全部完成</div>
+                </div>
+            </div>
+        `;
+        document.getElementById('evalRecordsSummary').style.display = 'block';
+        
+        // ⭐ 生成記錄卡片列表
+        let recordsHtml = '';
+        let recordCount = 0;
+        
+        recordsSnapshot.forEach(doc => {
+            recordCount++;
+            const record = doc.data();
+            
+            // 格式化日期
+            const completedDate = record.completedAt ? 
+                new Date(record.completedAt.toDate()).toLocaleString('zh-TW') : 
+                '未知日期';
+            
+            // 參與人員
+            const participants = record.participants || '未記錄';
+            const completedBy = record.completedBy || '未知';
+            const trainingCount = record.trainingCount || recordCount;
+            
+            recordsHtml += `
+                <div class="audit-history-card-modern passed" 
+                     onclick="viewTrainingRecordDetail('${doc.id}', '${itemId}')"
+                     style="cursor: pointer; transition: all 0.3s;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <h3 style="margin-bottom: 8px; color: #333; font-size: 1.3em;">
+                                ✅ 訓練完成（第 ${trainingCount} 次）
+                            </h3>
+                            <div style="color: #666; font-size: 1em; line-height: 1.8;">
+                                📅 ${completedDate}<br>
+                                👤 完成確認者：${completedBy}
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: right;">
+                            <div style="font-size: 3.5em; font-weight: bold; color: #2ed573; line-height: 1;">
+                                ✓
+                            </div>
+                            <div style="color: #666; margin-top: 5px; font-size: 1em;">
+                                已完成
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="padding: 15px; background: #f0fff4; border-radius: 10px; border-left: 4px solid #2ed573;">
+                        <strong style="color: #2ed573;">👥 參與人員：</strong><br>
+                        <div style="margin-top: 8px; color: #333; line-height: 1.6;">
+                            ${participants}
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 20px; padding: 12px; background: white; border-radius: 10px; font-size: 1em; color: #ffa502; border: 2px dashed #ffa502;">
+                        👆 點擊查看完整訓練詳情
+                    </div>
+                </div>
+            `;
+        });
+        
+        document.getElementById('evalRecordsContent').innerHTML = recordsHtml;
+        
+    } catch (error) {
+        console.error('載入訓練記錄失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+        // ⭐⭐⭐ 新增：查看訓練記錄詳情（獨立頁面）⭐⭐⭐
+async function viewTrainingRecordDetail(recordId, itemId) {
+    showPage('evaluationRecordDetailPage'); // 複用評核詳情頁面
+    
+    // 儲存當前記錄 ID（用於返回）
+    window.currentEvalRecordId = recordId;
+    
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        const recordDoc = await db.collection('trainingRecords').doc(recordId).get();
+        const record = recordDoc.data();
+        
+        const stepRecords = record.stepRecords || {};
+        
+        // 更新標題
+        const completedDate = record.completedAt ? 
+            new Date(record.completedAt.toDate()).toLocaleDateString('zh-TW') : 
+            '未知日期';
+        document.getElementById('evalRecordDetailTitle').textContent = 
+            `📝 訓練記錄 - ${completedDate}`;
+        
+        // ⭐⭐⭐ 結果摘要樣式（訓練記錄版本）⭐⭐⭐
+        let resultHtml = `
+            <div class="quiz-result-summary passed">
+                <div style="font-size: 1.8em; margin-bottom: 15px;">
+                    🎓 訓練已完成！
+                </div>
+                <div style="font-size: 1.3em; margin: 15px 0;">
+                    第 ${record.trainingCount || '?'} 次訓練
+                </div>
+                <div class="quiz-status-badge">
+                    ✅ 所有步驟及簽名已齊全
+                </div>
+                <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
+                    <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
+                        <strong>👥 參與人員：</strong><br>
+                        ${record.participants || '未記錄'}<br><br>
+                        <strong>👤 完成確認者：</strong><br>
+                        ${record.completedBy || '未知'}<br><br>
+                        <strong>📅 完成時間：</strong><br>
+                        ${record.completedAt ? new Date(record.completedAt.toDate()).toLocaleString('zh-TW') : '未知'}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // ⭐⭐⭐ 顯示每個步驟的詳細簽名記錄 ⭐⭐⭐
+        let stepCounter = 0;
+        item.checklist.forEach((step, index) => {
+            if (step.isSubtitle) {
+                resultHtml += `
+                    <div style="margin: 30px 0 15px 0;">
+                        <span class="step-subtitle">${step.step}</span>
+                    </div>
+                `;
+            } else {
+                stepCounter++;
+                const stepRecord = stepRecords[index] || {};
+                
+                resultHtml += `
+                    <div class="quiz-question-card">
+                        <div class="quiz-question-header">
+                            <div>
+                                <span class="quiz-question-number">Step ${stepCounter}</span>
+                                <span class="badge badge-success" style="margin-left: 10px;">✅ 已完成</span>
+                            </div>
+                        </div>
+                        <div class="quiz-question-text" style="font-size: 1.1em;">${step.step}</div>
+                        
+                        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                            <div style="display: grid; gap: 12px;">
+                                <div style="padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #ffa502;">
+                                    <strong style="color: #ffa502;">📅 教授日期：</strong>
+                                    <span style="margin-left: 10px;">${stepRecord.trainingDate || '未記錄'}</span>
+                                </div>
+                                <div style="padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #2ed573;">
+                                    <strong style="color: #2ed573;">✍️ 新同事簽名：</strong>
+                                    <span style="margin-left: 10px;">${stepRecord.traineeSignature || '未簽名'}</span>
+                                </div>
+                                <div style="padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                                    <strong style="color: #3b82f6;">✍️ 陪帶同事簽名：</strong>
+                                    <span style="margin-left: 10px;">${stepRecord.mentorSignature || '未簽名'}</span>
+                                </div>
+                                <div style="padding: 10px; background: white; border-radius: 6px; border-left: 3px solid #8b5cf6;">
+                                    <strong style="color: #8b5cf6;">✍️ Supervisor 簽名：</strong>
+                                    <span style="margin-left: 10px;">${stepRecord.supervisorSignature || '未簽名'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        document.getElementById('evalRecordDetailContent').innerHTML = resultHtml;
+        
+    } catch (error) {
+        console.error('載入訓練記錄失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+        // ⭐⭐⭐ 新增：重新訓練（類似 reopenItemEvaluation）⭐⭐⭐
+async function reopenTraining(itemId) {
+    if (!confirm('❓ 確定要重新訓練此項目嗎？\n\n✅ 這會開始新的訓練，所有歷史記錄會保留。')) {
+        return;
+    }
+
+    try {
+        // ⭐⭐⭐ 刪除舊的 pending 記錄（如果存在）⭐⭐⭐
+        const oldPendingSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')
+            .get();
+
+        const deletePromises = oldPendingSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deletePromises);
+
+        // ⭐⭐⭐ 建立新的 pending 記錄 ⭐⭐⭐
+        await db.collection('trainingRecords').add({
+            userId: currentStaffId,
+            itemId: itemId,
+            status: 'pending',
+            stepRecords: {},
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showToast('✅ 已開始新的訓練，歷史記錄已保留', 'success');
+        closeModal();
+        
+        await showCategoryEvaluation(currentCategoryId);
+        
+        setTimeout(() => {
+            const card = document.getElementById(`eval_item_${itemId}`);
+            if (card && !card.classList.contains('expanded')) {
+                card.classList.add('expanded');
+            }
+        }, 300);
+        
+    } catch (error) {
+        console.error('重新訓練失敗:', error);
+        showToast('❌ 操作失敗', 'error');
+    }
+}
+        
         // ==================== 訓練記錄相關函數 ====================
 
 // ⭐⭐⭐ 儲存單一步驟的訓練日期（即時更新狀態）⭐⭐⭐
