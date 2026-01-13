@@ -8204,11 +8204,10 @@ async function viewTrainingRecordsList(itemId) {
     }
 }
 
-        // ⭐⭐⭐ 新增：查看訓練記錄詳情（獨立頁面）⭐⭐⭐
+// ⭐⭐⭐ 新增：查看訓練記錄詳情（獨立頁面）⭐⭐⭐
 async function viewTrainingRecordDetail(recordId, itemId) {
-    showPage('evaluationRecordDetailPage'); // 複用評核詳情頁面
+    showPage('evaluationRecordDetailPage');
     
-    // 儲存當前記錄 ID（用於返回）
     window.currentEvalRecordId = recordId;
     
     try {
@@ -8220,21 +8219,38 @@ async function viewTrainingRecordDetail(recordId, itemId) {
         
         const stepRecords = record.stepRecords || {};
         
-        // 更新標題
+        // ⭐⭐⭐ 修復：計算訓練次數（如果未儲存）⭐⭐⭐
+        let trainingCount = record.trainingCount;
+        if (!trainingCount) {
+            const allCompletedRecords = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'completed')
+                .orderBy('completedAt', 'asc')
+                .get();
+            
+            let count = 1;
+            allCompletedRecords.forEach(doc => {
+                if (doc.id === recordId) {
+                    trainingCount = count;
+                }
+                count++;
+            });
+        }
+        
         const completedDate = record.completedAt ? 
             new Date(record.completedAt.toDate()).toLocaleDateString('zh-TW') : 
             '未知日期';
         document.getElementById('evalRecordDetailTitle').textContent = 
             `📝 訓練記錄 - ${completedDate}`;
         
-        // ⭐⭐⭐ 結果摘要樣式（訓練記錄版本）⭐⭐⭐
         let resultHtml = `
             <div class="quiz-result-summary passed">
                 <div style="font-size: 1.8em; margin-bottom: 15px;">
                     🎓 訓練已完成！
                 </div>
                 <div style="font-size: 1.3em; margin: 15px 0;">
-                    第 ${record.trainingCount || '?'} 次訓練
+                    第 ${trainingCount || '?'} 次訓練
                 </div>
                 <div class="quiz-status-badge">
                     ✅ 所有步驟及簽名已齊全
@@ -8252,7 +8268,6 @@ async function viewTrainingRecordDetail(recordId, itemId) {
             </div>
         `;
         
-        // ⭐⭐⭐ 顯示每個步驟的詳細簽名記錄 ⭐⭐⭐
         let stepCounter = 0;
         item.checklist.forEach((step, index) => {
             if (step.isSubtitle) {
@@ -9023,7 +9038,7 @@ const stepCompleted = trainingDate && traineeSignature && mentorSignature && sup
     }
 }
 
-        // ⭐⭐⭐ 新增：更新整體訓練進度 ⭐⭐⭐
+// ⭐⭐⭐ 新增：更新整體訓練進度 ⭐⭐⭐
 async function updateOverallProgress(itemId) {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
@@ -9032,6 +9047,7 @@ async function updateOverallProgress(itemId) {
         const recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')  // ⭐ 只查詢 pending 記錄
             .limit(1)
             .get();
 
@@ -9044,17 +9060,23 @@ async function updateOverallProgress(itemId) {
         let totalSteps = actualSteps.length;
         let completedSteps = 0;
 
-item.checklist.forEach((step, index) => {
-    if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
-        stepRecords[index]?.traineeSignature && 
-        stepRecords[index]?.mentorSignature && 
-        stepRecords[index]?.supervisorSignature) {  // ⭐ 新增 Supervisor 檢查
-        completedSteps++;
-    }
-});
+        // ⭐⭐⭐ 修復：必須同時有日期 + 3個簽名才算完成 ⭐⭐⭐
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                const stepRecord = stepRecords[index];
+                if (stepRecord?.trainingDate && 
+                    stepRecord?.traineeSignature && 
+                    stepRecord?.mentorSignature && 
+                    stepRecord?.supervisorSignature) {
+                    completedSteps++;
+                }
+            }
+        });
 
         const completionRate = Math.round((completedSteps / totalSteps) * 100);
-        const isCompleted = completionRate === 100;
+
+        // ⭐⭐⭐ 修復：pending 記錄永遠唔算 completed ⭐⭐⭐
+        const isCompleted = false; // pending 記錄一定唔係 completed
 
         // 更新進度環
         const card = document.getElementById(`eval_item_${itemId}`);
@@ -9076,24 +9098,29 @@ item.checklist.forEach((step, index) => {
             const scoreItems = card.querySelectorAll('.score-item-value');
             if (scoreItems.length >= 3) {
                 scoreItems[1].textContent = completedSteps;
-                scoreItems[1].className = `score-item-value ${isCompleted ? 'pass' : 'fail'}`;
+                scoreItems[1].className = `score-item-value ${completionRate === 100 ? 'pass' : 'fail'}`;
                 scoreItems[2].textContent = `${completionRate}%`;
-                scoreItems[2].className = `score-item-value ${isCompleted ? 'pass' : 'fail'}`;
+                scoreItems[2].className = `score-item-value ${completionRate === 100 ? 'pass' : 'fail'}`;
             }
 
             const overallStatusElement = card.querySelector('.score-info .score-item-value[style*="font-size: 1.1em"]');
             if (overallStatusElement) {
-                const statusText = isCompleted ? '✅ 訓練已完成' : '⏳ 訓練進行中';
+                // ⭐⭐⭐ 修復：清晰顯示狀態 ⭐⭐⭐
+                let statusText = '';
+                if (completionRate === 100) {
+                    statusText = '⏳ 待標記完成（所有步驟已完成）';
+                } else if (completionRate > 0) {
+                    statusText = `⏳ 訓練進行中 (${completionRate}%)`;
+                } else {
+                    statusText = '⏳ 訓練進行中';
+                }
+                
                 overallStatusElement.innerHTML = statusText;
-                overallStatusElement.className = `score-item-value ${isCompleted ? 'pass' : ''}`;
+                overallStatusElement.className = 'score-item-value';
             }
 
-            // 更新卡片樣式
-            if (isCompleted) {
-                card.classList.add('completed');
-            } else {
-                card.classList.remove('completed');
-            }
+            // ⭐⭐⭐ 修復：移除錯誤的 completed class ⭐⭐⭐
+            card.classList.remove('completed');
         }
 
     } catch (error) {
