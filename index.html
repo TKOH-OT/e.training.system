@@ -4907,11 +4907,32 @@ Object.keys(recordsByItem).forEach(itemId => {
         
 // ========== 訓練記錄類型 ==========
 if (item.recordType === 'training' && item.hasChecklist && record) {
-    // ⭐⭐⭐ 修復：只認明確標記完成嘅記錄 ⭐⭐⭐
     if (record.status === 'completed') {
+        // ✅ 明確標記完成：計入完成項目
         completedCount++;
+    } else if (record.status === 'pending' && record.stepRecords) {
+        // ⭐⭐⭐ 新增：檢查 pending 記錄是否實際已完成所有步驟 ⭐⭐⭐
+        const stepRecords = record.stepRecords;
+        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+        
+        let allStepsCompleted = true;
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                const stepRecord = stepRecords[index];
+                if (!stepRecord?.trainingDate || 
+                    !stepRecord?.traineeSignature || 
+                    !stepRecord?.mentorSignature ||
+                    !stepRecord?.supervisorSignature) {
+                    allStepsCompleted = false;
+                }
+            }
+        });
+        
+        // ⭐ 如果所有步驟都已完成（只是未標記 completed），也計入
+        if (allStepsCompleted) {
+            completedCount++;
+        }
     }
-    // ⭐⭐⭐ 移除自動判斷邏輯，防止未標記完成時誤判為 100% ⭐⭐⭐
 }
     
 // ========== Checklist 評核類型 ==========
@@ -5336,24 +5357,34 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     const currentRecord = records[item.docId];
     
 let isCompleted = false;
+
 if (currentRecord && currentRecord.status === 'completed') {
-    // ⭐⭐⭐ 明確標記完成：顯示 100% ⭐⭐⭐
+    // ✅ 明確標記完成：顯示 100%
     completedSteps = totalSteps;
     isCompleted = true;
 } else if (currentRecord && currentRecord.stepRecords) {
-    // ⭐⭐⭐ Pending 記錄：計算進度，但唔判斷為完成 ⭐⭐⭐
+    // ⭐⭐⭐ Pending 記錄：正確計算進度 ⭐⭐⭐
     const stepRecords = currentRecord.stepRecords || {};
+    
     item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
-            stepRecords[index]?.traineeSignature && 
-            stepRecords[index]?.mentorSignature &&
-            stepRecords[index]?.supervisorSignature) {
-            completedSteps++;
+        if (!step.isSubtitle) {
+            const stepRecord = stepRecords[index];
+            // ⭐⭐⭐ 修復：計算已完成的步驟 ⭐⭐⭐
+            if (stepRecord?.trainingDate && 
+                stepRecord?.traineeSignature && 
+                stepRecord?.mentorSignature &&
+                stepRecord?.supervisorSignature) {
+                completedSteps++;
+            }
         }
     });
-    // ⭐⭐⭐ 唔自動判斷完成，必須手動標記 ⭐⭐⭐
-    isCompleted = false;
+    
+    // ⭐⭐⭐ 修復：如果所有步驟都完成，判定為完成（用於顯示）⭐⭐⭐
+    isCompleted = (completedSteps === totalSteps);
 }
+
+// ⭐⭐⭐ 修復：正確計算完成率 ⭐⭐⭐
+const completionRate = Math.round((completedSteps / totalSteps) * 100);
     
     const completionRate = Math.round((completedSteps / totalSteps) * 100);
 
@@ -5956,16 +5987,24 @@ async function refreshCurrentItemCard(itemId) {
         const checklistStatus = record?.checklistStatus || {};
         const remarks = record?.remarks || {};
 
-        let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
-        let passedSteps = 0;
+let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
+let passedSteps = 0;
+let evaluatedSteps = 0; // ⭐ 新增：已評核步驟數（pass + fail）
 
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle && checklistStatus[index] === 'pass') {
-                passedSteps++;
-            }
-        });
+item.checklist.forEach((step, index) => {
+    if (!step.isSubtitle) {
+        const status = checklistStatus[index];
+        if (status === 'pass') {
+            passedSteps++;
+            evaluatedSteps++; // ⭐ 已評核
+        } else if (status === 'fail') {
+            evaluatedSteps++; // ⭐ 已評核（雖然不合格）
+        }
+    }
+});
 
-        const completionRate = Math.round((passedSteps / totalSteps) * 100);
+// ⭐⭐⭐ 修復：完成率 = 合格步驟 / 總步驟（用於顯示分數）⭐⭐⭐
+const completionRate = Math.round((passedSteps / totalSteps) * 100);
         
         // 更新進度環
         const card = document.getElementById(`eval_item_${itemId}`);
@@ -6157,9 +6196,10 @@ async function markItemComplete(itemId) {
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
-// ⭐⭐⭐ 修正：合格判斷（支援自訂合格分數 + Critical 必須合格）⭐⭐⭐
-            const passingScore = item.passingScore || 80; // 讀取自訂合格分數，預設 80%
-            const isPassed = !hasCriticalFailed && completionRate >= passingScore;
+// ⭐⭐⭐ 關鍵修復：使用自訂合格分數，並加入 Critical 邏輯 ⭐⭐⭐
+const passingScore = item.passingScore || 80; // 讀取項目的合格分數設定
+const meetsScoreRequirement = completionRate >= passingScore; // 達到分數要求
+const isPassed = !hasCriticalFailed && meetsScoreRequirement; // ⭐ 兩個條件都要滿足
             
             // 雙方簽名驗證
             const allRecordsSnapshot = await db.collection('trainingRecords')
