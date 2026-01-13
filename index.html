@@ -5353,38 +5353,32 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     let totalSteps = actualSteps.length;
     let completedSteps = 0;
     
-    // ⭐⭐⭐ 修復：使用 records[item.docId] 而唔係 record ⭐⭐⭐
     const currentRecord = records[item.docId];
     
-let isCompleted = false;
+    let isCompleted = false;
 
-if (currentRecord && currentRecord.status === 'completed') {
-    // ✅ 明確標記完成：顯示 100%
-    completedSteps = totalSteps;
-    isCompleted = true;
-} else if (currentRecord && currentRecord.stepRecords) {
-    // ⭐⭐⭐ Pending 記錄：正確計算進度 ⭐⭐⭐
-    const stepRecords = currentRecord.stepRecords || {};
-    
-    item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle) {
-            const stepRecord = stepRecords[index];
-            // ⭐⭐⭐ 修復：計算已完成的步驟 ⭐⭐⭐
-            if (stepRecord?.trainingDate && 
-                stepRecord?.traineeSignature && 
-                stepRecord?.mentorSignature &&
-                stepRecord?.supervisorSignature) {
-                completedSteps++;
+    if (currentRecord && currentRecord.status === 'completed') {
+        completedSteps = totalSteps;
+        isCompleted = true;
+    } else if (currentRecord && currentRecord.stepRecords) {
+        const stepRecords = currentRecord.stepRecords || {};
+        
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                const stepRecord = stepRecords[index];
+                if (stepRecord?.trainingDate && 
+                    stepRecord?.traineeSignature && 
+                    stepRecord?.mentorSignature &&
+                    stepRecord?.supervisorSignature) {
+                    completedSteps++;
+                }
             }
-        }
-    });
-    
-    // ⭐⭐⭐ 修復：如果所有步驟都完成，判定為完成（用於顯示）⭐⭐⭐
-    isCompleted = (completedSteps === totalSteps);
-}
+        });
+        
+        isCompleted = (completedSteps === totalSteps);
+    }
 
-// ⭐⭐⭐ 修復：正確計算完成率 ⭐⭐⭐
-const completionRate = Math.round((completedSteps / totalSteps) * 100);
+    const completionRate = Math.round((completedSteps / totalSteps) * 100);
     
     let badges = '<span class="badge badge-info">📝 訓練記錄</span>';
     
@@ -5399,6 +5393,7 @@ const completionRate = Math.round((completedSteps / totalSteps) * 100);
     const circumference = 2 * Math.PI * 50;
     const offset = circumference - (completionRate / 100) * circumference;
 
+    // ⭐⭐⭐ 關鍵修復：只渲染一次 checklist ⭐⭐⭐
     let stepCounter = 0;
     const stepsHtml = item.checklist.map((step, index) => {
         if (step.isSubtitle) {
@@ -5411,7 +5406,6 @@ const completionRate = Math.round((completedSteps / totalSteps) * 100);
         
         stepCounter++;
         
-        // ⭐⭐⭐ 用 currentRecord ⭐⭐⭐
         if (currentRecord && currentRecord.status === 'completed') {
             return `
                 <div class="checklist-item completed" style="margin-bottom: 20px;">
@@ -5429,7 +5423,6 @@ const completionRate = Math.round((completedSteps / totalSteps) * 100);
             `;
         }
         
-        // ⭐⭐⭐ 用 currentRecord ⭐⭐⭐
         const stepRecords = currentRecord?.stepRecords || {};
         const stepRecord = stepRecords[index] || {};
         const trainingDate = stepRecord.trainingDate || '';
@@ -5452,11 +5445,11 @@ const completionRate = Math.round((completedSteps / totalSteps) * 100);
                         <div class="training-record-label">📅 教授/講解日期:</div>
                         <div>
                             ${hasEditPermission ? `
-                               <input type="date" id="trainingDate_${item.docId}_${index}" 
-   value="${trainingDate}" 
-   onclick="event.stopPropagation()" 
-   onchange="event.stopPropagation(); saveStepTrainingDate('${item.docId}', ${index})"
-                                       style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; width: 100%;">
+                                <input type="date" id="trainingDate_${item.docId}_${index}" 
+                                    value="${trainingDate}" 
+                                    onclick="event.stopPropagation()" 
+                                    onchange="event.stopPropagation(); saveStepTrainingDate('${item.docId}', ${index})"
+                                    style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; width: 100%;">
                             ` : `
                                 <div style="padding: 8px; background: #f0f0f0; border-radius: 6px;">
                                     ${trainingDate || '尚未設定'}
@@ -5470,13 +5463,13 @@ const completionRate = Math.round((completedSteps / totalSteps) * 100);
                         <div>
                             ${hasEditPermission ? `
                                 <div style="margin-bottom: 6px;">
-<button class="btn btn-success btn-small"
-onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'trainee')">
-🖊️ 一鍵多簽
-</button>
-</div>
-                               <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
- onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
+                                    <button class="btn btn-success btn-small"
+                                        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'trainee')">
+                                        🖊️ 一鍵多簽
+                                    </button>
+                                </div>
+                                <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
+                                    onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
                                     ${traineeSignature || '點擊輸入簽名'}
                                 </div>
                             ` : `
@@ -5493,12 +5486,12 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'trainee')
                             ${hasEditPermission ? `
                                 <div style="margin-bottom: 6px;">
                                     <button class="btn btn-success btn-small"
-onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'mentor')">
+                                        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'mentor')">
                                         🖊️ 陪帶一鍵多簽
                                     </button>
                                 </div>
-                               <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
- onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
+                                <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
+                                    onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
                                     ${mentorSignature || '點擊輸入簽名'}
                                 </div>
                             ` : `
@@ -5515,12 +5508,12 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'mentor')"
                             ${hasEditPermission || currentUser.role === 'supervisor' ? `
                                 <div style="margin-bottom: 6px;">
                                     <button class="btn btn-success btn-small"
-onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'supervisor')">
+                                        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'supervisor')">
                                         🖊️ Supervisor 一鍵多簽
                                     </button>
                                 </div>
                                 <div class="signature-box ${supervisorSignature ? 'signed' : ''}" 
- onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')">
+                                    onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')">
                                     ${supervisorSignature || '點擊輸入簽名'}
                                 </div>
                             ` : `
@@ -5539,7 +5532,7 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'superviso
                 </div>
             </div>
         `;
-    }).join('');
+    }).join(''); // ⭐⭐⭐ 關鍵：這裡用 .join('') 將陣列轉換為字串
 
     itemsHtml.push(`
         <div class="item-card ${isCompleted ? 'completed' : ''}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
@@ -5569,16 +5562,16 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'superviso
                     </div>
                 </div>
 
-<div class="item-card-actions">
-    ${hasEditPermission || currentUser.role === 'supervisor' ? `
-        ${currentRecord?.status !== 'completed' ? `
-            <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markTrainingComplete('${item.docId}')">✅ 標記完成</button>
-        ` : ''}
-        ${currentRecord?.status === 'completed' ? `
-            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>
-        ` : ''}
-    ` : ''}
-</div>
+                <div class="item-card-actions">
+                    ${hasEditPermission || currentUser.role === 'supervisor' ? `
+                        ${currentRecord?.status !== 'completed' ? `
+                            <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markTrainingComplete('${item.docId}')">✅ 標記完成</button>
+                        ` : ''}
+                        ${currentRecord?.status === 'completed' ? `
+                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>
+                        ` : ''}
+                    ` : ''}
+                </div>
             </div>
 
             <div class="item-card-content">
@@ -5612,7 +5605,7 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'superviso
             </div>
         </div>
     `);
-    return;  // ⭐ 重要：訓練記錄類型渲染完畢後直接 return
+    return;
 }
 
             // ========== Checklist 評核類型 ==========
