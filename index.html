@@ -4882,28 +4882,35 @@ Object.keys(recordsByItem).forEach(itemId => {
         const item = itemObj;
         const record = records[itemObj.docId];
         
-        // ========== 訓練記錄類型 ==========
+// ========== 訓練記錄類型 ==========
 if (item.recordType === 'training' && item.hasChecklist && record) {
-    const stepRecords = record.stepRecords || {};
-    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-    let allStepsCompleted = true;
-    
-    item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle) {
-            const stepRecord = stepRecords[index];
-            if (!stepRecord?.trainingDate || 
-                !stepRecord?.traineeSignature || 
-                !stepRecord?.mentorSignature ||
-                !stepRecord?.supervisorSignature) {  // ⭐ 新增 Supervisor 檢查
-                allStepsCompleted = false;
-            }
-        }
-    });
-    
-    if (allStepsCompleted) {
+    // ⭐⭐⭐ 修復：直接檢查 status ⭐⭐⭐
+    if (record.status === 'completed') {
         completedCount++;
+    } else if (record.stepRecords) {
+        // 如果係 pending，逐步檢查
+        const stepRecords = record.stepRecords || {};
+        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+        let allStepsCompleted = true;
+        
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                const stepRecord = stepRecords[index];
+                if (!stepRecord?.trainingDate || 
+                    !stepRecord?.traineeSignature || 
+                    !stepRecord?.mentorSignature ||
+                    !stepRecord?.supervisorSignature) {
+                    allStepsCompleted = false;
+                }
+            }
+        });
+        
+        if (allStepsCompleted) {
+            completedCount++;
+        }
     }
 }
+    
 // ========== Checklist 評核類型 ==========
 else if (item.hasChecklist && record) {
     const actualSteps = item.checklist.filter(s => !s.isSubtitle);
@@ -5316,228 +5323,257 @@ async function showCategoryEvaluation(categoryId) {
         items.forEach(item => {
             const record = records[item.docId];
 
-            // ========== 訓練記錄類型 ==========
-            if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
-                // ... (訓練記錄的處理保持不變)
-                const stepRecords = record?.stepRecords || {};
-                
-                const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-                let totalSteps = actualSteps.length;
-                let completedSteps = 0;
-                
-               item.checklist.forEach((step, index) => {
-    if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
-        stepRecords[index]?.traineeSignature && 
-        stepRecords[index]?.mentorSignature && 
-        stepRecords[index]?.supervisorSignature) {  // ⭐ 新增 Supervisor 檢查
-        completedSteps++;
+// ========== 訓練記錄類型 ==========
+if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
+    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+    let totalSteps = actualSteps.length;
+    let completedSteps = 0;
+    
+    // ⭐⭐⭐ 修復：如果係 completed 記錄，直接判斷為 100% ⭐⭐⭐
+    let isCompleted = false;
+    if (record && record.status === 'completed') {
+        completedSteps = totalSteps;
+        isCompleted = true;
+    } else if (record && record.stepRecords) {
+        // 如果係 pending 或其他狀態，逐步檢查
+        const stepRecords = record.stepRecords || {};
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
+                stepRecords[index]?.traineeSignature && 
+                stepRecords[index]?.mentorSignature &&
+                stepRecords[index]?.supervisorSignature) {
+                completedSteps++;
+            }
+        });
+        isCompleted = completedSteps === totalSteps;
     }
-});
+    
+    const completionRate = Math.round((completedSteps / totalSteps) * 100);
 
-                const completionRate = Math.round((completedSteps / totalSteps) * 100);
-                const isCompleted = completionRate === 100;
+    let badges = '<span class="badge badge-info">📝 訓練記錄</span>';
+    
+    if (item.hasDeadline) {
+        badges += `<span class="badge badge-warning">⏰ ${item.deadlineValue} ${item.deadlineUnit === 'days' ? '日' : item.deadlineUnit === 'weeks' ? '周' : '月'}</span>`;
+    }
+    
+    if (item.isImportant) {
+        badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
+    }
 
-                let badges = '<span class="badge badge-info">📝 訓練記錄</span>';
-                
-                if (item.hasDeadline) {
-                    badges += `<span class="badge badge-warning">⏰ ${item.deadlineValue} ${item.deadlineUnit === 'days' ? '日' : item.deadlineUnit === 'weeks' ? '周' : '月'}</span>`;
-                }
-                
-                if (item.isImportant) {
-                    badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
-                }
+    const circumference = 2 * Math.PI * 50;
+    const offset = circumference - (completionRate / 100) * circumference;
 
-                const circumference = 2 * Math.PI * 50;
-                const offset = circumference - (completionRate / 100) * circumference;
-
-                let stepCounter = 0;
-                const stepsHtml = item.checklist.map((step, index) => {
-                    if (step.isSubtitle) {
-                        return `
-                            <div style="margin: 20px 0 10px 0;">
-                                <span class="step-subtitle">${step.step}</span>
-                            </div>
-                        `;
-                    }
-                    
-                    stepCounter++;
-                    const stepRecord = stepRecords[index] || {};
-                    const trainingDate = stepRecord.trainingDate || '';
-                    const traineeSignature = stepRecord.traineeSignature || '';
-                    const mentorSignature = stepRecord.mentorSignature || '';
-                    const stepCompleted = trainingDate && traineeSignature && mentorSignature;
-
-                    return `
-                        <div class="checklist-item ${stepCompleted ? 'completed' : ''}" style="margin-bottom: 20px;">
-                            <div class="checklist-step-header">
-                                <div class="checklist-step-name">
-                                    <span class="step-number">Step ${stepCounter}:</span>
-                                    ${step.step}
-                                </div>
-                            </div>
-                            
-                            <div class="training-record-item" style="margin-top: 12px;">
-                                <div class="training-record-row">
-                                    <div class="training-record-label">📅 教授/講解日期:</div>
-                                    <div>
-                                        ${hasEditPermission ? `
-                                           <input type="date" id="trainingDate_${item.docId}_${index}" 
-       value="${trainingDate}" 
-       onclick="event.stopPropagation()" 
-       onchange="event.stopPropagation(); saveStepTrainingDate('${item.docId}', ${index})"
-                                                   style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; width: 100%;">
-                                        ` : `
-                                            <div style="padding: 8px; background: #f0f0f0; border-radius: 6px;">
-                                                ${trainingDate || '尚未設定'}
-                                            </div>
-                                        `}
-                                    </div>
-                                </div>
-                                
-                                <div class="training-record-row">
-                                    <div class="training-record-label">✍️ 新同事簽名:</div>
-                                    <div>
-                                        ${hasEditPermission ? `
-                                            <div style="margin-bottom: 6px;">
-    <button class="btn btn-success btn-small"
-        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'trainee')">
-        🖊️ 一鍵多簽
-    </button>
-</div>
-                                           <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
-     onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
-                                                ${traineeSignature || '點擊輸入簽名'}
-                                            </div>
-                                        ` : `
-                                            <div class="signature-box ${traineeSignature ? 'signed' : ''}">
-                                                ${traineeSignature || '尚未簽名'}
-                                            </div>
-                                        `}
-                                    </div>
-                                </div>
-
-                                <div class="training-record-row">
-                                    <div class="training-record-label">✍️ 陪帶同事簽名:</div>
-                                    <div>
-                                        ${hasEditPermission ? `
-                                            <div style="margin-bottom: 6px;">
-                                                <button class="btn btn-success btn-small"
-    onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'mentor')">
-                                                    🖊️ 陪帶一鍵多簽
-                                                </button>
-                                            </div>
-                                           <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
-     onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
-                                                ${mentorSignature || '點擊輸入簽名'}
-                                            </div>
-                                        ` : `
-                                            <div class="signature-box ${mentorSignature ? 'signed' : ''}">
-                                                ${mentorSignature || '尚未簽名'}
-                                            </div>
-                                        `}
-                                    </div>
-                                </div>
-
-                                <div class="training-record-row">
-                                    <div class="training-record-label">👔 Supervisor 加簽:</div>
-                                    <div>
-                                        ${hasEditPermission || currentUser.role === 'supervisor' ? `
-                                            <div style="margin-bottom: 6px;">
-                                                <button class="btn btn-success btn-small"
-    onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'supervisor')">
-                                                    🖊️ Supervisor 一鍵多簽
-                                                </button>
-                                            </div>
-                                            <div class="signature-box ${stepRecord.supervisorSignature ? 'signed' : ''}" 
-     onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'supervisor', '${stepRecord.supervisorSignature || ''}')">
-                                                ${stepRecord.supervisorSignature || '點擊輸入簽名'}
-                                            </div>
-                                        ` : `
-                                            <div class="signature-box ${stepRecord.supervisorSignature ? 'signed' : ''}">
-                                                ${stepRecord.supervisorSignature || '尚未簽名'}
-                                            </div>
-                                        `}
-                                    </div>
-                                </div>
-
-                                <div style="margin-top: 10px; padding: 10px; background: ${stepCompleted ? '#f0fff4' : '#fff9e6'}; border-radius: 6px; text-align: center; font-size: 0.9em;">
-                                    <strong style="color: ${stepCompleted ? '#2ed573' : '#ffa502'};">
-                                        ${stepCompleted ? '✅ 此步驟已完成（含 Supervisor 加簽）' : '⏳ 待完成'}
-                                    </strong>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                itemsHtml.push(`
-                    <div class="item-card ${isCompleted ? 'completed' : ''}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
-                        <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
-                        
-                        <div class="item-card-header">
-                            <div class="item-card-title-section">
-                                <div class="item-card-name" style="font-size: 1.8em; font-weight: 900; color: #2c3e50; line-height: 1.3; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); letter-spacing: 0.5px; background: linear-gradient(135deg, #ffa502 0%, #ff6b35 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; padding: 5px 0; margin-bottom: 10px; text-align: center;">
-                                    ${item.name}
-                                </div>
-                                <div class="item-card-badges">${badges}</div>
-                            </div>
-                            
-                            <div class="item-card-progress">
-                                <svg class="item-progress-ring" width="120" height="120" viewBox="0 0 120 120">
-                                    <circle class="item-progress-ring-bg" cx="60" cy="60" r="50" 
-                                        fill="none" stroke-width="10"/>
-                                    <circle class="item-progress-ring-circle" cx="60" cy="60" r="50" 
-                                        fill="none" stroke-width="10"
-                                        stroke-dasharray="${circumference}" 
-                                        stroke-dashoffset="${offset}"
-                                        stroke-linecap="round"/>
-                                </svg>
-                                <div class="item-progress-text">
-                                    <div class="item-progress-percent">${completionRate}%</div>
-                                    <div class="item-progress-label">${completedSteps}/${totalSteps}</div>
-                                </div>
-                            </div>
-
-                            <div class="item-card-actions">
-                                ${hasEditPermission ? `
-                                    ${isCompleted ? `<button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>` : ''}
-                                ` : ''}
-                            </div>
-                        </div>
-
-                        <div class="item-card-content">
-                            <div class="score-info">
-                                <div class="score-title">📊 訓練進度</div>
-                                <div class="score-details">
-                                    <div class="score-item">
-                                        <div class="score-item-label">總步驟</div>
-                                        <div class="score-item-value">${totalSteps}</div>
-                                    </div>
-                                    <div class="score-item">
-                                        <div class="score-item-label">已完成</div>
-                                        <div class="score-item-value ${isCompleted ? 'pass' : 'fail'}">${completedSteps}</div>
-                                    </div>
-                                    <div class="score-item">
-                                        <div class="score-item-label">完成率</div>
-                                        <div class="score-item-value ${isCompleted ? 'pass' : 'fail'}">${completionRate}%</div>
-                                    </div>
-                                </div>
-                                <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 8px; text-align: center;">
-                                    <span class="score-item-value ${isCompleted ? 'pass' : ''}" style="font-size: 1.1em;">
-                                        ${isCompleted ? '✅ 訓練已完成' : '⏳ 訓練進行中'}
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            <div class="training-record-container">
-                                <div class="training-record-header">📝 訓練記錄 (逐步完成)</div>
-                                ${stepsHtml}
-                            </div>
+    // ⭐⭐⭐ 修復：渲染步驟時，如果係 completed 就讀取 completed 記錄 ⭐⭐⭐
+    let stepCounter = 0;
+    const stepsHtml = item.checklist.map((step, index) => {
+        if (step.isSubtitle) {
+            return `
+                <div style="margin: 20px 0 10px 0;">
+                    <span class="step-subtitle">${step.step}</span>
+                </div>
+            `;
+        }
+        
+        stepCounter++;
+        
+        // ⭐⭐⭐ 關鍵修改：如果係 completed，就顯示「已完成」，唔再顯示簽名框 ⭐⭐⭐
+        if (record && record.status === 'completed') {
+            return `
+                <div class="checklist-item completed" style="margin-bottom: 20px;">
+                    <div class="checklist-step-header">
+                        <div class="checklist-step-name">
+                            <span class="step-number">Step ${stepCounter}:</span>
+                            ${step.step}
                         </div>
                     </div>
-                `);
-                return;
-            }
+                    
+                    <div style="margin-top: 10px; padding: 10px; background: #f0fff4; border-radius: 6px; text-align: center; font-size: 0.9em;">
+                        <strong style="color: #2ed573;">✅ 此步驟已完成</strong>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ⭐⭐⭐ 如果係 pending 或無記錄，就正常顯示簽名框 ⭐⭐⭐
+        const stepRecords = record?.stepRecords || {};
+        const stepRecord = stepRecords[index] || {};
+        const trainingDate = stepRecord.trainingDate || '';
+        const traineeSignature = stepRecord.traineeSignature || '';
+        const mentorSignature = stepRecord.mentorSignature || '';
+        const supervisorSignature = stepRecord.supervisorSignature || '';
+        const stepCompleted = trainingDate && traineeSignature && mentorSignature && supervisorSignature;
+
+        return `
+            <div class="checklist-item ${stepCompleted ? 'completed' : ''}" style="margin-bottom: 20px;">
+                <div class="checklist-step-header">
+                    <div class="checklist-step-name">
+                        <span class="step-number">Step ${stepCounter}:</span>
+                        ${step.step}
+                    </div>
+                </div>
+                
+                <div class="training-record-item" style="margin-top: 12px;">
+                    <div class="training-record-row">
+                        <div class="training-record-label">📅 教授/講解日期:</div>
+                        <div>
+                            ${hasEditPermission ? `
+                               <input type="date" id="trainingDate_${item.docId}_${index}" 
+   value="${trainingDate}" 
+   onclick="event.stopPropagation()" 
+   onchange="event.stopPropagation(); saveStepTrainingDate('${item.docId}', ${index})"
+                                       style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; width: 100%;">
+                            ` : `
+                                <div style="padding: 8px; background: #f0f0f0; border-radius: 6px;">
+                                    ${trainingDate || '尚未設定'}
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                    
+                    <div class="training-record-row">
+                        <div class="training-record-label">✍️ 新同事簽名:</div>
+                        <div>
+                            ${hasEditPermission ? `
+                                <div style="margin-bottom: 6px;">
+<button class="btn btn-success btn-small"
+onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'trainee')">
+🖊️ 一鍵多簽
+</button>
+</div>
+                               <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
+ onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
+                                    ${traineeSignature || '點擊輸入簽名'}
+                                </div>
+                            ` : `
+                                <div class="signature-box ${traineeSignature ? 'signed' : ''}">
+                                    ${traineeSignature || '尚未簽名'}
+                                </div>
+                            `}
+                        </div>
+                    </div>
+
+                    <div class="training-record-row">
+                        <div class="training-record-label">✍️ 陪帶同事簽名:</div>
+                        <div>
+                            ${hasEditPermission ? `
+                                <div style="margin-bottom: 6px;">
+                                    <button class="btn btn-success btn-small"
+onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'mentor')">
+                                        🖊️ 陪帶一鍵多簽
+                                    </button>
+                                </div>
+                               <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
+ onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
+                                    ${mentorSignature || '點擊輸入簽名'}
+                                </div>
+                            ` : `
+                                <div class="signature-box ${mentorSignature ? 'signed' : ''}">
+                                    ${mentorSignature || '尚未簽名'}
+                                </div>
+                            `}
+                        </div>
+                    </div>
+
+                    <div class="training-record-row">
+                        <div class="training-record-label">👔 Supervisor 加簽:</div>
+                        <div>
+                            ${hasEditPermission || currentUser.role === 'supervisor' ? `
+                                <div style="margin-bottom: 6px;">
+                                    <button class="btn btn-success btn-small"
+onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'supervisor')">
+                                        🖊️ Supervisor 一鍵多簽
+                                    </button>
+                                </div>
+                                <div class="signature-box ${supervisorSignature ? 'signed' : ''}" 
+ onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')">
+                                    ${supervisorSignature || '點擊輸入簽名'}
+                                </div>
+                            ` : `
+                                <div class="signature-box ${supervisorSignature ? 'signed' : ''}">
+                                    ${supervisorSignature || '尚未簽名'}
+                                </div>
+                            `}
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 10px; padding: 10px; background: ${stepCompleted ? '#f0fff4' : '#fff9e6'}; border-radius: 6px; text-align: center; font-size: 0.9em;">
+                        <strong style="color: ${stepCompleted ? '#2ed573' : '#ffa502'};">
+                            ${stepCompleted ? '✅ 此步驟已完成（含 Supervisor 加簽）' : '⏳ 待完成'}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    itemsHtml.push(`
+        <div class="item-card ${isCompleted ? 'completed' : ''}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
+            <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
+            
+            <div class="item-card-header">
+                <div class="item-card-title-section">
+                    <div class="item-card-name" style="font-size: 1.8em; font-weight: 900; color: #2c3e50; line-height: 1.3; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); letter-spacing: 0.5px; background: linear-gradient(135deg, #ffa502 0%, #ff6b35 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; padding: 5px 0; margin-bottom: 10px; text-align: center;">
+                        ${item.name}
+                    </div>
+                    <div class="item-card-badges">${badges}</div>
+                </div>
+                
+                <div class="item-card-progress">
+                    <svg class="item-progress-ring" width="120" height="120" viewBox="0 0 120 120">
+                        <circle class="item-progress-ring-bg" cx="60" cy="60" r="50" 
+                            fill="none" stroke-width="10"/>
+                        <circle class="item-progress-ring-circle" cx="60" cy="60" r="50" 
+                            fill="none" stroke-width="10"
+                            stroke-dasharray="${circumference}" 
+                            stroke-dashoffset="${offset}"
+                            stroke-linecap="round"/>
+                    </svg>
+                    <div class="item-progress-text">
+                        <div class="item-progress-percent">${completionRate}%</div>
+                        <div class="item-progress-label">${completedSteps}/${totalSteps}</div>
+                    </div>
+                </div>
+
+                <div class="item-card-actions">
+                    ${hasEditPermission ? `
+                        ${isCompleted ? `<button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>` : ''}
+                    ` : ''}
+                </div>
+            </div>
+
+            <div class="item-card-content">
+                <div class="score-info">
+                    <div class="score-title">📊 訓練進度</div>
+                    <div class="score-details">
+                        <div class="score-item">
+                            <div class="score-item-label">總步驟</div>
+                            <div class="score-item-value">${totalSteps}</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-item-label">已完成</div>
+                            <div class="score-item-value ${isCompleted ? 'pass' : 'fail'}">${completedSteps}</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-item-label">完成率</div>
+                            <div class="score-item-value ${isCompleted ? 'pass' : 'fail'}">${completionRate}%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 8px; text-align: center;">
+                        <span class="score-item-value ${isCompleted ? 'pass' : ''}" style="font-size: 1.1em;">
+                            ${isCompleted ? '✅ 訓練已完成' : '⏳ 訓練進行中'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="training-record-container">
+                    <div class="training-record-header">📝 訓練記錄 (逐步完成)</div>
+                    ${stepsHtml}
+                </div>
+            </div>
+        </div>
+    `);
+    return;  // ⭐ 重要：訓練記錄類型渲染完畢後直接 return
+}
 
             // ========== Checklist 評核類型 ==========
             if (item.hasChecklist && item.checklist) {
