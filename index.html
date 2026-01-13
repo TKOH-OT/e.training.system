@@ -6066,20 +6066,9 @@ async function markItemComplete(itemId) {
 
             const record = pendingSnapshot.docs[0].data();
             const checklistStatus = record.checklistStatus || {};
-
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             
-            // ⭐⭐⭐ 修復 Bug 1: 檢查是否有步驟選擇「不合格」⭐⭐⭐
-            const hasFailedSteps = item.checklist.some((step, index) =>
-                !step.isSubtitle && checklistStatus[index] === 'fail'
-            );
-            
-            if (hasFailedSteps) {
-                showToast('❌ 有步驟選擇「不合格」，無法標記完成！請先修正或重新評核', 'error');
-                return;
-            }
-            
-            // ⭐⭐⭐ 修復 Bug 2: 檢查是否有未評核的步驟 ⭐⭐⭐
+            // ✅ 檢查 1: 是否有未評核的步驟
             const hasPendingSteps = item.checklist.some((step, index) =>
                 !step.isSubtitle && (!checklistStatus[index] || checklistStatus[index] === 'pending')
             );
@@ -6089,16 +6078,11 @@ async function markItemComplete(itemId) {
                 return;
             }
             
-            // ⭐⭐⭐ 修復 Bug 3: 檢查 Critical 步驟是否不合格 ⭐⭐⭐
+            // ✅ 檢查 2: 檢查 Critical 步驟是否不合格（但不阻止提交）
             const hasCriticalFailed = item.checklist.some((step, index) =>
                 !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
             );
             
-            if (hasCriticalFailed) {
-                showToast('❌ 有 Critical 步驟不合格，無法標記為合格！', 'error');
-                return;
-            }
-
             // 計算合格步驟數
             let passedSteps = 0;
             item.checklist.forEach((step, index) => {
@@ -6108,6 +6092,9 @@ async function markItemComplete(itemId) {
             });
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
+
+            // ⭐⭐⭐ 修正：合格判斷 ⭐⭐⭐
+            // 只有當「所有 Critical 步驟合格」且「完成率 100%」時，才算合格
             const isPassed = !hasCriticalFailed && completionRate === 100;
 
             // 雙方簽名驗證
@@ -6132,7 +6119,7 @@ async function markItemComplete(itemId) {
                 itemId: itemId,
                 categoryId: item.categoryId,
                 status: 'completed',
-                isPassed: isPassed,
+                isPassed: isPassed,  // ⭐ 這裡會根據 Critical 步驟自動判斷
                 completionRate: completionRate,
                 hasCriticalFailed: hasCriticalFailed,
                 checklistStatus: checklistStatus,
