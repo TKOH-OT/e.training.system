@@ -5977,7 +5977,7 @@ async function refreshCurrentItemCard(itemId) {
         const recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
-            .where('status', '==', 'pending')  // ⭐ 新增：只攞 pending
+            .where('status', '==', 'pending')
             .limit(1)
             .get();
 
@@ -5985,34 +5985,36 @@ async function refreshCurrentItemCard(itemId) {
         const checklistStatus = record?.checklistStatus || {};
         const remarks = record?.remarks || {};
 
-let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
-let passedSteps = 0;
-let evaluatedSteps = 0; // ⭐ 新增：已評核步驟數（pass + fail）
+        let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
+        let passedSteps = 0;
+        let evaluatedSteps = 0;
 
-item.checklist.forEach((step, index) => {
-    if (!step.isSubtitle) {
-        const status = checklistStatus[index];
-        if (status === 'pass') {
-            passedSteps++;
-            evaluatedSteps++; // ⭐ 已評核
-        } else if (status === 'fail') {
-            evaluatedSteps++; // ⭐ 已評核（雖然不合格）
-        }
-    }
-});
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                const status = checklistStatus[index];
+                if (status === 'pass') {
+                    passedSteps++;
+                    evaluatedSteps++;
+                } else if (status === 'fail') {
+                    evaluatedSteps++;
+                }
+            }
+        });
 
-// ⭐⭐⭐ 修復：完成率 = 合格步驟 / 總步驟（用於顯示分數）⭐⭐⭐
-const completionRate = Math.round((passedSteps / totalSteps) * 100);
+        const completionRate = Math.round((passedSteps / totalSteps) * 100);
         
-        // 更新進度環
+        // ⭐⭐⭐ 修復 Bug 1: 進度顯示「已評核數 / 總數」，而非「合格數 / 總數」⭐⭐⭐
         const card = document.getElementById(`eval_item_${itemId}`);
         if (card) {
             const percentElement = card.querySelector('.item-progress-percent');
             const labelElement = card.querySelector('.item-progress-label');
             const circleElement = card.querySelector('.item-progress-ring-circle');
             
+            // ⭐ 進度環顯示「合格率」
             if (percentElement) percentElement.textContent = `${completionRate}%`;
-            if (labelElement) labelElement.textContent = `${passedSteps}/${totalSteps}`;
+            
+            // ⭐⭐⭐ 修復：標籤顯示「已評核數 / 總數」⭐⭐⭐
+            if (labelElement) labelElement.textContent = `${evaluatedSteps}/${totalSteps}`;
             
             if (circleElement) {
                 const circumference = 2 * Math.PI * 50;
@@ -6072,13 +6074,14 @@ const completionRate = Math.round((passedSteps / totalSteps) * 100);
             let overallStatus = '';
             let overallClass = '';
 
-            // ⭐⭐⭐ 修正：pending 記錄唔應該顯示 completed 狀態 ⭐⭐⭐
+            // ⭐⭐⭐ 修正判斷邏輯 ⭐⭐⭐
             if (!allCriticalPassed) {
                 overallStatus = '<span class="critical-warning">⚠️ 有 Critical 步驟不合格</span>';
                 overallClass = '';
                 card.classList.remove('completed', 'failed', 'eval-failed');
-            } else if (completionRate < 100) {
-                overallStatus = `⚠️ 完成率 ${completionRate}%`;
+            } else if (evaluatedSteps < totalSteps) {
+                // ⭐ 改用 evaluatedSteps 判斷
+                overallStatus = `⏳ 已評核 ${evaluatedSteps}/${totalSteps} 步驟 (${completionRate}% 合格)`;
                 overallClass = '';
                 card.classList.remove('completed', 'failed', 'eval-failed');
             } else {
@@ -6505,7 +6508,6 @@ async function viewEvaluationRecordsList(itemId) {
 async function viewEvaluationResultDetail(recordId, itemId) {
     showPage('evaluationRecordDetailPage');
     
-    // 儲存當前記錄 ID（用於返回）
     window.currentEvalRecordId = recordId;
     
     try {
@@ -6528,8 +6530,19 @@ async function viewEvaluationResultDetail(recordId, itemId) {
         });
         
         const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-        const isPassed = record.isPassed !== false && completionRate === 100; // ⭐ 向下兼容
-        const attemptCount = record.attemptCount || 1;
+        
+        // ⭐⭐⭐ 修復 Bug 1: 正確讀取合格狀態 ⭐⭐⭐
+        let isPassed = false;
+        if (record.isPassed === true) {
+            isPassed = true;
+        } else if (record.isPassed === false) {
+            isPassed = false;
+        } else {
+            // 舊數據兼容
+            isPassed = completionRate === 100;
+        }
+        
+        const attemptCount = record.attemptNumber || 1;
         const totalFailCount = record.totalFailCount || 0;
         
         // 更新標題
@@ -8418,9 +8431,8 @@ async function saveStepTrainingDate(itemId, stepIndex) {
     
     const date = dateInput.value;
     
-    // ⭐⭐⭐ 防止未選擇日期時觸發 ⭐⭐⭐
     if (!date) {
-        return; // 無選擇日期，直接返回
+        return;
     }
     
     try {
@@ -8458,8 +8470,9 @@ async function saveStepTrainingDate(itemId, stepIndex) {
 
         showToast('✅ 訓練日期已儲存', 'success');
         
-        // ⭐ 即時更新完成狀態顯示
+        // ⭐⭐⭐ 修復 Bug 2: 即時更新步驟和整體進度 ⭐⭐⭐
         await refreshTrainingStepStatus(itemId, stepIndex);
+        await updateOverallProgress(itemId);  // ⭐ 新增這行
         
     } catch (error) {
         console.error('儲存訓練日期失敗:', error);
@@ -9001,21 +9014,21 @@ async function refreshSignatureBox(itemId, stepIndex, type, signature) {
             }
         }
 
-        // ⭐ 更新完成狀態
+        // ⭐⭐⭐ 修復 Bug 2: 訓練記錄同時更新步驟和整體進度 ⭐⭐⭐
         if (item.recordType === 'training') {
             await refreshTrainingStepStatus(itemId, stepIndex);
+            await updateOverallProgress(itemId);  // ⭐ 新增這行
         } else {
             await refreshCurrentItemCard(itemId);
         }
 
     } catch (error) {
-    console.error('更新簽名框失敗:', error);
-    showToast('⚠️ 簽名已儲存，但畫面更新失敗，請手動刷新', 'warning');
-    // ⭐ 延遲刷新整個頁面，確保用戶睇到訊息
-    setTimeout(() => {
-        showCategoryEvaluation(currentCategoryId);
-    }, 1500);
-}
+        console.error('更新簽名框失敗:', error);
+        showToast('⚠️ 簽名已儲存，但畫面更新失敗，請手動刷新', 'warning');
+        setTimeout(() => {
+            showCategoryEvaluation(currentCategoryId);
+        }, 1500);
+    }
 }
         
         // ⭐⭐⭐ 新增：即時更新訓練步驟完成狀態 ⭐⭐⭐
