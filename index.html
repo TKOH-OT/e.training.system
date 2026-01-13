@@ -4009,6 +4009,7 @@ async function saveItemSettings(itemId) {
             name: name,
             hasDeadline: hasDeadline,
             isImportant: isImportant
+            passingScore: item.recordType === 'checklist' ? (parseInt(document.getElementById('editPassingScore')?.value) || 80) : null // ⭐ 新增
         };
 
         if (currentTrainingType === 'PCA') {
@@ -4211,6 +4212,15 @@ function showAddItemModal() {
         <div id="recordTypeHint" style="background: #f0f4ff; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 0.9em; border-left: 4px solid #ffa502;">
             <strong>📋 評核步驟 Checklist:</strong> 需要逐步評估每個步驟是否合格/不合格，有 Critical 步驟控制
         </div>
+
+        <!-- ⭐ 新增：合格分數設定 -->
+        <div class="input-group" id="passingScoreGroup" style="display: none;">
+            <label>✅ 合格分數 (%)</label>
+            <input type="number" id="passingScoreInput" min="0" max="100" value="80" placeholder="80">
+            <div style="margin-top: 5px; color: #666; font-size: 0.9em;">
+                ⚠️ 預設 80%。無論設定幾多，所有 <strong style="color: #ff4757;">Critical 步驟</strong> 都必須合格才算通過！
+            </div>
+        </div>
         
         <!-- 共用的步驟輸入區域 -->
         <div id="checklistInputGroup" style="margin-top: 15px;">
@@ -4288,6 +4298,15 @@ function showAddItemModal() {
                 </div>
             </div>
         </div>
+        ${item.recordType === 'checklist' ? `
+                <div class="input-group">
+                    <label>✅ 合格分數 (%)</label>
+                    <input type="number" id="editPassingScore" min="0" max="100" value="${item.passingScore || 80}" placeholder="80">
+                    <div style="margin-top: 5px; color: #666; font-size: 0.9em;">
+                        ⚠️ 無論設定幾多，所有 <strong style="color: #ff4757;">Critical 步驟</strong> 都必須合格才算通過！
+                    </div>
+                </div>
+            ` : ''}
         <div class="checkbox-group">
             <input type="checkbox" id="isImportantCheck">
             <label for="isImportantCheck">⭐ 加入重要評核時間表</label>
@@ -4317,6 +4336,16 @@ function toggleRecordTypeOptions() {
         hint.innerHTML = '<strong>📝 訓練記錄:</strong> 只記錄教授/講解日期及雙方簽名，不需評估合格/不合格';
         hint.style.borderLeftColor = '#2ed573';
         stepsLabel.textContent = '📝 訓練步驟';
+    }
+    
+    // ⭐ 新增：控制合格分數欄位顯示
+    const passingScoreGroup = document.getElementById('passingScoreGroup');
+    if (passingScoreGroup) {
+        if (recordType === 'checklist') {
+            passingScoreGroup.style.display = 'block';
+        } else {
+            passingScoreGroup.style.display = 'none';
+        }
     }
 }
         
@@ -4443,6 +4472,7 @@ async function createTrainingItem() {
         checklist: checklistSteps, // ⭐ 都儲存步驟內容
         hasDeadline: hasDeadline,
         isImportant: isImportant,
+        passingScore: recordType === 'checklist' ? (parseInt(document.getElementById('passingScoreInput')?.value) || 80) : null, // ⭐ 新增合格分數
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -5778,10 +5808,24 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'superviso
                                         <div class="score-item-label">完成率</div>
                                         <div class="score-item-value ${completionRate === 100 ? 'pass' : 'fail'}">${completionRate}%</div>
                                     </div>
+                                    ${item.recordType === 'checklist' ? `
+                                        <div class="score-item">
+                                            <div class="score-item-label">合格標準</div>
+                                            <div class="score-item-value" style="color: #ffa502;">${item.passingScore || 80}%</div>
+                                        </div>
+                                    ` : ''}
                                 </div>
                                 <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 8px; text-align: center;">
                                     <span class="score-item-value ${overallClass}" style="font-size: 1.1em;">${overallStatus}</span>
                                 </div>
+                                ${item.recordType === 'checklist' && item.checklist.some(s => s.critical && !s.isSubtitle) ? `
+                                    <div style="margin-top: 10px; padding: 10px; background: #fff5f5; border-radius: 8px; border-left: 4px solid #ff4757;">
+                                        <strong style="color: #ff4757;">⚠️ 重要提醒：</strong>
+                                        <div style="margin-top: 5px; color: #666; font-size: 0.9em;">
+                                            無論完成率幾多，所有 <strong style="color: #ff4757;">Critical 步驟</strong> 都必須合格才可通過評核！
+                                        </div>
+                                    </div>
+                                ` : ''}
                             </div>
                             <div class="checklist-container">
                                 <div class="checklist-header">📋 評核步驟 Checklist</div>
@@ -6117,10 +6161,10 @@ async function markItemComplete(itemId) {
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
-            // ⭐⭐⭐ 修正：合格判斷 ⭐⭐⭐
-            // 只有當「所有 Critical 步驟合格」且「完成率 100%」時，才算合格
-            const isPassed = !hasCriticalFailed && completionRate === 100;
-
+// ⭐⭐⭐ 修正：合格判斷（支援自訂合格分數 + Critical 必須合格）⭐⭐⭐
+            const passingScore = item.passingScore || 80; // 讀取自訂合格分數，預設 80%
+            const isPassed = !hasCriticalFailed && completionRate >= passingScore;
+            
             // 雙方簽名驗證
             const allRecordsSnapshot = await db.collection('trainingRecords')
                 .where('userId', '==', currentStaffId)
