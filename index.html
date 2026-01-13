@@ -6893,7 +6893,8 @@ async function confirmBatchSignSelected(itemId, type, signerName) {
     console.error("批量簽署失敗:", error);
     showToast("❌ 批量簽署失敗: " + error.message, "error");
 }
-
+}
+        
 // ==================== Toast 訊息提示 ====================
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
