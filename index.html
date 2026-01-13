@@ -5329,14 +5329,15 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     let totalSteps = actualSteps.length;
     let completedSteps = 0;
     
-    // ⭐⭐⭐ 修復：如果係 completed 記錄，直接判斷為 100% ⭐⭐⭐
+    // ⭐⭐⭐ 修復：使用 records[item.docId] 而唔係 record ⭐⭐⭐
+    const currentRecord = records[item.docId];
+    
     let isCompleted = false;
-    if (record && record.status === 'completed') {
+    if (currentRecord && currentRecord.status === 'completed') {
         completedSteps = totalSteps;
         isCompleted = true;
-    } else if (record && record.stepRecords) {
-        // 如果係 pending 或其他狀態，逐步檢查
-        const stepRecords = record.stepRecords || {};
+    } else if (currentRecord && currentRecord.stepRecords) {
+        const stepRecords = currentRecord.stepRecords || {};
         item.checklist.forEach((step, index) => {
             if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
                 stepRecords[index]?.traineeSignature && 
@@ -5363,7 +5364,6 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     const circumference = 2 * Math.PI * 50;
     const offset = circumference - (completionRate / 100) * circumference;
 
-    // ⭐⭐⭐ 修復：渲染步驟時，如果係 completed 就讀取 completed 記錄 ⭐⭐⭐
     let stepCounter = 0;
     const stepsHtml = item.checklist.map((step, index) => {
         if (step.isSubtitle) {
@@ -5376,8 +5376,8 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
         
         stepCounter++;
         
-        // ⭐⭐⭐ 關鍵修改：如果係 completed，就顯示「已完成」，唔再顯示簽名框 ⭐⭐⭐
-        if (record && record.status === 'completed') {
+        // ⭐⭐⭐ 用 currentRecord ⭐⭐⭐
+        if (currentRecord && currentRecord.status === 'completed') {
             return `
                 <div class="checklist-item completed" style="margin-bottom: 20px;">
                     <div class="checklist-step-header">
@@ -5394,8 +5394,8 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
             `;
         }
         
-        // ⭐⭐⭐ 如果係 pending 或無記錄，就正常顯示簽名框 ⭐⭐⭐
-        const stepRecords = record?.stepRecords || {};
+        // ⭐⭐⭐ 用 currentRecord ⭐⭐⭐
+        const stepRecords = currentRecord?.stepRecords || {};
         const stepRecord = stepRecords[index] || {};
         const trainingDate = stepRecord.trainingDate || '';
         const traineeSignature = stepRecord.traineeSignature || '';
