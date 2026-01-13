@@ -4884,31 +4884,11 @@ Object.keys(recordsByItem).forEach(itemId => {
         
 // ========== 訓練記錄類型 ==========
 if (item.recordType === 'training' && item.hasChecklist && record) {
-    // ⭐⭐⭐ 修復：直接檢查 status ⭐⭐⭐
+    // ⭐⭐⭐ 修復：只認明確標記完成嘅記錄 ⭐⭐⭐
     if (record.status === 'completed') {
         completedCount++;
-    } else if (record.stepRecords) {
-        // 如果係 pending，逐步檢查
-        const stepRecords = record.stepRecords || {};
-        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-        let allStepsCompleted = true;
-        
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle) {
-                const stepRecord = stepRecords[index];
-                if (!stepRecord?.trainingDate || 
-                    !stepRecord?.traineeSignature || 
-                    !stepRecord?.mentorSignature ||
-                    !stepRecord?.supervisorSignature) {
-                    allStepsCompleted = false;
-                }
-            }
-        });
-        
-        if (allStepsCompleted) {
-            completedCount++;
-        }
     }
+    // ⭐⭐⭐ 移除自動判斷邏輯，防止未標記完成時誤判為 100% ⭐⭐⭐
 }
     
 // ========== Checklist 評核類型 ==========
@@ -5332,22 +5312,25 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     // ⭐⭐⭐ 修復：使用 records[item.docId] 而唔係 record ⭐⭐⭐
     const currentRecord = records[item.docId];
     
-    let isCompleted = false;
-    if (currentRecord && currentRecord.status === 'completed') {
-        completedSteps = totalSteps;
-        isCompleted = true;
-    } else if (currentRecord && currentRecord.stepRecords) {
-        const stepRecords = currentRecord.stepRecords || {};
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
-                stepRecords[index]?.traineeSignature && 
-                stepRecords[index]?.mentorSignature &&
-                stepRecords[index]?.supervisorSignature) {
-                completedSteps++;
-            }
-        });
-        isCompleted = completedSteps === totalSteps;
-    }
+let isCompleted = false;
+if (currentRecord && currentRecord.status === 'completed') {
+    // ⭐⭐⭐ 明確標記完成：顯示 100% ⭐⭐⭐
+    completedSteps = totalSteps;
+    isCompleted = true;
+} else if (currentRecord && currentRecord.stepRecords) {
+    // ⭐⭐⭐ Pending 記錄：計算進度，但唔判斷為完成 ⭐⭐⭐
+    const stepRecords = currentRecord.stepRecords || {};
+    item.checklist.forEach((step, index) => {
+        if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
+            stepRecords[index]?.traineeSignature && 
+            stepRecords[index]?.mentorSignature &&
+            stepRecords[index]?.supervisorSignature) {
+            completedSteps++;
+        }
+    });
+    // ⭐⭐⭐ 唔自動判斷完成，必須手動標記 ⭐⭐⭐
+    isCompleted = false;
+}
     
     const completionRate = Math.round((completedSteps / totalSteps) * 100);
 
@@ -5534,11 +5517,16 @@ onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'superviso
                     </div>
                 </div>
 
-                <div class="item-card-actions">
-                    ${hasEditPermission ? `
-                        ${isCompleted ? `<button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>` : ''}
-                    ` : ''}
-                </div>
+<div class="item-card-actions">
+    ${hasEditPermission || currentUser.role === 'supervisor' ? `
+        ${currentRecord?.status !== 'completed' ? `
+            <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markTrainingComplete('${item.docId}')">✅ 標記完成</button>
+        ` : ''}
+        ${currentRecord?.status === 'completed' ? `
+            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>
+        ` : ''}
+    ` : ''}
+</div>
             </div>
 
             <div class="item-card-content">
@@ -7929,87 +7917,79 @@ async function saveSignature(itemId, type) {
     }
 }
 
-// ==================== 標記訓練完成（強化版）====================
+// ==================== 標記訓練/評核完成（統一版）====================
 async function markTrainingComplete(itemId) {
     try {
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .limit(1)
-            .get();
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
 
-        if (recordsSnapshot.empty) {
-            showToast('❌ 請先完成所有訓練步驟', 'error');
-            return;
-        }
+        // ⭐⭐⭐ 訓練記錄類型 ⭐⭐⭐
+        if (item.recordType === 'training') {
+            const recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .limit(1)
+                .get();
 
-        const record = recordsSnapshot.docs[0].data();
-        const stepRecords = record.stepRecords || {};
-
-        let allSigned = true;
-        const signedUsers = new Set();
-
-        // ✅ 檢查每步是否齊
-        Object.values(stepRecords).forEach(step => {
-            if (!step.trainingDate || !step.traineeSignature || !step.mentorSignature || !step.supervisorSignature) {
-                allSigned = false;
-            } else {
-                // 收集所有簽署人
-                if (step.traineeSignature) signedUsers.add(step.traineeSignature);
-                if (step.mentorSignature) signedUsers.add(step.mentorSignature);
-                if (step.supervisorSignature) signedUsers.add(step.supervisorSignature);
+            if (recordsSnapshot.empty) {
+                showToast('❌ 請先完成所有訓練步驟', 'error');
+                return;
             }
-        });
 
-        if (!allSigned) {
-            showToast('⚠️ 存在步驟未完成或簽名未齊', 'warning');
-            return;
+            const record = recordsSnapshot.docs[0].data();
+            const stepRecords = record.stepRecords || {};
+            const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+
+            // ✅ 檢查所有步驟是否完成
+            let allStepsCompleted = true;
+            const signedUsers = new Set();
+
+            item.checklist.forEach((step, index) => {
+                if (!step.isSubtitle) {
+                    const stepRecord = stepRecords[index];
+                    if (!stepRecord?.trainingDate || 
+                        !stepRecord?.traineeSignature || 
+                        !stepRecord?.mentorSignature ||
+                        !stepRecord?.supervisorSignature) {
+                        allStepsCompleted = false;
+                    } else {
+                        // 收集所有簽署人
+                        if (stepRecord.traineeSignature) signedUsers.add(stepRecord.traineeSignature);
+                        if (stepRecord.mentorSignature) signedUsers.add(stepRecord.mentorSignature);
+                        if (stepRecord.supervisorSignature) signedUsers.add(stepRecord.supervisorSignature);
+                    }
+                }
+            });
+
+            if (!allStepsCompleted) {
+                showToast('⚠️ 存在步驟未完成或簽名未齊（需要日期 + 3個簽名）', 'warning');
+                return;
+            }
+
+            // ✅ 更新為完成狀態
+            const completedAt = new Date();
+            const participants = Array.from(signedUsers).join(', ');
+
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
+                status: 'completed',
+                isPassed: true,
+                completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                completedBy: currentUser.name,
+                participants: participants
+            });
+
+            showToast(`✅ 訓練記錄已完成\n👥 參與人員：${participants}`, 'success');
+            showCategoryEvaluation(currentCategoryId);
         }
-
-        // ✅ 保存完成記錄 + 所有簽名人 + 時間
-        const completedAt = new Date();
-        const participants = Array.from(signedUsers).join(', ');
-
-        await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
-            status: 'completed',
-            isPassed: true,
-            completedAt: completedAt.toISOString(),
-            completedBy: currentUser.name,
-            participants: participants
-        });
-
-        showToast(`✅ 已標記完成\n👥 參與人員：${participants}`, 'success');
-
-        // ✅ 唔自動跳返主畫面，只更新畫面
-        showCategoryEvaluation(currentCategoryId);
+        
+        // ⭐⭐⭐ Checklist 類型（保留原邏輯）⭐⭐⭐
+        else {
+            // 呼叫原有嘅 markItemComplete 函數
+            await markItemComplete(itemId);
+        }
 
     } catch (error) {
         console.error('標記完成失敗:', error);
-        showToast('❌ 操作失敗', 'error');
-    }
-}
-        
-// 重設訓練記錄
-async function resetTraining(itemId) {
-    if (!confirm('❓ 確定要重設此訓練記錄嗎？')) {
-        return;
-    }
-
-    try {
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .limit(1)
-            .get();
-
-        if (!recordsSnapshot.empty) {
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).delete();
-        }
-
-        showToast('✅ 訓練記錄已重設', 'success');
-        showCategoryEvaluation(currentCategoryId);
-    } catch (error) {
-        console.error('重設失敗:', error);
         showToast('❌ 操作失敗', 'error');
     }
 }
