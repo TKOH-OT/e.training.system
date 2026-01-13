@@ -4883,26 +4883,27 @@ Object.keys(recordsByItem).forEach(itemId => {
         const record = records[itemObj.docId];
         
         // ========== 訓練記錄類型 ==========
-        if (item.recordType === 'training' && item.hasChecklist && record) {
-            const stepRecords = record.stepRecords || {};
-            const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-            let allStepsCompleted = true;
-            
-            item.checklist.forEach((step, index) => {
-                if (!step.isSubtitle) {
-                    const stepRecord = stepRecords[index];
-                    if (!stepRecord?.trainingDate || 
-                        !stepRecord?.traineeSignature || 
-                        !stepRecord?.mentorSignature) {
-                        allStepsCompleted = false;
-                    }
-                }
-            });
-            
-            if (allStepsCompleted) {
-                completedCount++;
+if (item.recordType === 'training' && item.hasChecklist && record) {
+    const stepRecords = record.stepRecords || {};
+    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+    let allStepsCompleted = true;
+    
+    item.checklist.forEach((step, index) => {
+        if (!step.isSubtitle) {
+            const stepRecord = stepRecords[index];
+            if (!stepRecord?.trainingDate || 
+                !stepRecord?.traineeSignature || 
+                !stepRecord?.mentorSignature ||
+                !stepRecord?.supervisorSignature) {  // ⭐ 新增 Supervisor 檢查
+                allStepsCompleted = false;
             }
         }
+    });
+    
+    if (allStepsCompleted) {
+        completedCount++;
+    }
+}
 // ========== Checklist 評核類型 ==========
 else if (item.hasChecklist && record) {
     const actualSteps = item.checklist.filter(s => !s.isSubtitle);
@@ -5324,12 +5325,14 @@ async function showCategoryEvaluation(categoryId) {
                 let totalSteps = actualSteps.length;
                 let completedSteps = 0;
                 
-                item.checklist.forEach((step, index) => {
-                    if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
-                        stepRecords[index]?.traineeSignature && stepRecords[index]?.mentorSignature) {
-                        completedSteps++;
-                    }
-                });
+               item.checklist.forEach((step, index) => {
+    if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
+        stepRecords[index]?.traineeSignature && 
+        stepRecords[index]?.mentorSignature && 
+        stepRecords[index]?.supervisorSignature) {  // ⭐ 新增 Supervisor 檢查
+        completedSteps++;
+    }
+});
 
                 const completionRate = Math.round((completedSteps / totalSteps) * 100);
                 const isCompleted = completionRate === 100;
@@ -6162,33 +6165,33 @@ async function markItemComplete(itemId) {
             }
 
             showCompletedItemOptions(itemId, isPassed);
-        } else {
-            // Training 類別保持不變
-            const recordsSnapshot = await db.collection('trainingRecords')
-                .where('userId', '==', currentStaffId)
-                .where('itemId', '==', itemId)
-                .limit(1)
-                .get();
+} else {
+    // Training 類別保持不變
+    const recordsSnapshot = await db.collection('trainingRecords')
+        .where('userId', '==', currentStaffId)
+        .where('itemId', '==', itemId)
+        .limit(1)
+        .get();
 
-            const recordData = {
-                status: 'completed',
-                isPassed: true,
-                evaluatedBy: currentUser.docId,
-                evaluatedAt: new Date().toISOString(),
-                completedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
+    const recordData = {
+        status: 'completed',
+        isPassed: true,
+        evaluatedBy: currentUser.docId,
+        evaluatedAt: new Date().toISOString(),
+        completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
 
-            if (recordsSnapshot.empty) {
-                recordData.userId = currentStaffId;
-                recordData.itemId = itemId;
-                await db.collection('trainingRecords').add(recordData);
-            } else {
-                await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
-            }
+    if (recordsSnapshot.empty) {
+        recordData.userId = currentStaffId;
+        recordData.itemId = itemId;
+        await db.collection('trainingRecords').add(recordData);
+    } else {
+        await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
+    }
 
-            showToast('✅ 訓練記錄已標記完成', 'success');
-            showCompletedItemOptions(itemId, isPassed);
-        }
+    showToast('✅ 訓練記錄已標記完成', 'success');
+    showCompletedItemOptions(itemId, true);  // ⭐ 修復：Training 類別固定為 true
+}
         
     } catch (error) {
         console.error('標記完成失敗:', error);
@@ -8680,12 +8683,14 @@ async function updateOverallProgress(itemId) {
         let totalSteps = actualSteps.length;
         let completedSteps = 0;
 
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
-                stepRecords[index]?.traineeSignature && stepRecords[index]?.mentorSignature) {
-                completedSteps++;
-            }
-        });
+item.checklist.forEach((step, index) => {
+    if (!step.isSubtitle && stepRecords[index]?.trainingDate && 
+        stepRecords[index]?.traineeSignature && 
+        stepRecords[index]?.mentorSignature && 
+        stepRecords[index]?.supervisorSignature) {  // ⭐ 新增 Supervisor 檢查
+        completedSteps++;
+    }
+});
 
         const completionRate = Math.round((completedSteps / totalSteps) * 100);
         const isCompleted = completionRate === 100;
