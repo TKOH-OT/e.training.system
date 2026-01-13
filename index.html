@@ -6974,8 +6974,7 @@ async function confirmBatchSignSelected(itemId, type, signerName) {
             return;
         }
 
-        const recordsSnapshot = await db
-            .collection("trainingRecords")
+        const recordsSnapshot = await db.collection("trainingRecords")
             .where("userId", "==", currentStaffId)
             .where("itemId", "==", itemId)
             .limit(1)
@@ -7010,12 +7009,15 @@ async function confirmBatchSignSelected(itemId, type, signerName) {
         closeModal();
         
         // ⭐⭐⭐ 修復 Bug 2：批量簽名後逐一更新簽名框 ⭐⭐⭐
+        console.log('🔄 開始批量更新簽名框...');
         for (const stepIndex of stepIndexes) {
+            console.log(`🔄 更新步驟 ${stepIndex}...`);
             await refreshSignatureBox(itemId, stepIndex, type, signerName);
         }
+        console.log('✅ 批量更新完成');
         
     } catch (error) {
-        console.error("批量簽署失敗:", error);
+        console.error("❌ 批量簽署失敗:", error);
         showToast("❌ 批量簽署失敗: " + error.message, "error");
     }
 }
@@ -9026,20 +9028,27 @@ async function refreshSignatureBox(itemId, stepIndex, type, signature) {
             return;
         }
 
-        // ⭐⭐⭐ Step 6: 找到對應的 training-record-item（步驟容器）⭐⭐⭐
-        const allRecordItems = card.querySelectorAll('.training-record-item');
-        console.log(`🔍 找到 ${allRecordItems.length} 個 training-record-item`);
+        // ⭐⭐⭐ Step 6: 找到對應的 checklist-item（步驟容器）⭐⭐⭐
+        const allChecklistItems = card.querySelectorAll('.checklist-item');
+        console.log(`🔍 找到 ${allChecklistItems.length} 個 checklist-item`);
 
-        if (actualStepIndex >= allRecordItems.length) {
-            console.error(`❌ actualStepIndex (${actualStepIndex}) 超出範圍 (${allRecordItems.length})`);
+        if (actualStepIndex >= allChecklistItems.length) {
+            console.error(`❌ actualStepIndex (${actualStepIndex}) 超出範圍 (${allChecklistItems.length})`);
             return;
         }
 
-        const targetRecordItem = allRecordItems[actualStepIndex];
-        console.log('✅ 找到目標步驟容器:', targetRecordItem);
+        const targetChecklistItem = allChecklistItems[actualStepIndex];
+        console.log('✅ 找到目標步驟容器:', targetChecklistItem);
 
-        // ⭐⭐⭐ Step 7: 在該容器內找到對應的簽名框 ⭐⭐⭐
-        const allSignatureBoxes = targetRecordItem.querySelectorAll('.signature-box');
+        // ⭐⭐⭐ Step 7: 在該步驟內找到 training-record-item ⭐⭐⭐
+        const trainingRecordItem = targetChecklistItem.querySelector('.training-record-item');
+        if (!trainingRecordItem) {
+            console.error('❌ 找不到 training-record-item');
+            return;
+        }
+
+        // ⭐⭐⭐ Step 8: 在 training-record-item 內找到對應的簽名框 ⭐⭐⭐
+        const allSignatureBoxes = trainingRecordItem.querySelectorAll('.signature-box');
         console.log(`🔍 找到 ${allSignatureBoxes.length} 個簽名框`);
 
         let targetBoxIndex = -1;
@@ -9061,7 +9070,7 @@ async function refreshSignatureBox(itemId, stepIndex, type, signature) {
         const targetBox = allSignatureBoxes[targetBoxIndex];
         console.log('✅ 找到目標簽名框:', targetBox);
 
-        // ⭐⭐⭐ Step 8: 更新簽名框內容 ⭐⭐⭐
+        // ⭐⭐⭐ Step 9: 更新簽名框內容 ⭐⭐⭐
         if (latestSignature) {
             targetBox.textContent = latestSignature;
             targetBox.classList.add('signed');
@@ -9072,15 +9081,10 @@ async function refreshSignatureBox(itemId, stepIndex, type, signature) {
             console.log('⚠️ 簽名框已清空');
         }
 
-        // ⭐ Step 9: 更新完成狀態
-        if (item.recordType === 'training') {
-            await refreshTrainingStepStatus(itemId, stepIndex);
-            await updateOverallProgress(itemId);
-            console.log('✅ 已更新訓練進度');
-        } else {
-            await refreshCurrentItemCard(itemId);
-            console.log('✅ 已刷新卡片');
-        }
+        // ⭐ Step 10: 更新完成狀態
+        await refreshTrainingStepStatus(itemId, stepIndex);
+        await updateOverallProgress(itemId);
+        console.log('✅ 已更新訓練進度');
 
     } catch (error) {
         console.error('❌ refreshSignatureBox 失敗:', error);
