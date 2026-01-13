@@ -5386,8 +5386,6 @@ if (currentRecord && currentRecord.status === 'completed') {
 // ⭐⭐⭐ 修復：正確計算完成率 ⭐⭐⭐
 const completionRate = Math.round((completedSteps / totalSteps) * 100);
     
-    const completionRate = Math.round((completedSteps / totalSteps) * 100);
-
     let badges = '<span class="badge badge-info">📝 訓練記錄</span>';
     
     if (item.hasDeadline) {
