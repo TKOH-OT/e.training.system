@@ -3872,6 +3872,10 @@ if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
                         <div class="item-card-actions">
                             ${!item.hasChecklist ? `<button class="btn btn-info btn-small" onclick="event.stopPropagation(); convertToChecklist('${item.docId}')">📋 轉換為 Checklist</button>` : ''}
                             <button class="btn btn-warning btn-small" onclick="event.stopPropagation(); editItemSettings('${item.docId}')">⚙️ 設定</button>
+
+                            <!-- ⭐ 新增：複製按鈕 -->
+    <button class="btn btn-info btn-small" onclick="event.stopPropagation(); showCopyChecklistModal('${item.docId}')">📋 複製</button>
+    
                             <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteTrainingItem('${item.docId}', '${item.name}')">🗑️ 刪除項目</button>
                         </div>
                     </div>
@@ -4014,6 +4018,197 @@ async function editItemSettings(itemId) {
     }
 }
 
+        // ==================== 複製評核 Checklist（Admin 專用）====================
+async function showCopyChecklistModal(itemId) {
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const sourceItem = itemDoc.data();
+        
+        // 生成新名稱（加上「複製」）
+        const newName = `${sourceItem.name} (複製)`;
+        
+        // ⭐ 準備步驟清單預覽
+        let stepsPreviewHtml = '';
+        if (sourceItem.hasChecklist && sourceItem.checklist) {
+            let stepCounter = 0;
+            stepsPreviewHtml = `
+                <div style="max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <strong style="color: #ffa502;">📋 將複製以下 ${sourceItem.checklist.filter(s => !s.isSubtitle).length} 個步驟：</strong>
+                    <div style="margin-top: 10px;">
+                        ${sourceItem.checklist.map((step, index) => {
+                            if (step.isSubtitle) {
+                                return `
+                                    <div style="margin: 15px 0 8px 0;">
+                                        <span style="background: #ffa502; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; font-size: 0.9em;">
+                                            ${step.step}
+                                        </span>
+                                    </div>
+                                `;
+                            } else {
+                                stepCounter++;
+                                return `
+                                    <div style="padding: 8px; margin: 5px 0; background: white; border-radius: 6px; border-left: 3px solid ${step.critical ? '#ff4757' : '#e0e0e0'};">
+                                        <strong style="color: #ffa502;">Step ${stepCounter}:</strong> ${step.step}
+                                        ${step.critical ? '<span class="badge badge-critical" style="margin-left: 8px; font-size: 0.75em;">⚠️ Critical</span>' : ''}
+                                    </div>
+                                `;
+                            }
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        const modalBody = `
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196f3;">
+                <strong style="color: #1976d2;">📌 來源項目：</strong>${sourceItem.name}
+            </div>
+            
+            <div class="input-group">
+                <label>📝 新項目名稱</label>
+                <input type="text" id="copyItemName" value="${newName}" placeholder="請輸入新項目名稱">
+            </div>
+            
+            ${currentTrainingType === 'PCA' ? `
+            <div class="input-group">
+                <label>👥 適用級別</label>
+                <select id="copyPcaLevel">
+                    <option value="ALL" ${(sourceItem.pcaLevel || 'ALL') === 'ALL' ? 'selected' : ''}>全部 PCA (PCA1, PCA2, PCA3)</option>
+                    <option value="PCA1" ${sourceItem.pcaLevel === 'PCA1' ? 'selected' : ''}>僅 PCA1</option>
+                    <option value="PCA2" ${sourceItem.pcaLevel === 'PCA2' ? 'selected' : ''}>僅 PCA2</option>
+                    <option value="PCA3" ${sourceItem.pcaLevel === 'PCA3' ? 'selected' : ''}>僅 PCA3</option>
+                </select>
+            </div>
+            ` : ''}
+            
+            ${sourceItem.recordType === 'checklist' ? `
+            <div class="input-group">
+                <label>✅ 合格分數 (%)</label>
+                <input type="number" id="copyPassingScore" min="0" max="100" value="${sourceItem.passingScore || 80}" placeholder="80">
+            </div>
+            ` : ''}
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="copyHasDeadline" ${sourceItem.hasDeadline ? 'checked' : ''} onchange="toggleCopyDeadlineSettings()">
+                <label for="copyHasDeadline">⏰ 設定截止日期</label>
+            </div>
+            
+            <div id="copyDeadlineSettings" class="deadline-settings" style="display: ${sourceItem.hasDeadline ? 'block' : 'none'};">
+                <div class="deadline-settings-title">⏰ 截止日期計算（從入職日期開始）</div>
+                <div class="deadline-inputs">
+                    <div class="input-group" style="margin: 0;">
+                        <label>數值</label>
+                        <input type="number" id="copyDeadlineValue" value="${sourceItem.deadlineValue || 1}" min="1" placeholder="請輸入數值">
+                    </div>
+                    <div class="input-group" style="margin: 0;">
+                        <label>單位</label>
+                        <select id="copyDeadlineUnit">
+                            <option value="days" ${sourceItem.deadlineUnit === 'days' ? 'selected' : ''}>日</option>
+                            <option value="weeks" ${sourceItem.deadlineUnit === 'weeks' ? 'selected' : ''}>周</option>
+                            <option value="months" ${sourceItem.deadlineUnit === 'months' ? 'selected' : ''}>月</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="copyIsImportant" ${sourceItem.isImportant ? 'checked' : ''}>
+                <label for="copyIsImportant">⭐ 加入重要評核時間表</label>
+            </div>
+            
+            ${stepsPreviewHtml}
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="confirmCopyChecklist('${itemId}')">✅ 確認複製</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('📋 複製評核 Checklist', modalBody);
+        
+    } catch (error) {
+        console.error('載入項目失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 切換複製的截止日期設定 ====================
+function toggleCopyDeadlineSettings() {
+    const checked = document.getElementById('copyHasDeadline').checked;
+    document.getElementById('copyDeadlineSettings').style.display = checked ? 'block' : 'none';
+}
+
+// ==================== 確認複製 Checklist ====================
+async function confirmCopyChecklist(sourceItemId) {
+    const newName = document.getElementById('copyItemName').value.trim();
+    
+    if (!newName) {
+        showToast('❌ 請輸入新項目名稱', 'error');
+        return;
+    }
+    
+    try {
+        // 讀取來源項目
+        const sourceDoc = await db.collection('trainingItems').doc(sourceItemId).get();
+        const sourceItem = sourceDoc.data();
+        
+        // 取得新的順序號碼
+        const itemsSnapshot = await db.collection('trainingItems')
+            .where('categoryId', '==', currentCategoryId)
+            .get();
+        
+        let maxOrder = 0;
+        itemsSnapshot.forEach(doc => {
+            const order = doc.data().order || 0;
+            if (order > maxOrder) maxOrder = order;
+        });
+        
+        // 準備新項目資料
+        const newItemData = {
+            categoryId: currentCategoryId,
+            name: newName,
+            recordType: sourceItem.recordType || 'checklist',
+            hasChecklist: sourceItem.hasChecklist || true,
+            checklist: sourceItem.checklist || [],  // ⭐ 完整複製所有步驟
+            hasDeadline: document.getElementById('copyHasDeadline').checked,
+            isImportant: document.getElementById('copyIsImportant').checked,
+            order: maxOrder + 1,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.docId
+        };
+        
+        // ⭐ PCA 級別
+        if (currentTrainingType === 'PCA') {
+            newItemData.pcaLevel = document.getElementById('copyPcaLevel').value;
+        }
+        
+        // ⭐ 合格分數（只有 checklist 才有）
+        if (sourceItem.recordType === 'checklist') {
+            newItemData.passingScore = parseInt(document.getElementById('copyPassingScore').value) || 80;
+        }
+        
+        // ⭐ 截止日期
+        if (newItemData.hasDeadline) {
+            newItemData.deadlineValue = parseInt(document.getElementById('copyDeadlineValue').value) || 1;
+            newItemData.deadlineUnit = document.getElementById('copyDeadlineUnit').value;
+        } else {
+            newItemData.deadlineValue = null;
+            newItemData.deadlineUnit = null;
+        }
+        
+        // ⭐ 寫入 Firebase
+        await db.collection('trainingItems').add(newItemData);
+        
+        showToast(`✅ 已成功複製「${newName}」（包含 ${sourceItem.checklist.filter(s => !s.isSubtitle).length} 個步驟）`, 'success');
+        closeModal();
+        showCategoryDetail(currentCategoryId);
+        
+    } catch (error) {
+        console.error('複製 Checklist 失敗:', error);
+        showToast('❌ 複製失敗: ' + error.message, 'error');
+    }
+}
+        
 // ==================== 切換編輯截止日期設定 ====================
 function toggleEditDeadlineSettings() {
     const checked = document.getElementById('editHasDeadline').checked;
