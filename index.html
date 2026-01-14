@@ -3076,27 +3076,26 @@
         let checklistSteps = [];
 
         // ==================== 權限檢查函數 ====================
-// ⭐⭐⭐ 新增：檢查用戶是否有權限編輯訓練記錄 ⭐⭐⭐
+// ⭐⭐⭐ 修復：開放 PCA1/PCA2 陪帶訓練權限 ⭐⭐⭐
 function canEditTrainingRecord(categoryName, targetStaffLevel) {
-    // 1. Admin & Supervisor 永遠有權限
+    // 1️⃣ Admin & Supervisor 永遠有權限
     if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
         return true;
     }
     
-    // 2. PCA1 員工只能為 PCA2 & PCA3 編輯【新入職PCA 陪帶訓練記錄】
+    // 2️⃣ PCA1 員工可以為 PCA2 & PCA3 編輯【訓練記錄】
     if (currentUser.role === 'staff' && currentUser.level === 'PCA1') {
-        // 必須係【新入職PCA 陪帶訓練記錄】分類
-        const isNewStaffTraining = categoryName.includes('新入職') || 
-                                   categoryName.includes('陪帶') || 
-                                   categoryName.includes('PCA');
-        
-        // 目標員工必須係 PCA2 或 PCA3
         const isTargetPCA2or3 = targetStaffLevel === 'PCA2' || targetStaffLevel === 'PCA3';
-        
-        return isNewStaffTraining && isTargetPCA2or3;
+        return isTargetPCA2or3;
     }
     
-    // 3. 其他情況一律無權限
+    // 3️⃣ PCA2 員工可以為 PCA3 編輯【訓練記錄】
+    if (currentUser.role === 'staff' && currentUser.level === 'PCA2') {
+        const isTargetPCA3 = targetStaffLevel === 'PCA3';
+        return isTargetPCA3;
+    }
+    
+    // 4️⃣ 其他情況一律無權限
     return false;
 }
         
@@ -3315,15 +3314,21 @@ function cancelSignatureLogin() {
         </div>
     `);
     
-    // ⭐⭐⭐ 新增：PCA1 員工可以為 PCA2 & PCA3 做陪帶訓練記錄 ⭐⭐⭐
-    if (currentUser.level === 'PCA1') {
-        menuHtml.push(`
-            <div class="menu-card" onclick="showPCA1MentorMenu()">
-                <div class="emoji">👨‍🏫</div>
-                <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA2/PCA3)</small></div>
-            </div>
-        `);
-    }
+// ⭐⭐⭐ PCA1 & PCA2 可以為下級做陪帶訓練 ⭐⭐⭐
+if (currentUser.level === 'PCA1') {
+    menuHtml.push(`
+        <div class="menu-card" onclick="showPCAMentorMenu()">
+            <div class="emoji">👨‍🏫</div>
+            <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA2/PCA3)</small></div>
+        </div>
+    `);
+} else if (currentUser.level === 'PCA2') {
+    menuHtml.push(`
+        <div class="menu-card" onclick="showPCAMentorMenu()">
+            <div class="emoji">👨‍🏫</div>
+            <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA3)</small></div>
+        </div>
+    `);
 }
 
             if (currentUser.role === 'admin') {
@@ -9274,25 +9279,46 @@ async function resetAllTraining(itemId) {
     }
 }
 
-        // ==================== PCA1 陪帶訓練專用選單 ====================
-function showPCA1MentorMenu() {
+// ==================== PCA 陪帶訓練專用選單（PCA1 & PCA2 共用）====================
+function showPCAMentorMenu() {
     showPage('staffLevelPage');
     
-    // 修改標題
-    document.querySelector('#staffLevelPage .top-bar h2').textContent = '📊 選擇要陪帶的員工職級';
+    // ⭐⭐⭐ 根據當前用戶職級決定可選擇的目標 ⭐⭐⭐
+    let title = '';
+    let menuCards = '';
     
-    // 只顯示 PCA2 和 PCA3 卡片
+    if (currentUser.level === 'PCA1') {
+        title = '📊 選擇要陪帶的員工職級（PCA1 可陪帶 PCA2 & PCA3）';
+        menuCards = `
+            <div class="menu-card level-PCA2" onclick="showStaffList('PCA2')">
+                <div class="emoji">🙋🏻‍♂️</div>
+                <div class="title">PCA2</div>
+            </div>
+            <div class="menu-card level-PCA3" onclick="showStaffList('PCA3')">
+                <div class="emoji">🙋🏻‍♀️</div>
+                <div class="title">PCA3</div>
+            </div>
+        `;
+    } else if (currentUser.level === 'PCA2') {
+        title = '📊 選擇要陪帶的員工職級（PCA2 可陪帶 PCA3）';
+        menuCards = `
+            <div class="menu-card level-PCA3" onclick="showStaffList('PCA3')">
+                <div class="emoji">🙋🏻‍♀️</div>
+                <div class="title">PCA3</div>
+            </div>
+        `;
+    } else {
+        // 其他職級（不應該出現這情況）
+        title = '❌ 權限錯誤';
+        menuCards = '<div class="no-data-message">你沒有權限使用此功能</div>';
+    }
+    
+    // 更新標題
+    document.querySelector('#staffLevelPage .top-bar h2').textContent = title;
+    
+    // 更新選單卡片
     const menuGrid = document.querySelector('#staffLevelPage .menu-grid');
-    menuGrid.innerHTML = `
-        <div class="menu-card level-PCA2" onclick="showStaffList('PCA2')">
-            <div class="emoji">🙋🏻‍♂️</div>
-            <div class="title">PCA2</div>
-        </div>
-        <div class="menu-card level-PCA3" onclick="showStaffList('PCA3')">
-            <div class="emoji">🙋🏻‍♀️</div>
-            <div class="title">PCA3</div>
-        </div>
-    `;
+    menuGrid.innerHTML = menuCards;
 }
 
 // ==================== QUIZ SYSTEM FUNCTIONS ====================
