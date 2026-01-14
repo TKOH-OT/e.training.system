@@ -301,7 +301,7 @@
 
         /* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
 .item-card.eval-failed {
-    background: linear-gradient(135deg, #ff4757 0%, #e84118 100%) !important;
+    background: linear-gradient(135deg, ffb3ba 0%, #e84118 100%) !important;
     color: white !important;
     animation: pulseRed 2s infinite;
 }
@@ -3170,13 +3170,31 @@ async function initializeSystem() {
             initializeSystem();
         });
 
-        // ==================== 🔐 簽名前帳號驗證機制（新增） ====================
-async function verifyUserBeforeSign() {
+// ==================== 🔐 簽名前帳號驗證機制（新增角色參數） ====================
+async function verifyUserBeforeSign(role = 'staff') {
     return new Promise((resolve, reject) => {
+        // ⭐⭐⭐ 根據角色顯示不同標題 ⭐⭐⭐
+        let title = '';
+        let description = '';
+        
+        if (role === 'staff') {
+            title = '🔐 員工簽名登入驗證';
+            description = '請輸入【受訓員工】的帳號密碼進行簽名';
+        } else if (role === 'supervisor') {
+            title = '🔐 主管簽名登入驗證';
+            description = '請輸入【評核主管】的帳號密碼進行簽名';
+        } else {
+            title = '🔐 簽名登入驗證';
+            description = '請輸入帳號密碼進行簽名';
+        }
+        
         const modalBody = `
+            <div style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffa502;">
+                <strong>💡 ${description}</strong>
+            </div>
             <div class="input-group">
                 <label>👤 帳號</label>
-                <input type="text" id="signLoginId" placeholder="請輸入帳號">
+                <input type="text" id="signLoginId" placeholder="請輸入帳號" autofocus>
             </div>
             <div class="input-group">
                 <label>🔒 密碼</label>
@@ -3187,11 +3205,16 @@ async function verifyUserBeforeSign() {
                 <button class="btn btn-secondary" onclick="cancelSignatureLogin()">❌ 取消</button>
             </div>
         `;
-        showModal('🔐 簽名登入驗證', modalBody);
+        showModal(title, modalBody);
 
         // 🌍 用 global 暫存 resolve/reject，方便其他函數取用
         window.signatureLoginResolve = resolve;
         window.signatureLoginReject = reject;
+        
+        // ⭐ 自動聚焦帳號輸入框
+        setTimeout(() => {
+            document.getElementById('signLoginId')?.focus();
+        }, 100);
     });
 }
 
@@ -6176,11 +6199,13 @@ const isPassed = !hasCriticalFailed && meetsScoreRequirement; // ⭐ 兩個條�
             
             const attemptNumber = allRecordsSnapshot.size + 1;
 
-            const staffName = await verifyUserBeforeSign().catch(() => null);
-            if (!staffName) return;
-            
-            const supervisorName = await verifyUserBeforeSign().catch(() => null);
-            if (!supervisorName) return;
+// ⭐⭐⭐ 修改：第一次簽名 - 員工簽名 ⭐⭐⭐
+const staffName = await verifyUserBeforeSign('staff').catch(() => null);
+if (!staffName) return;
+
+// ⭐⭐⭐ 修改：第二次簽名 - 主管簽名 ⭐⭐⭐
+const supervisorName = await verifyUserBeforeSign('supervisor').catch(() => null);
+if (!supervisorName) return;
             
             const signedAt = new Date().toISOString();
 
