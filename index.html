@@ -5288,16 +5288,46 @@ itemsSnapshot.forEach(doc => {
                     return;
                 }
 
-                // 獲取培訓記錄
-                const recordsSnapshot = await db.collection('trainingRecords')
-                    .where('userId', '==', staffId)
-                    .get();
+                // ⭐⭐⭐ 修復：智能選擇記錄（優先 pending，否則取最新 completed）⭐⭐⭐
+const recordsSnapshot = await db.collection('trainingRecords')
+    .where('userId', '==', staffId)
+    .get();
 
-                const records = {};
-                recordsSnapshot.forEach(doc => {
-                    const record = doc.data();
-                    records[record.itemId] = record;
-                });
+const recordsByItem = {};
+recordsSnapshot.forEach(doc => {
+    const record = doc.data();
+    const itemId = record.itemId;
+    
+    if (!recordsByItem[itemId]) {
+        recordsByItem[itemId] = [];
+    }
+    recordsByItem[itemId].push({ docId: doc.id, ...record });
+});
+
+// ⭐⭐⭐ 關鍵修復：智能選擇顯示記錄 ⭐⭐⭐
+const records = {};
+Object.keys(recordsByItem).forEach(itemId => {
+    const itemRecords = recordsByItem[itemId];
+    
+    // 優先選擇 pending 記錄
+    const pendingRecord = itemRecords.find(r => r.status === 'pending');
+    
+    if (pendingRecord) {
+        records[itemId] = pendingRecord;
+    } else {
+        // 沒有 pending 記錄，取最新的 completed 記錄
+        const completedRecords = itemRecords.filter(r => r.status === 'completed');
+        if (completedRecords.length > 0) {
+            // 按完成時間排序，取最新的
+            completedRecords.sort((a, b) => {
+                const timeA = a.completedAt?.toDate?.() || new Date(0);
+                const timeB = b.completedAt?.toDate?.() || new Date(0);
+                return timeB - timeA; // 降序排列，最新的在前
+            });
+            records[itemId] = completedRecords[0];
+        }
+    }
+});
 
                 const now = new Date();
                 const timelineHtml = [];
