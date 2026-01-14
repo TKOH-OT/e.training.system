@@ -3872,15 +3872,16 @@ function toggleItemCard(itemId) {
     const card = document.getElementById(`item_${itemId}`);
     const allCards = document.querySelectorAll('.item-card');
     
+    // ⭐⭐⭐ 修改：只允許展開，不允許收起 ⭐⭐⭐
     if (card.classList.contains('expanded')) {
-        // 收起當前卡片
-        card.classList.remove('expanded');
-    } else {
-        // 先收起所有卡片
-        allCards.forEach(c => c.classList.remove('expanded'));
-        // 展開當前卡片
-        card.classList.add('expanded');
+        // 已展開時，點擊卡片不做任何事
+        return;
     }
+    
+    // 先收起所有卡片
+    allCards.forEach(c => c.classList.remove('expanded'));
+    // 展開當前卡片
+    card.classList.add('expanded');
 }
         
 // ==================== 編輯項目設定 ====================
@@ -5861,6 +5862,15 @@ if (item.recordType === 'training') {
 // ==================== 切換評核項目卡片展開/收起 ====================
 async function toggleEvalItemCard(itemId) {
     try {
+        const card = document.getElementById(`eval_item_${itemId}`);
+        const allCards = document.querySelectorAll('#evaluationContent .item-card');
+        
+        // ⭐⭐⭐ 修改：只允許展開，不允許收起 ⭐⭐⭐
+        if (card.classList.contains('expanded')) {
+            // 已展開時，點擊卡片不做任何事
+            return;
+        }
+        
         // ⭐⭐⭐ 取得項目類型 ⭐⭐⭐
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
@@ -5892,14 +5902,6 @@ async function toggleEvalItemCard(itemId) {
                 }
             }
         }
-
-        const card = document.getElementById(`eval_item_${itemId}`);
-        const allCards = document.querySelectorAll('#evaluationContent .item-card');
-        
-        if (card.classList.contains('expanded')) {
-            card.classList.remove('expanded');
-            return;
-        }
         
         // ⭐⭐⭐ 已完成記錄 → 顯示選項彈窗 ⭐⭐⭐
         if (record && record.status === 'completed') {
@@ -5911,7 +5913,9 @@ async function toggleEvalItemCard(itemId) {
             }
         }
 
+        // 先收起所有卡片
         allCards.forEach(c => c.classList.remove('expanded'));
+        // 展開當前卡片
         card.classList.add('expanded');
         
     } catch (error) {
