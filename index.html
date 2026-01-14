@@ -4964,7 +4964,6 @@ else if (item.hasChecklist && record) {
         else if (!item.recordType && !item.hasChecklist && record && record.status === 'completed') {
             completedCount++;
         }
-    })
 
     // ⭐⭐⭐ 計算百分比 ⭐⭐⭐
     const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
