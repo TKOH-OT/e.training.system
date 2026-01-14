@@ -6282,6 +6282,9 @@ function showCompletedItemOptions(itemId, isPassed) {
 async function viewEvaluationRecordsList(itemId) {
     closeModal();
     showPage('evaluationRecordsListPage');
+
+      // ⭐⭐⭐ 新增：標記為評核記錄類型 ⭐⭐⭐
+    window.currentRecordType = 'evaluation';
     
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
@@ -8112,6 +8115,9 @@ function showTrainingCompletedOptions(itemId) {
 async function viewTrainingRecordsList(itemId) {
     closeModal();
     showPage('evaluationRecordsListPage'); // 複用評核記錄頁面
+
+        // ⭐⭐⭐ 新增：標記為訓練記錄類型 ⭐⭐⭐
+    window.currentRecordType = 'training';
     
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
@@ -8230,11 +8236,12 @@ async function viewTrainingRecordsList(itemId) {
     }
 }
 
-// ⭐⭐⭐ 新增：查看訓練記錄詳情（獨立頁面）⭐⭐⭐
+// ⭐⭐⭐ 修改：訓練記錄詳情（只顯示簽名和日期）⭐⭐⭐
 async function viewTrainingRecordDetail(recordId, itemId) {
     showPage('evaluationRecordDetailPage');
     
     window.currentEvalRecordId = recordId;
+    window.currentRecordType = 'training'; // ⭐ 標記類型
     
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
@@ -8245,7 +8252,7 @@ async function viewTrainingRecordDetail(recordId, itemId) {
         
         const stepRecords = record.stepRecords || {};
         
-        // ⭐⭐⭐ 修復：計算訓練次數（如果未儲存）⭐⭐⭐
+        // 計算訓練次數
         let trainingCount = record.trainingCount;
         if (!trainingCount) {
             const allCompletedRecords = await db.collection('trainingRecords')
@@ -8270,6 +8277,7 @@ async function viewTrainingRecordDetail(recordId, itemId) {
         document.getElementById('evalRecordDetailTitle').textContent = 
             `📝 訓練記錄 - ${completedDate}`;
         
+        // ⭐⭐⭐ 訓練記錄摘要（綠色背景）⭐⭐⭐
         let resultHtml = `
             <div class="quiz-result-summary passed">
                 <div style="font-size: 1.8em; margin-bottom: 15px;">
@@ -8294,6 +8302,7 @@ async function viewTrainingRecordDetail(recordId, itemId) {
             </div>
         `;
         
+        // ⭐⭐⭐ 逐步顯示訓練記錄（白色卡片）⭐⭐⭐
         let stepCounter = 0;
         item.checklist.forEach((step, index) => {
             if (step.isSubtitle) {
@@ -11635,20 +11644,46 @@ async function saveEditedAccount(docId) {
     }
 }
 
-        // ⭐⭐⭐ 新增：評核記錄頁面返回導航 ⭐⭐⭐
+// ⭐⭐⭐ 修改：根據記錄類型決定返回位置 ⭐⭐⭐
 function backToEvaluationFromRecords() {
-    if (window.currentEvalCategoryId) {
-        showCategoryEvaluation(window.currentEvalCategoryId);
+    const recordType = window.currentRecordType || 'evaluation';
+    
+    if (recordType === 'training') {
+        // 訓練記錄：返回訓練記錄列表
+        if (window.currentEvalItemId) {
+            viewTrainingRecordsList(window.currentEvalItemId);
+        } else if (window.currentEvalCategoryId) {
+            showCategoryEvaluation(window.currentEvalCategoryId);
+        } else {
+            showTrainingProgress(currentStaffId);
+        }
     } else {
-        showTrainingProgress(currentStaffId);
+        // 評核記錄：返回評核頁面
+        if (window.currentEvalCategoryId) {
+            showCategoryEvaluation(window.currentEvalCategoryId);
+        } else {
+            showTrainingProgress(currentStaffId);
+        }
     }
 }
 
 function backToEvalRecordsList() {
-    if (window.currentEvalItemId) {
-        viewEvaluationRecordsList(window.currentEvalItemId);
+    const recordType = window.currentRecordType || 'evaluation';
+    
+    if (recordType === 'training') {
+        // 訓練記錄：返回訓練記錄列表
+        if (window.currentEvalItemId) {
+            viewTrainingRecordsList(window.currentEvalItemId);
+        } else {
+            backToEvaluationFromRecords();
+        }
     } else {
-        backToEvaluationFromRecords();
+        // 評核記錄：返回評核記錄列表
+        if (window.currentEvalItemId) {
+            viewEvaluationRecordsList(window.currentEvalItemId);
+        } else {
+            backToEvaluationFromRecords();
+        }
     }
 }
     </script>
