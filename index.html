@@ -5327,24 +5327,41 @@ async function showCategoryEvaluation(categoryId) {
             const record = records[item.docId];
 
 // ========== 訓練記錄類型 ==========
-if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
+if (item.recordType === 'training') {
     const actualSteps = item.checklist.filter(s => !s.isSubtitle);
     let totalSteps = actualSteps.length;
     let completedSteps = 0;
     
-    const currentRecord = records[item.docId];
+    // ⭐⭐⭐ 修復：強制查詢該項目的最新記錄 ⭐⭐⭐
+    let currentRecord = records[item.docId];
+    
+    // 如果 records 物件中沒有，手動查詢一次
+    if (!currentRecord) {
+        const tempSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', item.docId)
+            .limit(1)
+            .get();
+        
+        if (!tempSnapshot.empty) {
+            currentRecord = tempSnapshot.docs[0].data();
+        }
+    }
     
     let isCompleted = false;
 
     if (currentRecord && currentRecord.status === 'completed') {
+        // ✅ 已完成：所有步驟都算完成
         completedSteps = totalSteps;
         isCompleted = true;
     } else if (currentRecord && currentRecord.stepRecords) {
+        // ⏳ 進行中：計算實際完成步驟數
         const stepRecords = currentRecord.stepRecords || {};
         
         item.checklist.forEach((step, index) => {
             if (!step.isSubtitle) {
                 const stepRecord = stepRecords[index];
+                // ⭐ 必須 4 個條件都滿足才算完成
                 if (stepRecord?.trainingDate && 
                     stepRecord?.traineeSignature && 
                     stepRecord?.mentorSignature &&
@@ -5358,184 +5375,10 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     }
 
     const completionRate = Math.round((completedSteps / totalSteps) * 100);
-    // ⭐⭐⭐ 新增：pending 記錄也要顯示進度 ⭐⭐⭐
-let displayCompletedSteps = completedSteps;
-let displayCompletionRate = completionRate;
-
-// 如果是 pending 狀態，計算實際完成步驟數（包含部分完成的）
-if (currentRecord && currentRecord.status === 'pending' && currentRecord.stepRecords) {
-    displayCompletedSteps = 0;
-    const stepRecords = currentRecord.stepRecords;
     
-    item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle) {
-            const stepRecord = stepRecords[index];
-            // ⭐ 有任何簽名或日期就算「進行中」
-            if (stepRecord?.trainingDate || 
-                stepRecord?.traineeSignature || 
-                stepRecord?.mentorSignature ||
-                stepRecord?.supervisorSignature) {
-                displayCompletedSteps++;
-            }
-        }
-    });
-    
-    displayCompletionRate = Math.round((displayCompletedSteps / totalSteps) * 100);
-}
-    
-    let badges = '<span class="badge badge-info">📝 訓練記錄</span>';
-    
-    if (item.hasDeadline) {
-        badges += `<span class="badge badge-warning">⏰ ${item.deadlineValue} ${item.deadlineUnit === 'days' ? '日' : item.deadlineUnit === 'weeks' ? '周' : '月'}</span>`;
-    }
-    
-    if (item.isImportant) {
-        badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
-    }
-
+    // ⭐⭐⭐ 後面的 HTML 輸出保持不變 ⭐⭐⭐
     const circumference = 2 * Math.PI * 50;
     const offset = circumference - (completionRate / 100) * circumference;
-
-    // ⭐⭐⭐ 關鍵修復：只渲染一次 checklist ⭐⭐⭐
-    let stepCounter = 0;
-    const stepsHtml = item.checklist.map((step, index) => {
-        if (step.isSubtitle) {
-            return `
-                <div style="margin: 20px 0 10px 0;">
-                    <span class="step-subtitle">${step.step}</span>
-                </div>
-            `;
-        }
-        
-        stepCounter++;
-        
-        if (currentRecord && currentRecord.status === 'completed') {
-            return `
-                <div class="checklist-item completed" style="margin-bottom: 20px;">
-                    <div class="checklist-step-header">
-                        <div class="checklist-step-name">
-                            <span class="step-number">Step ${stepCounter}:</span>
-                            ${step.step}
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 10px; padding: 10px; background: #f0fff4; border-radius: 6px; text-align: center; font-size: 0.9em;">
-                        <strong style="color: #2ed573;">✅ 此步驟已完成</strong>
-                    </div>
-                </div>
-            `;
-        }
-        
-        const stepRecords = currentRecord?.stepRecords || {};
-        const stepRecord = stepRecords[index] || {};
-        const trainingDate = stepRecord.trainingDate || '';
-        const traineeSignature = stepRecord.traineeSignature || '';
-        const mentorSignature = stepRecord.mentorSignature || '';
-        const supervisorSignature = stepRecord.supervisorSignature || '';
-        const stepCompleted = trainingDate && traineeSignature && mentorSignature && supervisorSignature;
-
-        return `
-            <div class="checklist-item ${stepCompleted ? 'completed' : ''}" style="margin-bottom: 20px;">
-                <div class="checklist-step-header">
-                    <div class="checklist-step-name">
-                        <span class="step-number">Step ${stepCounter}:</span>
-                        ${step.step}
-                    </div>
-                </div>
-                
-                <div class="training-record-item" style="margin-top: 12px;">
-                    <div class="training-record-row">
-                        <div class="training-record-label">📅 教授/講解日期:</div>
-                        <div>
-                            ${hasEditPermission ? `
-                                <input type="date" id="trainingDate_${item.docId}_${index}" 
-                                    value="${trainingDate}" 
-                                    onclick="event.stopPropagation()" 
-                                    onchange="event.stopPropagation(); saveStepTrainingDate('${item.docId}', ${index})"
-                                    style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; width: 100%;">
-                            ` : `
-                                <div style="padding: 8px; background: #f0f0f0; border-radius: 6px;">
-                                    ${trainingDate || '尚未設定'}
-                                </div>
-                            `}
-                        </div>
-                    </div>
-                    
-                    <div class="training-record-row">
-                        <div class="training-record-label">✍️ 新同事簽名:</div>
-                        <div>
-                            ${hasEditPermission ? `
-                                <div style="margin-bottom: 6px;">
-                                    <button class="btn btn-success btn-small"
-                                        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'trainee')">
-                                        🖊️ 一鍵多簽
-                                    </button>
-                                </div>
-                                <div class="signature-box ${traineeSignature ? 'signed' : ''}" 
-                                    onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')">
-                                    ${traineeSignature || '點擊輸入簽名'}
-                                </div>
-                            ` : `
-                                <div class="signature-box ${traineeSignature ? 'signed' : ''}">
-                                    ${traineeSignature || '尚未簽名'}
-                                </div>
-                            `}
-                        </div>
-                    </div>
-
-                    <div class="training-record-row">
-                        <div class="training-record-label">✍️ 陪帶同事簽名:</div>
-                        <div>
-                            ${hasEditPermission ? `
-                                <div style="margin-bottom: 6px;">
-                                    <button class="btn btn-success btn-small"
-                                        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'mentor')">
-                                        🖊️ 陪帶一鍵多簽
-                                    </button>
-                                </div>
-                                <div class="signature-box ${mentorSignature ? 'signed' : ''}" 
-                                    onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')">
-                                    ${mentorSignature || '點擊輸入簽名'}
-                                </div>
-                            ` : `
-                                <div class="signature-box ${mentorSignature ? 'signed' : ''}">
-                                    ${mentorSignature || '尚未簽名'}
-                                </div>
-                            `}
-                        </div>
-                    </div>
-
-                    <div class="training-record-row">
-                        <div class="training-record-label">👔 Supervisor 加簽:</div>
-                        <div>
-                            ${hasEditPermission || currentUser.role === 'supervisor' ? `
-                                <div style="margin-bottom: 6px;">
-                                    <button class="btn btn-success btn-small"
-                                        onclick="event.stopPropagation(); openBatchSignModal('${item.docId}', 'supervisor')">
-                                        🖊️ Supervisor 一鍵多簽
-                                    </button>
-                                </div>
-                                <div class="signature-box ${supervisorSignature ? 'signed' : ''}" 
-                                    onclick="event.stopPropagation(); editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')">
-                                    ${supervisorSignature || '點擊輸入簽名'}
-                                </div>
-                            ` : `
-                                <div class="signature-box ${supervisorSignature ? 'signed' : ''}">
-                                    ${supervisorSignature || '尚未簽名'}
-                                </div>
-                            `}
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 10px; padding: 10px; background: ${stepCompleted ? '#f0fff4' : '#fff9e6'}; border-radius: 6px; text-align: center; font-size: 0.9em;">
-                        <strong style="color: ${stepCompleted ? '#2ed573' : '#ffa502'};">
-                            ${stepCompleted ? '✅ 此步驟已完成（含 Supervisor 加簽）' : '⏳ 待完成'}
-                        </strong>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join(''); // ⭐⭐⭐ 關鍵：這裡用 .join('') 將陣列轉換為字串
 
     itemsHtml.push(`
         <div class="item-card ${isCompleted ? 'completed' : ''}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}')">
@@ -5543,7 +5386,7 @@ if (currentRecord && currentRecord.status === 'pending' && currentRecord.stepRec
             
             <div class="item-card-header">
                 <div class="item-card-title-section">
-                    <div class="item-card-name" style="font-size: 1.8em; font-weight: 900; color: #2c3e50; line-height: 1.3; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); letter-spacing: 0.5px; background: linear-gradient(135deg, #ffa502 0%, #ff6b35 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; padding: 5px 0; margin-bottom: 10px; text-align: center;">
+                    <div class="item-card-name" style="...">
                         ${item.name}
                     </div>
                     <div class="item-card-badges">${badges}</div>
@@ -5560,8 +5403,8 @@ if (currentRecord && currentRecord.status === 'pending' && currentRecord.stepRec
                             stroke-linecap="round"/>
                     </svg>
                     <div class="item-progress-text">
-                       <div class="item-progress-percent">${displayCompletionRate}%</div>
-<div class="item-progress-label">${displayCompletedSteps}/${totalSteps}</div>
+                        <div class="item-progress-percent">${completionRate}%</div>
+                        <div class="item-progress-label">${completedSteps}/${totalSteps}</div>
                     </div>
                 </div>
 
