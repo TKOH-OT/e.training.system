@@ -9141,29 +9141,29 @@ const stepCompleted = trainingDate && traineeSignature && mentorSignature && sup
     }
 }
 
-// ⭐⭐⭐ 新增：更新整體訓練進度 ⭐⭐⭐
+// ⭐⭐⭐ 更新整體訓練進度（即時刷新）⭐⭐⭐
 async function updateOverallProgress(itemId) {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
 
-let recordsSnapshot = await db.collection('trainingRecords')
-  .where('userId', '==', currentStaffId)
-  .where('itemId', '==', itemId)
-  .where('status', '==', 'pending')
-  .limit(1)
-  .get();
+        // ⭐⭐⭐ 強制重新查詢最新記錄 ⭐⭐⭐
+        let recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
 
-if (recordsSnapshot.empty) {
-  // 兼容舊資料（無 status）
-  recordsSnapshot = await db.collection('trainingRecords')
-    .where('userId', '==', currentStaffId)
-    .where('itemId', '==', itemId)
-    .limit(1)
-    .get();
-}
+        if (recordsSnapshot.empty) {
+            recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .limit(1)
+                .get();
+        }
 
-if (recordsSnapshot.empty) return;
+        if (recordsSnapshot.empty) return;
         
         const record = recordsSnapshot.docs[0].data();
         const stepRecords = record.stepRecords || {};
@@ -9172,7 +9172,7 @@ if (recordsSnapshot.empty) return;
         let totalSteps = actualSteps.length;
         let completedSteps = 0;
 
-        // ⭐⭐⭐ 修復：必須同時有日期 + 3個簽名才算完成 ⭐⭐⭐
+        // ⭐⭐⭐ 重新計算完成步驟數 ⭐⭐⭐
         item.checklist.forEach((step, index) => {
             if (!step.isSubtitle) {
                 const stepRecord = stepRecords[index];
@@ -9187,37 +9187,44 @@ if (recordsSnapshot.empty) return;
 
         const completionRate = Math.round((completedSteps / totalSteps) * 100);
 
-        // ⭐⭐⭐ 修復：pending 記錄永遠唔算 completed ⭐⭐⭐
-        const isCompleted = false; // pending 記錄一定唔係 completed
-
-        // 更新進度環
+        // ⭐⭐⭐ 更新卡片顯示 ⭐⭐⭐
         const card = document.getElementById(`eval_item_${itemId}`);
         if (card) {
+            // 更新進度環
             const percentElement = card.querySelector('.item-progress-percent');
             const labelElement = card.querySelector('.item-progress-label');
             const circleElement = card.querySelector('.item-progress-ring-circle');
 
-            if (percentElement) percentElement.textContent = `${completionRate}%`;
-            if (labelElement) labelElement.textContent = `${completedSteps}/${totalSteps}`;
+            if (percentElement) {
+                percentElement.textContent = `${completionRate}%`;
+            }
+            if (labelElement) {
+                labelElement.textContent = `${completedSteps}/${totalSteps}`;
+            }
 
             if (circleElement) {
                 const circumference = 2 * Math.PI * 50;
-const offset = circumference - (displayCompletionRate / 100) * circumference;  // ⭐ 改用 displayCompletionRate
+                const offset = circumference - (completionRate / 100) * circumference;
                 circleElement.setAttribute('stroke-dashoffset', offset);
             }
 
-            // 更新整體完成狀態
+            // ⭐⭐⭐ 更新「已完成」數字（關鍵修復）⭐⭐⭐
             const scoreItems = card.querySelectorAll('.score-item-value');
             if (scoreItems.length >= 3) {
-                scoreItems[1].textContent = completedSteps;
+                // scoreItems[0] = 總步驟
+                // scoreItems[1] = 已完成
+                // scoreItems[2] = 完成率
+                
+                scoreItems[1].textContent = completedSteps;  // ⭐ 更新「已完成」
                 scoreItems[1].className = `score-item-value ${completionRate === 100 ? 'pass' : 'fail'}`;
+                
                 scoreItems[2].textContent = `${completionRate}%`;
                 scoreItems[2].className = `score-item-value ${completionRate === 100 ? 'pass' : 'fail'}`;
             }
 
+            // 更新狀態文字
             const overallStatusElement = card.querySelector('.score-info .score-item-value[style*="font-size: 1.1em"]');
             if (overallStatusElement) {
-                // ⭐⭐⭐ 修復：清晰顯示狀態 ⭐⭐⭐
                 let statusText = '';
                 if (completionRate === 100) {
                     statusText = '⏳ 待標記完成（所有步驟已完成）';
@@ -9231,9 +9238,11 @@ const offset = circumference - (displayCompletionRate / 100) * circumference;  /
                 overallStatusElement.className = 'score-item-value';
             }
 
-            // ⭐⭐⭐ 修復：移除錯誤的 completed class ⭐⭐⭐
+            // 移除錯誤的 completed class
             card.classList.remove('completed');
         }
+
+        console.log(`✅ 已更新進度：${completedSteps}/${totalSteps} (${completionRate}%)`);
 
     } catch (error) {
         console.error('更新整體進度失敗:', error);
