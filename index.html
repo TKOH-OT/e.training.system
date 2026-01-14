@@ -4910,29 +4910,15 @@ if (item.recordType === 'training' && item.hasChecklist && record) {
     if (record.status === 'completed') {
         // ✅ 明確標記完成：計入完成項目
         completedCount++;
-    } else if (record.status === 'pending' && record.stepRecords) {
-        // ⭐⭐⭐ 新增：檢查 pending 記錄是否實際已完成所有步驟 ⭐⭐⭐
-        const stepRecords = record.stepRecords;
-        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
         
-        let allStepsCompleted = true;
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle) {
-                const stepRecord = stepRecords[index];
-                if (!stepRecord?.trainingDate || 
-                    !stepRecord?.traineeSignature || 
-                    !stepRecord?.mentorSignature ||
-                    !stepRecord?.supervisorSignature) {
-                    allStepsCompleted = false;
-                }
-            }
-        });
-        
-        // ⭐ 如果所有步驟都已完成（只是未標記 completed），也計入
-        if (allStepsCompleted) {
-            completedCount++;
-        }
+// ========== 訓練記錄類型 ==========
+if (item.recordType === 'training' && item.hasChecklist && record) {
+    // ⭐⭐⭐ 只有 completed 狀態才計入完成數 ⭐⭐⭐
+    if (record.status === 'completed') {
+        completedCount++;
     }
+    // ⭐ pending 狀態不計入，必須手動標記完成
+}
 }
     
 // ========== Checklist 評核類型 ==========
@@ -6905,17 +6891,14 @@ async function openBatchSignSelection(itemId, type, signerName) {
     const item = itemDoc.data();
 
     const label =
-        type === "trainee"
-            ? "新同事"
-            : type === "mentor"
-            ? "陪帶同事"
-            : "Supervisor";
+        type === "trainee" ? "新同事" :
+        type === "mentor" ? "陪帶同事" : "Supervisor";
 
-    // 載入現有記錄，判斷哪些已簽名
-    const recordsSnapshot = await db
-        .collection("trainingRecords")
+    // ⭐⭐⭐ 關鍵修復：只查詢 pending 記錄 ⭐⭐⭐
+    const recordsSnapshot = await db.collection("trainingRecords")
         .where("userId", "==", currentStaffId)
         .where("itemId", "==", itemId)
+        .where("status", "==", "pending")  // ⭐ 新增這行
         .limit(1)
         .get();
 
@@ -8921,7 +8904,6 @@ async function resetStepSignature(itemId, stepIndex, type) {
         
 // ==================== 儲存單一步驟的簽名（支援 3 種類型）====================
 async function saveStepSignature(itemId, stepIndex, type, signerName) {
-    // signerName 直接由登入簽名回傳，唔再從 input 取值
     if (!signerName) return;
 
     const recordsSnapshot = await db.collection('trainingRecords')
@@ -8934,7 +8916,6 @@ async function saveStepSignature(itemId, stepIndex, type, signerName) {
     let recordData = {};
 
     if (recordsSnapshot.empty) {
-        // 無記錄時新建
         const newDoc = await db.collection('trainingRecords').add({
             userId: currentStaffId,
             itemId,
@@ -8949,15 +8930,16 @@ async function saveStepSignature(itemId, stepIndex, type, signerName) {
     if (!recordData.stepRecords) recordData.stepRecords = {};
     if (!recordData.stepRecords[stepIndex]) recordData.stepRecords[stepIndex] = {};
 
-    // 寫入簽名者名稱與簽署時間
     recordData.stepRecords[stepIndex][`${type}Signature`] = signerName;
     recordData.stepRecords[stepIndex][`${type}SignedAt`] = new Date().toISOString();
 
     await db.collection('trainingRecords').doc(recordId).update(recordData);
     showToast(`✅ ${signerName} 已簽名`, 'success');
     
-    // 更新畫面
-    showCategoryEvaluation(currentCategoryId);
+    // ⭐⭐⭐ 關鍵修復：只更新簽名框，不重新載入整個頁面 ⭐⭐⭐
+    await refreshSignatureBox(itemId, stepIndex, type, signerName);
+    await refreshTrainingStepStatus(itemId, stepIndex);
+    await updateOverallProgress(itemId);
 }
         
 // ⭐⭐⭐ 修復：刷新單個簽名框（支援 trainee/mentor/supervisor）⭐⭐⭐
