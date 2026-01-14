@@ -5332,6 +5332,21 @@ if (item.recordType === 'training') {
     const totalSteps = actualSteps.length;
     let completedSteps = 0;
     
+    // ⭐⭐⭐ 加入這段：初始化 badges ⭐⭐⭐
+    let badges = '';
+    
+    if (item.hasDeadline) {
+        badges += `<span class="badge badge-warning">⏰ ${item.deadlineValue} ${item.deadlineUnit === 'days' ? '日' : item.deadlineUnit === 'weeks' ? '周' : '月'}</span>`;
+    }
+    
+    if (item.isImportant) {
+        badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
+    }
+    
+    // 如果是訓練記錄類型，加上特殊標記
+    badges += '<span class="badge badge-info">📝 訓練記錄</span>';
+    // ⭐⭐⭐ 結束新增區域 ⭐⭐⭐
+    
     // ⭐⭐⭐ 修復：強制查詢該項目的最新記錄 ⭐⭐⭐
     let currentRecord = records[item.docId];
     
