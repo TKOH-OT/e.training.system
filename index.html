@@ -5417,36 +5417,37 @@ if (item.recordType === 'training') {
                     <div class="training-record-item">
                         <div class="training-record-row">
                             <div class="training-record-label">📅 教授日期：</div>
-                            <input type="date" 
-                                   id="trainingDate_${item.docId}_${index}" 
-                                   value="${trainingDate}"
-                                   ${hasEditPermission || currentUser.role === 'supervisor' ? '' : 'disabled'}
-                                   onchange="saveStepTrainingDate('${item.docId}', ${index})"
-                                   style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px;">
+                           <input type="date" 
+       id="trainingDate_${item.docId}_${index}" 
+       value="${trainingDate}"
+       ${hasEditPermission || currentUser.role === 'supervisor' ? '' : 'disabled'}
+       onclick="event.stopPropagation()"
+       onchange="saveStepTrainingDate('${item.docId}', ${index})"
+       style="padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px;">
                         </div>
                         
                         <div class="training-record-row">
                             <div class="training-record-label">✍️ 新同事簽名：</div>
-                            <div class="signature-box ${traineeSignature ? 'signed' : ''}"
-                                 onclick="${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')` : ''}">
-                                ${traineeSignature || '點擊輸入簽名'}
-                            </div>
+                           <div class="signature-box ${traineeSignature ? 'signed' : ''}"
+     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')` : ''}">
+    ${traineeSignature || '點擊輸入簽名'}
+</div>
                         </div>
                         
                         <div class="training-record-row">
                             <div class="training-record-label">✍️ 陪帶同事簽名：</div>
                             <div class="signature-box ${mentorSignature ? 'signed' : ''}"
-                                 onclick="${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')` : ''}">
-                                ${mentorSignature || '點擊輸入簽名'}
-                            </div>
+     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')` : ''}">
+    ${mentorSignature || '點擊輸入簽名'}
+</div>
                         </div>
                         
                         <div class="training-record-row">
                             <div class="training-record-label">✍️ Supervisor 簽名：</div>
                             <div class="signature-box ${supervisorSignature ? 'signed' : ''}"
-                                 onclick="${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')` : ''}">
-                                ${supervisorSignature || '點擊輸入簽名'}
-                            </div>
+     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')` : ''}">
+    ${supervisorSignature || '點擊輸入簽名'}
+</div>
                         </div>
                     </div>
                     
@@ -5670,11 +5671,12 @@ if (item.recordType === 'training') {
                             ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
                                 <div class="step-remarks">
                                     <label>💬 評核意見/備註:</label>
-                                    <textarea 
-                                        id="remark_${item.docId}_${index}" 
-                                        placeholder="請輸入評核意見或備註..."
-                                        onchange="saveRemark('${item.docId}', ${index})"
-                                    >${remark}</textarea>
+                                   <textarea 
+    id="remark_${item.docId}_${index}" 
+    placeholder="請輸入評核意見或備註..."
+    onclick="event.stopPropagation()"
+    onchange="saveRemark('${item.docId}', ${index})"
+>${remark}</textarea>
                                 </div>
                             ` : remark ? `
                                 <div class="step-remarks">
