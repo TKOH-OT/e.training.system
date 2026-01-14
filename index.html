@@ -5491,7 +5491,7 @@ if (item.recordType === 'training') {
     const offset = circumference - (completionRate / 100) * circumference;
 
     itemsHtml.push(`
-        <div class="item-card ${isCompleted ? 'completed' : ''}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}', event)">
+    <div class="item-card ${isCompleted ? 'completed' : ''}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}', event)">
             <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
             
             <div class="item-card-header">
@@ -5726,7 +5726,7 @@ if (item.recordType === 'training') {
                 }
 
                 itemsHtml.push(`
-                    <div class="item-card ${overallClass} ${cardStatusClass}" id="eval_item_${itemId}" onclick="toggleEvalItemCard('${itemId}', event)">
+    <div class="item-card ${overallClass} ${cardStatusClass}" id="eval_item_${item.docId}" onclick="toggleEvalItemCard('${item.docId}', event)">
                         <button class="back-button" onclick="event.stopPropagation(); collapseItemCard('${item.docId}')">🔙 收起</button>
                         
                         <div class="item-card-header">
