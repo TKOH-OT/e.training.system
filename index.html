@@ -5317,8 +5317,12 @@ importantItems.forEach(item => {
     const record = records[item.docId];
     let isCompleted = false;
 
-    if (item.hasChecklist && record) {
-        // ⭐ 排除章節標題
+    // ⭐⭐⭐ 修復：正確判斷訓練記錄和評核的完成狀態 ⭐⭐⭐
+    if (item.recordType === 'training') {
+        // 訓練記錄：只要 status === 'completed' 就算完成
+        isCompleted = record && record.status === 'completed' && record.isPassed === true;
+    } else if (item.hasChecklist && record) {
+        // 評核 Checklist：需檢查 Critical 步驟和完成率
         const allCriticalPassed = item.checklist.every((step, index) => {
             if (step.isSubtitle || !step.critical) return true;
             return record.checklistStatus && record.checklistStatus[index] === 'pass';
@@ -5334,12 +5338,24 @@ importantItems.forEach(item => {
         });
         
         const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-        isCompleted = allCriticalPassed && completionRate === 100 && record.status === 'completed';
+        
+        // ⭐⭐⭐ 關鍵：同時檢查 status 和 isPassed ⭐⭐⭐
+        if (record.status === 'completed') {
+            if (record.isPassed === true) {
+                // 新數據：明確標記為合格
+                isCompleted = true;
+            } else if (record.isPassed !== false && allCriticalPassed && completionRate === 100) {
+                // 舊數據兼容：沒有明確標記，但符合條件
+                isCompleted = true;
+            }
+            // record.isPassed === false 時，isCompleted 保持 false
+        }
     } else if (record) {
-        isCompleted = record.status === 'completed';
+        // 舊版項目（無 recordType）
+        isCompleted = record.status === 'completed' && record.isPassed !== false;
     }
 
-    // ⭐⭐⭐ 關鍵修改：如果已完成，直接跳過此項目
+    // ⭐⭐⭐ 關鍵：如果已完成且合格，直接跳過此項目 ⭐⭐⭐
     if (isCompleted) {
         return; // 不顯示已完成的項目
     }
