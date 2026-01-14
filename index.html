@@ -8774,48 +8774,58 @@ async function resetStepSignature(itemId, stepIndex, type) {
 async function saveStepSignature(itemId, stepIndex, type, signerName) {
     if (!signerName) return;
 
-    const recordsSnapshot = await db.collection('trainingRecords')
-        .where('userId', '==', currentStaffId)
-        .where('itemId', '==', itemId)
-        .limit(1)
-        .get();
+    try {
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .limit(1)
+            .get();
 
-    let recordId;
-    let recordData = {};
+        let recordId;
+        let recordData = {};
 
-    if (recordsSnapshot.empty) {
-        const newDoc = await db.collection('trainingRecords').add({
-            userId: currentStaffId,
-            itemId,
+        if (recordsSnapshot.empty) {
+            // ✅ 建立新記錄
+            const newDoc = await db.collection('trainingRecords').add({
+                userId: currentStaffId,
+                itemId: itemId,
+                status: 'pending',
+                stepRecords: {},
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            recordId = newDoc.id;
+            recordData = { stepRecords: {} };
+        } else {
+            recordId = recordsSnapshot.docs[0].id;
+            recordData = recordsSnapshot.docs[0].data();
+        }
+
+        if (!recordData.stepRecords) recordData.stepRecords = {};
+        if (!recordData.stepRecords[stepIndex]) recordData.stepRecords[stepIndex] = {};
+
+        // ✅ 更新簽名
+        recordData.stepRecords[stepIndex][`${type}Signature`] = signerName;
+        recordData.stepRecords[stepIndex][`${type}SignedAt`] = new Date().toISOString();
+
+        // ✅ 更新 Firebase
+        await db.collection('trainingRecords').doc(recordId).update({
             status: 'pending',
-            stepRecords: {},
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            stepRecords: recordData.stepRecords,
+            updatedBy: currentUser.docId,
+            updatedAt: new Date().toISOString()
         });
-        recordId = newDoc.id;
-    } else {
-        recordId = recordsSnapshot.docs[0].id;
-        recordData = recordsSnapshot.docs[0].data();
-    }
 
-    if (!recordData.stepRecords) recordData.stepRecords = {};
-    if (!recordData.stepRecords[stepIndex]) recordData.stepRecords[stepIndex] = {};
-
-    recordData.stepRecords[stepIndex][`${type}Signature`] = signerName;
-    recordData.stepRecords[stepIndex][`${type}SignedAt`] = new Date().toISOString();
-
-    await db.collection('trainingRecords').doc(recordId).update(recordData);
-        status: 'pending',
-  stepRecords: recordData.stepRecords,
-  updatedBy: currentUser.docId,
-  updatedAt: new Date().toISOString()
-});
+        showToast(`✅ ${signerName} 已簽名`, 'success');
         
-    showToast(`✅ ${signerName} 已簽名`, 'success');
-    
-    // ⭐⭐⭐ 關鍵修復：只更新簽名框，不重新載入整個頁面 ⭐⭐⭐
-    await refreshSignatureBox(itemId, stepIndex, type, signerName);
-    await refreshTrainingStepStatus(itemId, stepIndex);
-    await updateOverallProgress(itemId);
+        // ⭐⭐⭐ 關鍵修復：只更新簽名框，不重新載入整個頁面 ⭐⭐⭐
+        await refreshSignatureBox(itemId, stepIndex, type, signerName);
+        await refreshTrainingStepStatus(itemId, stepIndex);
+        await updateOverallProgress(itemId);
+        
+    } catch (error) {
+        console.error('儲存簽名失敗:', error);
+        showToast('❌ 儲存失敗: ' + error.message, 'error');
+    }
 }
         
 // ⭐⭐⭐ 修復：刷新單個簽名框（支援 trainee/mentor/supervisor）⭐⭐⭐
