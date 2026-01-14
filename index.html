@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>TKOH A&OT Training & Quality Monitoring System (維護中)</title>
+    <title>TKOH A&OT Training & Quality Monitoring System </title>
     <style>
         
         * {
@@ -9359,9 +9359,8 @@ function showPCAMentorMenu() {
 
 // ==================== 新增測驗分類 ====================
 function showAddQuizCategoryModal() {
-    selectedEmoji = '📚'; // 預設 Emoji
+    selectedEmoji = '📚';
     
-    // ⭐⭐⭐ 修復：使用 EMOJI_LIST 生成選擇器 ⭐⭐⭐
     const emojiOptions = EMOJI_LIST.map(emoji => 
         `<div class="emoji-option ${emoji === selectedEmoji ? 'selected' : ''}" 
               onclick="selectQuizEmoji('${emoji}')">${emoji}</div>`
@@ -9369,36 +9368,41 @@ function showAddQuizCategoryModal() {
     
     const modalBody = `
         <div class="form-section">
-            <label>分類名稱</label>
-            <input type="text" id="newQuizCategoryName" placeholder="例如：手部衛生測驗">
+            <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">分類名稱</label>
+            <input type="text" id="newQuizCategoryName" 
+                   placeholder="例如：手部衛生測驗"
+                   style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
         </div>
         
         <div class="form-section">
-            <label>Emoji 圖示</label>
+            <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">Emoji 圖示</label>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                 <input type="text" id="newQuizCategoryEmoji" 
                        value="${selectedEmoji}" 
-                       placeholder="例如：🧼" 
+                       placeholder="🧼" 
                        maxlength="2"
-                       style="width: 80px; text-align: center; font-size: 2em;"
+                       style="width: 100px; padding: 14px; text-align: center; font-size: 2.5em; border: 2px solid #ffa502; border-radius: 8px;"
                        readonly>
-                <span style="color: #666;">👈 已選擇的 Emoji</span>
+                <span style="color: #666; font-size: 1em;">👈 已選擇的 Emoji</span>
             </div>
             
-            <!-- ⭐⭐⭐ 新增：Emoji 選擇器（更大尺寸）⭐⭐⭐ -->
-            <div class="emoji-picker" style="max-height: 400px; grid-template-columns: repeat(10, 1fr);">
+            <div class="emoji-picker" style="max-height: 400px; grid-template-columns: repeat(10, 1fr); gap: 12px;">
                 ${emojiOptions}
             </div>
         </div>
         
         <div class="form-section">
-            <label>合格分數 (%)</label>
-            <input type="number" id="newQuizCategoryPassingScore" min="0" max="100" value="60" placeholder="60">
+            <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">合格分數 (%)</label>
+            <input type="number" id="newQuizCategoryPassingScore" 
+                   min="0" max="100" value="60" placeholder="60"
+                   style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
         </div>
         
         <div class="form-section">
-            <label>顯示順序</label>
-            <input type="number" id="newQuizCategoryOrder" min="1" value="1" placeholder="1">
+            <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">顯示順序</label>
+            <input type="number" id="newQuizCategoryOrder" 
+                   min="1" value="1" placeholder="1"
+                   style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
         </div>
         
         <div class="modal-buttons">
@@ -9479,37 +9483,44 @@ async function editQuizCategorySettings(categoryId) {
         
         const modalBody = `
             <div class="form-section">
-                <label>分類名稱</label>
-                <input type="text" id="editQuizCategoryName" value="${category.name}" placeholder="例如：手部衛生測驗">
+                <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">分類名稱</label>
+                <input type="text" id="editQuizCategoryName" 
+                       value="${category.name}" 
+                       placeholder="例如：手部衛生測驗"
+                       style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
             </div>
             
             <div class="form-section">
-                <label>Emoji 圖示</label>
+                <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">Emoji 圖示</label>
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
                     <input type="text" id="editQuizCategoryEmoji" 
                            value="${selectedEmoji}" 
-                           placeholder="例如：🧼" 
+                           placeholder="🧼" 
                            maxlength="2"
-                           style="width: 80px; text-align: center; font-size: 2em;"
+                           style="width: 100px; padding: 14px; text-align: center; font-size: 2.5em; border: 2px solid #ffa502; border-radius: 8px;"
                            readonly>
-                    <span style="color: #666;">👈 已選擇的 Emoji</span>
+                    <span style="color: #666; font-size: 1em;">👈 已選擇的 Emoji</span>
                 </div>
                 
-                <div class="emoji-picker" style="max-height: 400px; grid-template-columns: repeat(10, 1fr);">
+                <div class="emoji-picker" style="max-height: 400px; grid-template-columns: repeat(10, 1fr); gap: 12px;">
                     ${emojiOptions}
                 </div>
             </div>
             
             <div class="form-section">
-                <label>合格分數 (%)</label>
-                <input type="number" id="editQuizCategoryPassingScore" min="0" max="100" 
-                       value="${category.passingScore || 60}" placeholder="60">
+                <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">合格分數 (%)</label>
+                <input type="number" id="editQuizCategoryPassingScore" 
+                       min="0" max="100" 
+                       value="${category.passingScore || 60}" placeholder="60"
+                       style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
             </div>
             
             <div class="form-section">
-                <label>顯示順序</label>
-                <input type="number" id="editQuizCategoryOrder" min="1" 
-                       value="${category.order || 1}" placeholder="1">
+                <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">顯示順序</label>
+                <input type="number" id="editQuizCategoryOrder" 
+                       min="1" 
+                       value="${category.order || 1}" placeholder="1"
+                       style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
             </div>
             
             <div class="modal-buttons">
