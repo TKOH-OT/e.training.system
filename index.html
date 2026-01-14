@@ -4908,17 +4908,10 @@ Object.keys(recordsByItem).forEach(itemId => {
 // ========== 訓練記錄類型 ==========
 if (item.recordType === 'training' && item.hasChecklist && record) {
     if (record.status === 'completed') {
-        // ✅ 明確標記完成：計入完成項目
-        completedCount++;
-        
-// ========== 訓練記錄類型 ==========
-if (item.recordType === 'training' && item.hasChecklist && record) {
-    // ⭐⭐⭐ 只有 completed 狀態才計入完成數 ⭐⭐⭐
-    if (record.status === 'completed') {
+        // ✅ 已完成：計入完成項目
         completedCount++;
     }
-    // ⭐ pending 狀態不計入，必須手動標記完成
-}
+    // ⭐ pending 狀態不計入完成數，必須手動標記完成
 }
     
 // ========== Checklist 評核類型 ==========
@@ -5365,6 +5358,30 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
     }
 
     const completionRate = Math.round((completedSteps / totalSteps) * 100);
+    // ⭐⭐⭐ 新增：pending 記錄也要顯示進度 ⭐⭐⭐
+let displayCompletedSteps = completedSteps;
+let displayCompletionRate = completionRate;
+
+// 如果是 pending 狀態，計算實際完成步驟數（包含部分完成的）
+if (currentRecord && currentRecord.status === 'pending' && currentRecord.stepRecords) {
+    displayCompletedSteps = 0;
+    const stepRecords = currentRecord.stepRecords;
+    
+    item.checklist.forEach((step, index) => {
+        if (!step.isSubtitle) {
+            const stepRecord = stepRecords[index];
+            // ⭐ 有任何簽名或日期就算「進行中」
+            if (stepRecord?.trainingDate || 
+                stepRecord?.traineeSignature || 
+                stepRecord?.mentorSignature ||
+                stepRecord?.supervisorSignature) {
+                displayCompletedSteps++;
+            }
+        }
+    });
+    
+    displayCompletionRate = Math.round((displayCompletedSteps / totalSteps) * 100);
+}
     
     let badges = '<span class="badge badge-info">📝 訓練記錄</span>';
     
@@ -5543,8 +5560,8 @@ if (item.recordType === 'training' && item.hasChecklist && item.checklist) {
                             stroke-linecap="round"/>
                     </svg>
                     <div class="item-progress-text">
-                        <div class="item-progress-percent">${completionRate}%</div>
-                        <div class="item-progress-label">${completedSteps}/${totalSteps}</div>
+                       <div class="item-progress-percent">${displayCompletionRate}%</div>
+<div class="item-progress-label">${displayCompletedSteps}/${totalSteps}</div>
                     </div>
                 </div>
 
@@ -9186,7 +9203,7 @@ async function updateOverallProgress(itemId) {
 
             if (circleElement) {
                 const circumference = 2 * Math.PI * 50;
-                const offset = circumference - (completionRate / 100) * circumference;
+const offset = circumference - (displayCompletionRate / 100) * circumference;  // ⭐ 改用 displayCompletionRate
                 circleElement.setAttribute('stroke-dashoffset', offset);
             }
 
