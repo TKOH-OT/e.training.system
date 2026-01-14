@@ -6836,7 +6836,9 @@ async function confirmBatchSignSelected(itemId, type, signerName) {
             await db.collection("trainingRecords").add({
                 userId: currentStaffId,
                 itemId,
+                status: 'pending',
                 stepRecords: record.stepRecords,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
 
@@ -8314,16 +8316,20 @@ async function saveStepTrainingDate(itemId, stepIndex) {
         const recordData = {
             userId: currentStaffId,
             itemId: itemId,
+            status: 'pending',
             stepRecords: stepRecords,
             updatedBy: currentUser.docId,
             updatedAt: new Date().toISOString()
         };
 
         if (recordsSnapshot.empty) {
-            await db.collection('trainingRecords').add(recordData);
-        } else {
-            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
-        }
+  await db.collection('trainingRecords').add({
+    ...recordData,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+} else {
+  await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
+}
 
         showToast('✅ 訓練日期已儲存', 'success');
         
@@ -8604,7 +8610,9 @@ async function batchSignAllSteps(itemId, type = "trainee") {
             const newDoc = await db.collection("trainingRecords").add({
                 userId: currentStaffId,
                 itemId,
+                status: 'pending',
                 stepRecords: {},
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             recordId = newDoc.id;
         } else {
@@ -8779,7 +8787,9 @@ async function saveStepSignature(itemId, stepIndex, type, signerName) {
         const newDoc = await db.collection('trainingRecords').add({
             userId: currentStaffId,
             itemId,
+            status: 'pending',
             stepRecords: {},
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         recordId = newDoc.id;
     } else {
@@ -8794,6 +8804,12 @@ async function saveStepSignature(itemId, stepIndex, type, signerName) {
     recordData.stepRecords[stepIndex][`${type}SignedAt`] = new Date().toISOString();
 
     await db.collection('trainingRecords').doc(recordId).update(recordData);
+        status: 'pending',
+  stepRecords: recordData.stepRecords,
+  updatedBy: currentUser.docId,
+  updatedAt: new Date().toISOString()
+});
+        
     showToast(`✅ ${signerName} 已簽名`, 'success');
     
     // ⭐⭐⭐ 關鍵修復：只更新簽名框，不重新載入整個頁面 ⭐⭐⭐
@@ -9000,15 +9016,24 @@ async function updateOverallProgress(itemId) {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
 
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', currentStaffId)
-            .where('itemId', '==', itemId)
-            .where('status', '==', 'pending')  // ⭐ 只查詢 pending 記錄
-            .limit(1)
-            .get();
+let recordsSnapshot = await db.collection('trainingRecords')
+  .where('userId', '==', currentStaffId)
+  .where('itemId', '==', itemId)
+  .where('status', '==', 'pending')
+  .limit(1)
+  .get();
 
-        if (recordsSnapshot.empty) return;
+if (recordsSnapshot.empty) {
+  // 兼容舊資料（無 status）
+  recordsSnapshot = await db.collection('trainingRecords')
+    .where('userId', '==', currentStaffId)
+    .where('itemId', '==', itemId)
+    .limit(1)
+    .get();
+}
 
+if (recordsSnapshot.empty) return;
+        
         const record = recordsSnapshot.docs[0].data();
         const stepRecords = record.stepRecords || {};
 
