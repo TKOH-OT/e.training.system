@@ -301,7 +301,7 @@
 
         /* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
 .item-card.eval-failed {
-    background: linear-gradient(135deg, ffb3ba 0%, #e84118 100%) !important;
+    background: linear-gradient(135deg,  0%, #e84118 100%) !important;
     color: white !important;
     animation: pulseRed 2s infinite;
 }
@@ -9359,6 +9359,14 @@ function showPCAMentorMenu() {
 
 // ==================== 新增測驗分類 ====================
 function showAddQuizCategoryModal() {
+    selectedEmoji = '📚'; // 預設 Emoji
+    
+    // ⭐⭐⭐ 修復：使用 EMOJI_LIST 生成選擇器 ⭐⭐⭐
+    const emojiOptions = EMOJI_LIST.map(emoji => 
+        `<div class="emoji-option ${emoji === selectedEmoji ? 'selected' : ''}" 
+              onclick="selectQuizEmoji('${emoji}')">${emoji}</div>`
+    ).join('');
+    
     const modalBody = `
         <div class="form-section">
             <label>分類名稱</label>
@@ -9367,7 +9375,20 @@ function showAddQuizCategoryModal() {
         
         <div class="form-section">
             <label>Emoji 圖示</label>
-            <input type="text" id="newQuizCategoryEmoji" placeholder="例如：🧼" maxlength="2">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="newQuizCategoryEmoji" 
+                       value="${selectedEmoji}" 
+                       placeholder="例如：🧼" 
+                       maxlength="2"
+                       style="width: 80px; text-align: center; font-size: 2em;"
+                       readonly>
+                <span style="color: #666;">👈 已選擇的 Emoji</span>
+            </div>
+            
+            <!-- ⭐⭐⭐ 新增：Emoji 選擇器（更大尺寸）⭐⭐⭐ -->
+            <div class="emoji-picker" style="max-height: 400px; grid-template-columns: repeat(10, 1fr);">
+                ${emojiOptions}
+            </div>
         </div>
         
         <div class="form-section">
@@ -9389,10 +9410,27 @@ function showAddQuizCategoryModal() {
     showModal('➕ 新增測驗分類', modalBody);
 }
 
+// ⭐⭐⭐ 新增：Quiz Emoji 選擇函數 ⭐⭐⭐
+function selectQuizEmoji(emoji) {
+    selectedEmoji = emoji;
+    
+    // 更新輸入框顯示
+    const emojiInput = document.getElementById('newQuizCategoryEmoji');
+    if (emojiInput) {
+        emojiInput.value = emoji;
+    }
+    
+    // 更新選中狀態
+    document.querySelectorAll('.emoji-picker .emoji-option').forEach(el => {
+        el.classList.remove('selected');
+    });
+    event.target.classList.add('selected');
+}
+
 // ==================== 儲存新測驗分類 ====================
 async function saveNewQuizCategory() {
     const name = document.getElementById('newQuizCategoryName').value.trim();
-    const emoji = document.getElementById('newQuizCategoryEmoji').value.trim();
+    const emoji = selectedEmoji; // ⭐ 改用 selectedEmoji 變數
     const passingScore = parseInt(document.getElementById('newQuizCategoryPassingScore').value) || 60;
     const order = parseInt(document.getElementById('newQuizCategoryOrder').value) || 1;
     
@@ -9402,7 +9440,7 @@ async function saveNewQuizCategory() {
     }
     
     if (!emoji) {
-        showToast('❌ 請輸入 Emoji 圖示', 'error');
+        showToast('❌ 請選擇 Emoji 圖示', 'error');
         return;
     }
     
@@ -9426,6 +9464,120 @@ async function saveNewQuizCategory() {
     }
 }
 
+        // ==================== 編輯測驗分類設定 ====================
+async function editQuizCategorySettings(categoryId) {
+    try {
+        const categoryDoc = await db.collection('quizCategories').doc(categoryId).get();
+        const category = categoryDoc.data();
+        
+        selectedEmoji = category.emoji || '📚';
+        
+        const emojiOptions = EMOJI_LIST.map(emoji => 
+            `<div class="emoji-option ${emoji === selectedEmoji ? 'selected' : ''}" 
+                  onclick="selectEditQuizEmoji('${emoji}')">${emoji}</div>`
+        ).join('');
+        
+        const modalBody = `
+            <div class="form-section">
+                <label>分類名稱</label>
+                <input type="text" id="editQuizCategoryName" value="${category.name}" placeholder="例如：手部衛生測驗">
+            </div>
+            
+            <div class="form-section">
+                <label>Emoji 圖示</label>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="editQuizCategoryEmoji" 
+                           value="${selectedEmoji}" 
+                           placeholder="例如：🧼" 
+                           maxlength="2"
+                           style="width: 80px; text-align: center; font-size: 2em;"
+                           readonly>
+                    <span style="color: #666;">👈 已選擇的 Emoji</span>
+                </div>
+                
+                <div class="emoji-picker" style="max-height: 400px; grid-template-columns: repeat(10, 1fr);">
+                    ${emojiOptions}
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <label>合格分數 (%)</label>
+                <input type="number" id="editQuizCategoryPassingScore" min="0" max="100" 
+                       value="${category.passingScore || 60}" placeholder="60">
+            </div>
+            
+            <div class="form-section">
+                <label>顯示順序</label>
+                <input type="number" id="editQuizCategoryOrder" min="1" 
+                       value="${category.order || 1}" placeholder="1">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="saveEditedQuizCategory('${categoryId}')">✅ 儲存</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('⚙️ 編輯測驗分類', modalBody);
+        
+    } catch (error) {
+        console.error('載入分類設定失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ⭐⭐⭐ 編輯時選擇 Emoji ⭐⭐⭐
+function selectEditQuizEmoji(emoji) {
+    selectedEmoji = emoji;
+    
+    const emojiInput = document.getElementById('editQuizCategoryEmoji');
+    if (emojiInput) {
+        emojiInput.value = emoji;
+    }
+    
+    document.querySelectorAll('.emoji-picker .emoji-option').forEach(el => {
+        el.classList.remove('selected');
+    });
+    event.target.classList.add('selected');
+}
+
+// ==================== 儲存編輯的測驗分類 ====================
+async function saveEditedQuizCategory(categoryId) {
+    const name = document.getElementById('editQuizCategoryName').value.trim();
+    const emoji = selectedEmoji;
+    const passingScore = parseInt(document.getElementById('editQuizCategoryPassingScore').value) || 60;
+    const order = parseInt(document.getElementById('editQuizCategoryOrder').value) || 1;
+    
+    if (!name) {
+        showToast('❌ 請輸入分類名稱', 'error');
+        return;
+    }
+    
+    if (!emoji) {
+        showToast('❌ 請選擇 Emoji 圖示', 'error');
+        return;
+    }
+    
+    try {
+        await db.collection('quizCategories').doc(categoryId).update({
+            name: name,
+            emoji: emoji,
+            passingScore: passingScore,
+            order: order,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: currentUser.docId
+        });
+        
+        showToast('✅ 測驗分類設定已更新', 'success');
+        closeModal();
+        loadQuizCategories();
+        
+    } catch (error) {
+        console.error('更新分類設定失敗:', error);
+        showToast('❌ 更新失敗', 'error');
+    }
+}
+        
 // ==================== 刪除測驗分類 ====================
 async function deleteQuizCategory(categoryId, categoryName) {
     if (!confirm(`❓ 確定要刪除測驗分類「${categoryName}」嗎？\n\n⚠️ 此操作會同時刪除所有相關題目和記錄，無法復原！`)) {
@@ -9569,10 +9721,11 @@ if (currentUser.role === 'staff') {
                         ${currentUser.role === 'staff' ? `<br><strong style="font-size: 1.1em; margin-top: 8px; display: block;">狀態：${quizStatusText}</strong>` : ''}
                     </div>
                     ${currentUser.role === 'admin' ? `
-                        <div class="card-actions">
-                            <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteQuizCategory('${doc.id}', '${category.name}')">🗑️ 刪除</button>
-                        </div>
-                    ` : ''}
+    <div class="card-actions">
+        <button class="btn btn-warning btn-small" onclick="event.stopPropagation(); editQuizCategorySettings('${doc.id}')">⚙️ 設定</button>
+        <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteQuizCategory('${doc.id}', '${category.name}')">🗑️ 刪除</button>
+    </div>
+` : ''}
                 </div>
             `;
         } // ⭐⭐⭐ 呢個 } 係 for loop 嘅結尾，保留！
