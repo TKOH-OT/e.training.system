@@ -3290,103 +3290,108 @@ function cancelSignatureLogin() {
             }
         }
 
-        // ==================== 顯示主選單 ====================
-        function showMainPage() {
-            hideZoomControls();
-            
-            const welcomeText = document.getElementById('userWelcome');
-            welcomeText.textContent = `👤 歡迎，${currentUser.name}`;
-
-            const menuHtml = [];
-
-            if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-                menuHtml.push(`
-                    <div class="menu-card" onclick="showPage('staffLevelPage')">
-                        <div class="emoji">📊</div>
-                        <div class="title">員工培訓記錄系統</div>
-                    </div>
-                `);
-} else if (currentUser.role === 'staff') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="viewMyProgress()">
-            <div class="emoji">📈</div>
-            <div class="title">我的培訓進度</div>
-        </div>
-    `);
+// ==================== 顯示主選單 ====================
+function showMainPage() {
+    hideZoomControls();
     
-// ⭐⭐⭐ PCA1 & PCA2 可以為下級做陪帶訓練 ⭐⭐⭐
-if (currentUser.level === 'PCA1') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="showPCAMentorMenu()">
-            <div class="emoji">👨‍🏫</div>
-            <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA2/PCA3)</small></div>
-        </div>
-    `);
-} else if (currentUser.level === 'PCA2') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="showPCAMentorMenu()">
-            <div class="emoji">👨‍🏫</div>
-            <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA3)</small></div>
-        </div>
-    `);
-}
+    const welcomeText = document.getElementById('userWelcome');
+    welcomeText.textContent = `👤 歡迎，${currentUser.name}`;
 
-            if (currentUser.role === 'admin') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="showAccountManage()">
-            <div class="emoji">👥</div>
-            <div class="title">帳戶管理系統</div>
-        </div>
-    `);
-    
-    // ⭐⭐⭐ 新增：Quiz 密碼管理 ⭐⭐⭐
-    menuHtml.push(`
-        <div class="menu-card" onclick="showChangeQuizPasswordModal()">
-            <div class="emoji">🔐</div>
-            <div class="title">Quiz 測驗密碼</div>
-        </div>
-    `);
-}
-            
-// ⭐ 開放給 admin 和 supervisor
-if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="showPage('auditMainPage')">
-            <div class="emoji">📋</div>
-            <div class="title">質量監測系統</div>
-        </div>
-    `);
-}
+    const menuHtml = [];
 
-            if (currentUser.role === 'admin') {
-                menuHtml.push(`
-                    <div class="menu-card" onclick="showPage('selectTrainingTypePage')">
-                        <div class="emoji">📚</div>
-                        <div class="title">員工培訓記錄介面</div>
-                    </div>
-                `);
-            }
-
-            // ⭐⭐⭐ 新增：Quiz 測驗系統入口 ⭐⭐⭐
-if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="showQuizMain()">
-            <div class="emoji">📝</div>
-            <div class="title">Quiz 測驗系統</div>
-        </div>
-    `);
-} else if (currentUser.role === 'staff') {
-    menuHtml.push(`
-        <div class="menu-card" onclick="showQuizMain()">
-            <div class="emoji">✍️</div>
-            <div class="title">我的 Quiz 測驗</div>
-        </div>
-    `);
-}
-            
-            document.getElementById('mainMenu').innerHTML = menuHtml.join('');
-            showPage('mainPage');
+    // ✅ Admin & Supervisor 選單
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="showPage('staffLevelPage')">
+                <div class="emoji">📊</div>
+                <div class="title">員工培訓記錄系統</div>
+            </div>
+        `);
+    } 
+    // ✅ 員工選單
+    else if (currentUser.role === 'staff') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="viewMyProgress()">
+                <div class="emoji">📈</div>
+                <div class="title">我的培訓進度</div>
+            </div>
+        `);
+        
+        // ⭐⭐⭐ PCA1 & PCA2 可以為下級做陪帶訓練 ⭐⭐⭐
+        if (currentUser.level === 'PCA1') {
+            menuHtml.push(`
+                <div class="menu-card" onclick="showPCAMentorMenu()">
+                    <div class="emoji">👨‍🏫</div>
+                    <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA2/PCA3)</small></div>
+                </div>
+            `);
+        } else if (currentUser.level === 'PCA2') {
+            menuHtml.push(`
+                <div class="menu-card" onclick="showPCAMentorMenu()">
+                    <div class="emoji">👨‍🏫</div>
+                    <div class="title">陪帶訓練記錄<br><small style="font-size: 0.75em; opacity: 0.9;">(為 PCA3)</small></div>
+                </div>
+            `);
         }
+    } // ⭐⭐⭐ 關鍵：這個 } 閉合 else if (currentUser.role === 'staff') ⭐⭐⭐
+
+    // ✅ Admin 專屬功能
+    if (currentUser.role === 'admin') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="showAccountManage()">
+                <div class="emoji">👥</div>
+                <div class="title">帳戶管理系統</div>
+            </div>
+        `);
+        
+        menuHtml.push(`
+            <div class="menu-card" onclick="showChangeQuizPasswordModal()">
+                <div class="emoji">🔐</div>
+                <div class="title">Quiz 測驗密碼</div>
+            </div>
+        `);
+    }
+    
+    // ✅ Admin & Supervisor 專屬功能
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="showPage('auditMainPage')">
+                <div class="emoji">📋</div>
+                <div class="title">質量監測系統</div>
+            </div>
+        `);
+    }
+
+    // ✅ Admin 專屬功能
+    if (currentUser.role === 'admin') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="showPage('selectTrainingTypePage')">
+                <div class="emoji">📚</div>
+                <div class="title">員工培訓記錄介面</div>
+            </div>
+        `);
+    }
+
+    // ✅ Quiz 測驗系統入口
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="showQuizMain()">
+                <div class="emoji">📝</div>
+                <div class="title">Quiz 測驗系統</div>
+            </div>
+        `);
+    } else if (currentUser.role === 'staff') {
+        menuHtml.push(`
+            <div class="menu-card" onclick="showQuizMain()">
+                <div class="emoji">✍️</div>
+                <div class="title">我的 Quiz 測驗</div>
+            </div>
+        `);
+    }
+    
+    document.getElementById('mainMenu').innerHTML = menuHtml.join('');
+    showPage('mainPage');
+} // ⭐⭐⭐ 關鍵：這個 } 閉合整個 showMainPage() 函數 ⭐⭐⭐
 
         // ==================== 選擇培訓類型 ====================
         function selectTrainingType(type) {
