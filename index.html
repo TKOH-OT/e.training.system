@@ -5323,13 +5323,13 @@ async function showCategoryEvaluation(categoryId) {
 
         const itemsHtml = [];
 
-        items.forEach(item => {
+for (const item of items) {
             const record = records[item.docId];
 
 // ========== 訓練記錄類型 ==========
 if (item.recordType === 'training') {
     const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-    let totalSteps = actualSteps.length;
+    const totalSteps = actualSteps.length;
     let completedSteps = 0;
     
     // ⭐⭐⭐ 修復：強制查詢該項目的最新記錄 ⭐⭐⭐
