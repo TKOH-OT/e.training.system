@@ -11644,15 +11644,13 @@ async function saveEditedAccount(docId) {
     }
 }
 
-// ⭐⭐⭐ 修改：根據記錄類型決定返回位置 ⭐⭐⭐
+// ⭐⭐⭐ 修復：避免無限循環 ⭐⭐⭐
 function backToEvaluationFromRecords() {
     const recordType = window.currentRecordType || 'evaluation';
     
     if (recordType === 'training') {
-        // 訓練記錄：返回訓練記錄列表
-        if (window.currentEvalItemId) {
-            viewTrainingRecordsList(window.currentEvalItemId);
-        } else if (window.currentEvalCategoryId) {
+        // 訓練記錄：返回評核頁面（不返回訓練記錄列表）
+        if (window.currentEvalCategoryId) {
             showCategoryEvaluation(window.currentEvalCategoryId);
         } else {
             showTrainingProgress(currentStaffId);
