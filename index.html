@@ -10258,7 +10258,26 @@ function showAddQuizItemModal() {
             </div>
             <button type="button" class="btn btn-info btn-small" onclick="addSortItem()">➕ 新增項目</button>
         </div>
-        
+
+        <div class="form-section" id="markingSchemeSection" style="display: none;">
+    <label>📋 Marking Scheme (評分標準)</label>
+    <textarea id="markingSchemeInput" rows="4" 
+              placeholder="例如：&#10;- 必須包含「五個時機」關鍵字 (5分)&#10;- 順序正確 (3分)&#10;- 詳細說明 (2分)"></textarea>
+</div>
+
+<script>
+// 根據題目類型顯示/隱藏 Marking Scheme
+function updateQuizItemTypeOptions() {
+    const type = document.getElementById('quizItemType').value;
+    
+    document.getElementById('choiceOptions').style.display = type === 'choice' ? 'block' : 'none';
+    document.getElementById('sortOptions').style.display = type === 'sort' ? 'block' : 'none';
+    
+    // ⭐ 新增：只有填充題才顯示 Marking Scheme
+    document.getElementById('markingSchemeSection').style.display = type === 'fill' ? 'block' : 'none';
+}
+</script>
+    
         <div class="form-section">
             <label>分數</label>
             <input type="number" id="quizItemScore" min="1" value="10" placeholder="10">
@@ -10319,6 +10338,7 @@ async function saveNewQuizItem() {
         type: type,
         score: score,
         order: order,
+    markingScheme: type === 'fill' ? (document.getElementById('markingSchemeInput')?.value.trim() || '') : '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: currentUser.docId
     };
@@ -11213,6 +11233,21 @@ function renderGradingInterface(itemId, item, answer) {
     if (answer.type === 'fill') {
         html += `
             <div style="margin-bottom: 15px;">
+                ${item.markingScheme ? `
+            <div style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="color: #1976d2; font-size: 1.1em;">📋 Marking Scheme (評分標準)</strong>
+                    <button type="button" class="btn btn-info btn-small" 
+                            onclick="toggleMarkingScheme('${itemId}')" 
+                            style="padding: 6px 12px; font-size: 0.85em;">
+                        👁️ 顯示/隱藏
+                    </button>
+                </div>
+                <div id="markingScheme_${itemId}" style="display: none; white-space: pre-wrap; line-height: 1.6; color: #333; margin-top: 10px;">
+${item.markingScheme}
+                </div>
+            </div>
+        ` : ''}
                 <strong>學員答案：</strong>
                 <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; margin-top: 8px; white-space: pre-wrap;">
                     ${answer.answer || '(未作答)'}
@@ -11305,6 +11340,14 @@ function renderGradingInterface(itemId, item, answer) {
     return html;
 }
 
+                // ==================== 切換 Marking Scheme 顯示 ====================
+function toggleMarkingScheme(itemId) {
+    const element = document.getElementById(`markingScheme_${itemId}`);
+    if (element) {
+        element.style.display = element.style.display === 'none' ? 'block' : 'none';
+    }
+}
+                
 // ==================== 提交批改結果 ====================
 async function submitQuizGrade() {
     if (!confirm('❓ 確定要提交批改結果嗎？')) {
