@@ -3835,7 +3835,9 @@ if (item.hasChecklist && item.checklist && item.checklist.length > 0) {
                     
                     <div class="item-card-header">
 <div class="item-card-title-section">
-<div class="item-card-name" style="font-size: 1.8em; font-weight: 900; color: ${item.nameColor || '#2c3e50'};
+    <div class="item-card-name" style="font-size: 1.8em; 
+                                       font-weight: 900; 
+                                       color: #2c3e50; 
                                        line-height: 1.3;
                                        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
                                        letter-spacing: 0.5px;
@@ -4411,41 +4413,6 @@ function showAddItemModal() {
             <label>📝 項目名稱</label>
             <input type="text" id="newItemName" placeholder="請輸入培訓項目名稱">
         </div>
-        <div class="input-group">
-    <label>🎨 名稱顏色</label>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;">
-        <label style="cursor: pointer;">
-            <input type="radio" name="itemColor" value="#333333" checked style="display: none;">
-            <div style="width: 40px; height: 40px; background: #333333; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="this.closest('label').querySelector('input').checked = true; this.style.borderColor='#ffa502'"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="itemColor" value="#ff4757" style="display: none;">
-            <div style="width: 40px; height: 40px; background: #ff4757; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="this.closest('label').querySelector('input').checked = true; this.style.borderColor='#ffa502'"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="itemColor" value="#2ed573" style="display: none;">
-            <div style="width: 40px; height: 40px; background: #2ed573; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="this.closest('label').querySelector('input').checked = true; this.style.borderColor='#ffa502'"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="itemColor" value="#1e90ff" style="display: none;">
-            <div style="width: 40px; height: 40px; background: #1e90ff; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="this.closest('label').querySelector('input').checked = true; this.style.borderColor='#ffa502'"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="itemColor" value="#ffa502" style="display: none;">
-            <div style="width: 40px; height: 40px; background: #ffa502; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="this.closest('label').querySelector('input').checked = true; this.style.borderColor='#ffa502'"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="itemColor" value="#8b5cf6" style="display: none;">
-            <div style="width: 40px; height: 40px; background: #8b5cf6; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="this.closest('label').querySelector('input').checked = true; this.style.borderColor='#ffa502'"></div>
-        </label>
-    </div>
-</div>
         ${currentTrainingType === 'PCA' ? `
         <div class="input-group">
             <label>👥 適用級別</label>
@@ -4722,7 +4689,6 @@ async function createTrainingItem() {
     let itemData = {
         categoryId: currentCategoryId,
         name: name,
-        nameColor: document.querySelector('input[name="itemColor"]:checked')?.value || '#333333',
         recordType: recordType,
         hasChecklist: true,
         checklist: checklistSteps,
@@ -5738,7 +5704,7 @@ if (item.recordType === 'training') {
                         <div class="training-record-row">
                             <div class="training-record-label">✍️ 新同事簽名：</div>
                            <div class="signature-box ${traineeSignature ? 'signed' : ''}"
-     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `('${item.docId}', ${index}, 'trainee', '${traineeSignature}')` : ''}">
+     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'trainee', '${traineeSignature}')` : ''}">
     ${traineeSignature || '點擊輸入簽名'}
 </div>
                         </div>
@@ -5746,7 +5712,7 @@ if (item.recordType === 'training') {
                         <div class="training-record-row">
                             <div class="training-record-label">✍️ 陪帶同事簽名：</div>
                             <div class="signature-box ${mentorSignature ? 'signed' : ''}"
-     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `('${item.docId}', ${index}, 'mentor', '${mentorSignature}')` : ''}">
+     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'mentor', '${mentorSignature}')` : ''}">
     ${mentorSignature || '點擊輸入簽名'}
 </div>
                         </div>
@@ -5754,7 +5720,7 @@ if (item.recordType === 'training') {
                         <div class="training-record-row">
                             <div class="training-record-label">✍️ Supervisor 簽名：</div>
                             <div class="signature-box ${supervisorSignature ? 'signed' : ''}"
-     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')` : ''}">
+     onclick="if(event) event.stopPropagation(); ${hasEditPermission || currentUser.role === 'supervisor' ? `editStepSignature('${item.docId}', ${index}, 'supervisor', '${supervisorSignature}')` : ''}">
     ${supervisorSignature || '點擊輸入簽名'}
 </div>
                         </div>
@@ -8780,17 +8746,7 @@ async function saveStepTrainingDate(itemId, stepIndex) {
 
 // ⭐⭐⭐ 編輯單一步驟的簽名（訓練記錄：支援 3 種簽名）⭐⭐⭐
 async function editStepSignature(itemId, stepIndex, type, currentValue) {
-    // ⭐⭐⭐ 根據類型決定驗證角色 ⭐⭐⭐
-    let verifyRole = 'staff';
-    if (type === 'supervisor') {
-        verifyRole = 'supervisor';
-    } else if (type === 'mentor') {
-        verifyRole = 'staff'; // 陪帶同事也是員工
-    } else {
-        verifyRole = 'staff'; // 新同事
-    }
-    
-    const signerName = await verifyUserBeforeSign(verifyRole).catch(() => null);
+    const signerName = await verifyUserBeforeSign().catch(() => null);
     if (!signerName) return; // 用戶取消
     saveStepSignature(itemId, stepIndex, type, signerName);
 }
@@ -9658,43 +9614,7 @@ function showAddQuizCategoryModal() {
                    placeholder="例如：手部衛生測驗"
                    style="width: 100%; padding: 14px; font-size: 1.1em; border: 2px solid #e0e0e0; border-radius: 8px;">
         </div>
-
-        <div class="form-section">
-    <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">🎨 名稱顏色</label>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px;">
-        <label style="cursor: pointer;">
-            <input type="radio" name="quizCategoryColor" value="#333333" checked style="display: none;">
-            <div class="color-option" style="width: 45px; height: 45px; background: #333333; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="selectQuizColor(this, '#333333')"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="quizCategoryColor" value="#ff4757" style="display: none;">
-            <div class="color-option" style="width: 45px; height: 45px; background: #ff4757; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="selectQuizColor(this, '#ff4757')"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="quizCategoryColor" value="#2ed573" style="display: none;">
-            <div class="color-option" style="width: 45px; height: 45px; background: #2ed573; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="selectQuizColor(this, '#2ed573')"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="quizCategoryColor" value="#1e90ff" style="display: none;">
-            <div class="color-option" style="width: 45px; height: 45px; background: #1e90ff; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="selectQuizColor(this, '#1e90ff')"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="quizCategoryColor" value="#ffa502" style="display: none;">
-            <div class="color-option" style="width: 45px; height: 45px; background: #ffa502; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="selectQuizColor(this, '#ffa502')"></div>
-        </label>
-        <label style="cursor: pointer;">
-            <input type="radio" name="quizCategoryColor" value="#8b5cf6" style="display: none;">
-            <div class="color-option" style="width: 45px; height: 45px; background: #8b5cf6; border-radius: 8px; border: 3px solid transparent;" 
-                 onclick="selectQuizColor(this, '#8b5cf6')"></div>
-        </label>
-    </div>
-</div>
-
+        
         <div class="form-section">
             <label style="font-size: 1.1em; font-weight: bold; margin-bottom: 10px; display: block;">Emoji 圖示</label>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
@@ -9752,17 +9672,6 @@ function selectQuizEmoji(emoji) {
     event.target.classList.add('selected');
 }
 
-        // ==================== 選擇 Quiz 分類顏色 ====================
-function selectQuizColor(element, color) {
-    // 清除所有選中狀態
-    document.querySelectorAll('.color-option').forEach(opt => {
-        opt.style.borderColor = 'transparent';
-    });
-    // 設定當前選中
-    element.style.borderColor = '#ffa502';
-    document.querySelector(`input[name="quizCategoryColor"][value="${color}"]`).checked = true;
-}
-        
 // ==================== 儲存新測驗分類 ====================
 async function saveNewQuizCategory() {
     const name = document.getElementById('newQuizCategoryName').value.trim();
@@ -9784,7 +9693,6 @@ async function saveNewQuizCategory() {
         await db.collection('quizCategories').add({
             name: name,
             emoji: emoji,
-            nameColor: document.querySelector('input[name="quizCategoryColor"]:checked')?.value || '#333333',
             passingScore: passingScore,
             order: order,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -10044,7 +9952,7 @@ if (currentUser.role === 'staff') {
             cardsHtml += `
                 <div class="training-card ${quizStatusClass}" onclick="viewQuizCategory('${doc.id}')">
                     <div class="card-icon">${category.emoji}</div>
-                    <div class="card-title" style="color: ${category.nameColor || '#333333'};">${category.name}</div>
+                    <div class="card-title">${category.name}</div>
                     <div class="card-progress">
                         <svg class="progress-ring" width="150" height="150" viewBox="0 0 150 150">
                             <circle class="progress-ring-bg" cx="75" cy="75" r="60" 
@@ -10258,26 +10166,7 @@ function showAddQuizItemModal() {
             </div>
             <button type="button" class="btn btn-info btn-small" onclick="addSortItem()">➕ 新增項目</button>
         </div>
-
-        <div class="form-section" id="markingSchemeSection" style="display: none;">
-    <label>📋 Marking Scheme (評分標準)</label>
-    <textarea id="markingSchemeInput" rows="4" 
-              placeholder="例如：&#10;- 必須包含「五個時機」關鍵字 (5分)&#10;- 順序正確 (3分)&#10;- 詳細說明 (2分)"></textarea>
-</div>
-
-<script>
-// 根據題目類型顯示/隱藏 Marking Scheme
-function updateQuizItemTypeOptions() {
-    const type = document.getElementById('quizItemType').value;
-    
-    document.getElementById('choiceOptions').style.display = type === 'choice' ? 'block' : 'none';
-    document.getElementById('sortOptions').style.display = type === 'sort' ? 'block' : 'none';
-    
-    // ⭐ 新增：只有填充題才顯示 Marking Scheme
-    document.getElementById('markingSchemeSection').style.display = type === 'fill' ? 'block' : 'none';
-}
-</script>
-    
+        
         <div class="form-section">
             <label>分數</label>
             <input type="number" id="quizItemScore" min="1" value="10" placeholder="10">
@@ -10338,7 +10227,6 @@ async function saveNewQuizItem() {
         type: type,
         score: score,
         order: order,
-    markingScheme: type === 'fill' ? (document.getElementById('markingSchemeInput')?.value.trim() || '') : '',
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: currentUser.docId
     };
@@ -11233,21 +11121,6 @@ function renderGradingInterface(itemId, item, answer) {
     if (answer.type === 'fill') {
         html += `
             <div style="margin-bottom: 15px;">
-                ${item.markingScheme ? `
-            <div style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <strong style="color: #1976d2; font-size: 1.1em;">📋 Marking Scheme (評分標準)</strong>
-                    <button type="button" class="btn btn-info btn-small" 
-                            onclick="toggleMarkingScheme('${itemId}')" 
-                            style="padding: 6px 12px; font-size: 0.85em;">
-                        👁️ 顯示/隱藏
-                    </button>
-                </div>
-                <div id="markingScheme_${itemId}" style="display: none; white-space: pre-wrap; line-height: 1.6; color: #333; margin-top: 10px;">
-${item.markingScheme}
-                </div>
-            </div>
-        ` : ''}
                 <strong>學員答案：</strong>
                 <div style="padding: 12px; background: #f8f9fa; border-radius: 8px; margin-top: 8px; white-space: pre-wrap;">
                     ${answer.answer || '(未作答)'}
@@ -11340,14 +11213,6 @@ ${item.markingScheme}
     return html;
 }
 
-                // ==================== 切換 Marking Scheme 顯示 ====================
-function toggleMarkingScheme(itemId) {
-    const element = document.getElementById(`markingScheme_${itemId}`);
-    if (element) {
-        element.style.display = element.style.display === 'none' ? 'block' : 'none';
-    }
-}
-                
 // ==================== 提交批改結果 ====================
 async function submitQuizGrade() {
     if (!confirm('❓ 確定要提交批改結果嗎？')) {
