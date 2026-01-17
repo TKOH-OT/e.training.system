@@ -193,7 +193,7 @@
             box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
         }
 
-        .menu-card . {
+        .menu-card .emoji {
             font-size: 3em;
             margin-bottom: 10px;
         }
@@ -946,7 +946,7 @@
             border-left: 4px solid #ffa502;
         }
 
-        .-picker {
+        .emoji-picker {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             gap: 10px;
@@ -955,7 +955,7 @@
             overflow-y: auto;
         }
 
-        .-option {
+        .emoji-option {
             font-size: 2em;
             padding: 10px;
             border: 2px solid #e0e0e0;
@@ -965,12 +965,12 @@
             transition: all 0.3s;
         }
 
-        .-option:hover {
+        .emoji-option:hover {
             border-color: #ffa502;
             transform: scale(1.1);
         }
 
-        .-option.selected {
+        .emoji-option.selected {
             border-color: #ffa502;
             background: #f0f4ff;
         }
@@ -1113,7 +1113,7 @@
             box-shadow: 0 10px 30px rgba(255, 165, 2, 0.5);
         }
 
-        .type-card . {
+        .type-card .emoji {
             font-size: 4em;
             margin-bottom: 15px;
         }
@@ -2147,7 +2147,7 @@
         padding: 20px;
     }
 
-    .menu-card . {
+    .menu-card .emoji {
         font-size: 2.5em;
     }
 
@@ -2396,8 +2396,8 @@
         width: 100%;
     }
 
-    /*  選擇器 */
-    .-picker {
+    /* Emoji 選擇器 */
+    .emoji-picker {
         grid-template-columns: repeat(5, 1fr);
     }
 
@@ -2433,7 +2433,7 @@
         padding: 15px;
     }
 
-    .menu-card . {
+    .menu-card .emoji {
         font-size: 2em;
     }
 
@@ -2451,7 +2451,7 @@
         font-size: 1.1em !important;
     }
 
-    .-picker {
+    .emoji-picker {
         grid-template-columns: repeat(4, 1fr);
     }
 }
@@ -2648,11 +2648,11 @@
             </div>
             <div class="training-type-selector">
                 <div class="type-card" onclick="selectTrainingType('PCA')">
-                    <div class="">🧑🏻</div>
+                    <div class="emoji">🧑🏻</div>
                     <div class="title">PCA 培訓</div>
                 </div>
                 <div class="type-card" onclick="selectTrainingType('OTA')">
-                    <div class="">💉</div>
+                    <div class="emoji">💉</div>
                     <div class="title">OTA 培訓</div>
                 </div>
             </div>
@@ -2695,19 +2695,19 @@
             </div>
             <div class="menu-grid">
                 <div class="menu-card level-PCA1" onclick="showStaffList('PCA1')">
-                    <div class="">🙋🏻</div>
+                    <div class="emoji">🙋🏻</div>
                     <div class="title">PCA1</div>
                 </div>
                 <div class="menu-card level-PCA2" onclick="showStaffList('PCA2')">
-                    <div class="">🙋🏻‍♂️</div>
+                    <div class="emoji">🙋🏻‍♂️</div>
                     <div class="title">PCA2</div>
                 </div>
                 <div class="menu-card level-PCA3" onclick="showStaffList('PCA3')">
-                    <div class="">🙋🏻‍♀️</div>
+                    <div class="emoji">🙋🏻‍♀️</div>
                     <div class="title">PCA3</div>
                 </div>
                 <div class="menu-card level-OTA" onclick="showStaffList('OTA')">
-                    <div class="">💉</div>
+                    <div class="emoji">💉</div>
                     <div class="title">OTA</div>
                 </div>
             </div>
@@ -3105,7 +3105,7 @@
         let currentCategoryId = '';
         let currentTrainingType = ''; // 'PCA' 或 'OTA'
         let currentZoomLevel = 1.0; // ⭐ 縮放級別
-        let selected = '📚';
+        let selectedEmoji = '📚';
         let selectedNameColor = '#333333'; // ⭐⭐⭐ 新增：預設黑色 ⭐⭐⭐
         let systemInitialized = false;
         let checklistSteps = [];
@@ -3167,7 +3167,7 @@ function canEditTrainingRecord(categoryName, targetStaffLevel) {
             '🧼', '🧹', '🧽', '🧴', '🧪', '🧫', '🩸', '💉', '🔬', '🔭',
             '🏥', '🏨', '🏢', '🏛️', '🏗️', '🏭', '🏬', '🏪', '🏩', '🏦',
             '🔍', '🔎', '📡', '📻', '📺', '📹', '📷', '📸', '🎬', '🎤',
-            '🔥', '💧', '🌊', '❄️', '☀️', '🌙', '🤖', '🧽', '🗄️', '✔️',
+            '🔥', '💧', '🌊', '❄️', '☀️', '🌙', '🤖', '🧽', '🗄️', '✔️', 
             '🐉'
         ];
 
