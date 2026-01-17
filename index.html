@@ -3229,16 +3229,18 @@ async function initializeSystem() {
 // ==================== 🔐 簽名前帳號驗證機制（新增角色參數） ====================
 async function verifyUserBeforeSign(role = 'staff') {
     return new Promise((resolve, reject) => {
-        // ⭐⭐⭐ 根據角色顯示不同標題 ⭐⭐⭐
         let title = '';
         let description = '';
         
         if (role === 'staff') {
             title = '🔐 員工簽名登入驗證';
             description = '請輸入【受訓員工】的帳號密碼進行簽名';
+        } else if (role === 'mentor') { // ⭐⭐⭐ 新增：陪帶同事 ⭐⭐⭐
+            title = '🔐 陪帶同事簽名登入驗證';
+            description = '請輸入【陪帶同事】的帳號密碼進行簽名';
         } else if (role === 'supervisor') {
             title = '🔐 主管簽名登入驗證';
-            description = '請輸入【評核主管】的帳號密碼進行簽名';
+            description = '請輸入【Supervisor】的帳號密碼進行簽名';
         } else {
             title = '🔐 簽名登入驗證';
             description = '請輸入帳號密碼進行簽名';
@@ -3263,11 +3265,9 @@ async function verifyUserBeforeSign(role = 'staff') {
         `;
         showModal(title, modalBody);
 
-        // 🌍 用 global 暫存 resolve/reject，方便其他函數取用
         window.signatureLoginResolve = resolve;
         window.signatureLoginReject = reject;
         
-        // ⭐ 自動聚焦帳號輸入框
         setTimeout(() => {
             document.getElementById('signLoginId')?.focus();
         }, 100);
