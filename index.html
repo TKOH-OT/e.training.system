@@ -5901,6 +5901,45 @@ if (item.recordType === 'training') {
             </div>
         `;
     }
+
+    // ⭐⭐⭐ 新增：訓練記錄的總評語區域 ⭐⭐⭐
+const overallComment = currentRecord?.overallComment || '';
+let overallCommentHtml = '';
+
+if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+    // 主管可編輯
+    overallCommentHtml = `
+        <div class="overall-comment-section">
+            <div class="overall-comment-header">
+                💬 總評語（主管填寫）
+            </div>
+            <textarea 
+                id="trainingOverallComment_${item.docId}" 
+                class="overall-comment-textarea"
+                placeholder="請在此輸入對整個訓練的總評語..."
+                onclick="event.stopPropagation()"
+                onchange="saveTrainingOverallComment('${item.docId}')"
+            >${overallComment}</textarea>
+            <div style="margin-top: 10px; color: #666; font-size: 0.9em; text-align: right;">
+                💡 評語會自動儲存
+            </div>
+        </div>
+    `;
+} else if (overallComment) {
+    // 員工只能查看
+    overallCommentHtml = `
+        <div class="overall-comment-section">
+            <div class="overall-comment-header">
+                💬 主管總評語
+            </div>
+            <div class="overall-comment-display">
+                ${overallComment}
+            </div>
+        </div>
+    `;
+}
+
+stepsHtml += overallCommentHtml;
     
     // ⭐⭐⭐ 生成卡片 HTML ⭐⭐⭐
     const circumference = 2 * Math.PI * 50;
@@ -6574,33 +6613,40 @@ async function saveRemark(itemId, stepIndex) {
             }
         }
 
-        // ⭐⭐⭐ 新增：儲存總評語 ⭐⭐⭐
-async function saveOverallComment(itemId) {
-    const commentText = document.getElementById(`overallComment_${itemId}`).value;
+// ⭐⭐⭐ 新增：儲存訓練記錄的總評語 ⭐⭐⭐
+async function saveTrainingOverallComment(itemId) {
+    const commentText = document.getElementById(`trainingOverallComment_${itemId}`).value;
 
     try {
-        const recordsSnapshot = await db.collection('trainingRecords')
+        // ⭐ 訓練記錄可能是 pending 或 completed 狀態
+        let recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
             .where('status', '==', 'pending')
             .limit(1)
             .get();
 
-        const recordData = {
-            userId: currentStaffId,
-            itemId: itemId,
-            overallComment: commentText,
-            status: 'pending',
-            commentUpdatedBy: currentUser.docId,
-            commentUpdatedAt: new Date().toISOString()
-        };
+        // 如果沒有 pending 記錄，查詢最新的 completed 記錄
+        if (recordsSnapshot.empty) {
+            recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'completed')
+                .orderBy('completedAt', 'desc')
+                .limit(1)
+                .get();
+        }
 
         if (recordsSnapshot.empty) {
-            // 如果沒有記錄，創建新記錄
+            // 如果完全沒有記錄，創建新的 pending 記錄
             await db.collection('trainingRecords').add({
-                ...recordData,
-                checklistStatus: {},
-                remarks: {},
+                userId: currentStaffId,
+                itemId: itemId,
+                status: 'pending',
+                stepRecords: {},
+                overallComment: commentText,
+                commentUpdatedBy: currentUser.docId,
+                commentUpdatedAt: new Date().toISOString(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
         } else {
@@ -8599,13 +8645,14 @@ async function markTrainingComplete(itemId) {
 
             const trainingCount = allCompletedRecords.size + 1; // 當前這次是第幾次
 
-            // ⭐⭐⭐ 修復：建立新的 completed 記錄，保留 pending ⭐⭐⭐
+// ⭐⭐⭐ 修復：建立新的 completed 記錄，保留 pending ⭐⭐⭐
 const newRecordData = {
     userId: currentStaffId,
     itemId: itemId,
     status: 'completed',
     isPassed: true,
     stepRecords: record.stepRecords, // ⭐ 保留步驟記錄
+    overallComment: record.overallComment || '', // ⭐⭐⭐ 新增：保留總評語 ⭐⭐⭐
     completedAt: firebase.firestore.FieldValue.serverTimestamp(),
     completedBy: currentUser.name,
     participants: participants,
@@ -8854,6 +8901,16 @@ async function viewTrainingRecordDetail(recordId, itemId) {
                         ${record.completedAt ? new Date(record.completedAt.toDate()).toLocaleString('zh-TW') : '未知'}
                     </div>
                 </div>
+                    ${record.overallComment ? `
+        <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
+            <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
+                <strong>💬 主管總評語：</strong><br>
+                <div style="margin-top: 10px; padding: 15px; background: rgba(255,255,255,0.5); border-radius: 8px; white-space: pre-wrap; line-height: 1.6;">
+                    ${record.overallComment}
+                </div>
+            </div>
+        </div>
+    ` : ''}
             </div>
         `;
         
