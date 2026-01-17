@@ -2579,6 +2579,55 @@
     box-shadow: 0 0 10px rgba(255, 165, 2, 0.5);
 }
 }        
+
+        /* ⭐⭐⭐ 總評語欄樣式 ⭐⭐⭐ */
+.overall-comment-section {
+    background: #fffbf0;
+    border: 2px solid #ffa502;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 25px;
+    box-shadow: 0 3px 10px rgba(255, 165, 2, 0.15);
+}
+
+.overall-comment-header {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #ffa502;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.overall-comment-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+    font-family: inherit;
+    resize: vertical;
+    transition: all 0.3s;
+}
+
+.overall-comment-textarea:focus {
+    outline: none;
+    border-color: #ffa502;
+    box-shadow: 0 0 0 3px rgba(255, 165, 2, 0.1);
+}
+
+.overall-comment-display {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #ffa502;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    color: #333;
+}
+}
     </style>
 </head>
 <body>
@@ -6062,6 +6111,43 @@ itemsHtml.push(`
                     `;
                 }).join('');
 
+                // ⭐⭐⭐ 新增：總評語區域（只有主管可編輯）⭐⭐⭐
+const overallComment = record?.overallComment || '';
+let overallCommentHtml = '';
+
+if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+    // 主管可編輯
+    overallCommentHtml = `
+        <div class="overall-comment-section">
+            <div class="overall-comment-header">
+                💬 總評語（主管填寫）
+            </div>
+            <textarea 
+                id="overallComment_${item.docId}" 
+                class="overall-comment-textarea"
+                placeholder="請在此輸入對整個評核的總評語..."
+                onclick="event.stopPropagation()"
+                onchange="saveOverallComment('${item.docId}')"
+            >${overallComment}</textarea>
+            <div style="margin-top: 10px; color: #666; font-size: 0.9em; text-align: right;">
+                💡 評語會自動儲存
+            </div>
+        </div>
+    `;
+} else if (overallComment) {
+    // 員工只能查看
+    overallCommentHtml = `
+        <div class="overall-comment-section">
+            <div class="overall-comment-header">
+                💬 主管總評語
+            </div>
+            <div class="overall-comment-display">
+                ${overallComment}
+            </div>
+        </div>
+    `;
+}
+                
                 // ⭐⭐⭐ 關鍵修正：根據 record 的 status 決定卡片狀態 ⭐⭐⭐
                 let overallStatus = '';
                 let overallClass = '';
@@ -6186,7 +6272,10 @@ itemsHtml.push(`
                                 <div class="checklist-header">📋 評核步驟 Checklist</div>
                                 ${checklistHtml}
                             </div>
-                            
+
+                            <!-- ⭐⭐⭐ 新增：總評語區域 ⭐⭐⭐ -->
+            ${overallCommentHtml}
+            
                             ${record?.status === 'completed' && record?.evaluationSignatures ? `
                                 <div class="training-record-container" style="margin-top: 25px;">
                                     <div class="training-record-header">✍️ 評核簽名記錄</div>
@@ -6484,7 +6573,52 @@ async function saveRemark(itemId, stepIndex) {
                 showToast('❌ 儲存失敗', 'error');
             }
         }
-    
+
+        // ⭐⭐⭐ 新增：儲存總評語 ⭐⭐⭐
+async function saveOverallComment(itemId) {
+    const commentText = document.getElementById(`overallComment_${itemId}`).value;
+
+    try {
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+
+        const recordData = {
+            userId: currentStaffId,
+            itemId: itemId,
+            overallComment: commentText,
+            status: 'pending',
+            commentUpdatedBy: currentUser.docId,
+            commentUpdatedAt: new Date().toISOString()
+        };
+
+        if (recordsSnapshot.empty) {
+            // 如果沒有記錄，創建新記錄
+            await db.collection('trainingRecords').add({
+                ...recordData,
+                checklistStatus: {},
+                remarks: {},
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            // 更新現有記錄
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
+                overallComment: commentText,
+                commentUpdatedBy: currentUser.docId,
+                commentUpdatedAt: new Date().toISOString()
+            });
+        }
+
+        showToast('✅ 總評語已儲存', 'success');
+    } catch (error) {
+        console.error('儲存總評語失敗:', error);
+        showToast('❌ 儲存失敗', 'error');
+    }
+}
+        
 // ==================== 標記評核完成（修正 Critical 判斷）====================
 async function markItemComplete(itemId) {
     try {
