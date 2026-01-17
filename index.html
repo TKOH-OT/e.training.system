@@ -8853,8 +8853,19 @@ async function saveStepTrainingDate(itemId, stepIndex) {
 
 // ⭐⭐⭐ 編輯單一步驟的簽名（訓練記錄：支援 3 種簽名）⭐⭐⭐
 async function editStepSignature(itemId, stepIndex, type, currentValue) {
-    const signerName = await verifyUserBeforeSign().catch(() => null);
-    if (!signerName) return; // 用戶取消
+    // ⭐⭐⭐ 關鍵修復：根據 type 傳遞正確角色 ⭐⭐⭐
+    let role = 'staff'; // 預設
+    
+    if (type === 'trainee') {
+        role = 'staff'; // 新同事 = 受訓員工
+    } else if (type === 'mentor') {
+        role = 'mentor'; // ⭐ 新增：陪帶同事
+    } else if (type === 'supervisor') {
+        role = 'supervisor'; // Supervisor
+    }
+    
+    const signerName = await verifyUserBeforeSign(role).catch(() => null);
+    if (!signerName) return;
     saveStepSignature(itemId, stepIndex, type, signerName);
 }
 
