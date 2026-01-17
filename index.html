@@ -6691,17 +6691,21 @@ if (!supervisorName) return;
             
             const signedAt = new Date().toISOString();
 
-            const newRecordData = {
-                userId: currentStaffId,
-                itemId: itemId,
-                categoryId: item.categoryId,
-                status: 'completed',
-                isPassed: isPassed,  // ⭐ 這裡會根據 Critical 步驟自動判斷
-                completionRate: completionRate,
-                hasCriticalFailed: hasCriticalFailed,
-                checklistStatus: checklistStatus,
-                remarks: record.remarks || {},
-                failureCount: record.failureCount || {},
+            // ⭐⭐⭐ 讀取總評語 ⭐⭐⭐
+const overallComment = record.overallComment || '';
+
+const newRecordData = {
+    userId: currentStaffId,
+    itemId: itemId,
+    categoryId: item.categoryId,
+    status: 'completed',
+    isPassed: isPassed,
+    completionRate: completionRate,
+    hasCriticalFailed: hasCriticalFailed,
+    checklistStatus: checklistStatus,
+    remarks: record.remarks || {},
+    overallComment: overallComment, // ⭐⭐⭐ 新增這一行 ⭐⭐⭐
+    failureCount: record.failureCount || {},
                 evaluationSignatures: {
                     staff: staffName,
                     supervisor: supervisorName,
@@ -7010,6 +7014,9 @@ async function viewEvaluationResultDetail(recordId, itemId) {
         const checklistStatus = record.checklistStatus || {};
         const remarks = record.remarks || {};
         
+        // ⭐⭐⭐ 新增：讀取總評語 ⭐⭐⭐
+        const overallComment = record.overallComment || '';
+        
         // 計算數據
         const actualSteps = item.checklist.filter(s => !s.isSubtitle);
         let passedSteps = 0;
@@ -7021,32 +7028,32 @@ async function viewEvaluationResultDetail(recordId, itemId) {
         
         const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
         
-        // ⭐⭐⭐ 修復 Bug 1: 正確讀取合格狀態 ⭐⭐⭐
         let isPassed = false;
         if (record.isPassed === true) {
             isPassed = true;
         } else if (record.isPassed === false) {
             isPassed = false;
         } else {
-            // 舊數據兼容
             isPassed = completionRate === 100;
         }
         
         const attemptCount = record.attemptNumber || 1;
         const totalFailCount = record.totalFailCount || 0;
         
-        // 更新標題
         const evalDate = record.evaluatedAt ? 
             new Date(record.evaluatedAt).toLocaleDateString('zh-TW') : 
             '未知日期';
         document.getElementById('evalRecordDetailTitle').textContent = 
             `📋 評核記錄 - ${evalDate}`;
         
-        // ⭐⭐⭐ 結果摘要樣式（參考 Quiz）⭐⭐⭐
+        // ⭐⭐⭐ 檢查是否為補登記錄 ⭐⭐⭐
+        const isBackdated = record.isBackdated || false;
+        
         let resultHtml = `
             <div class="quiz-result-summary ${isPassed ? 'passed' : 'failed'}">
                 <div style="font-size: 1.8em; margin-bottom: 15px;">
                     ${isPassed ? '🎉 評核合格！' : '💪 評核不合格'}
+                    ${isBackdated ? '<div style="font-size: 0.6em; margin-top: 10px;">📝 此為補登記錄</div>' : ''}
                 </div>
                 <div class="quiz-score-display">${completionRate}%</div>
                 <div style="font-size: 1.3em; margin: 15px 0;">
@@ -7060,6 +7067,23 @@ async function viewEvaluationResultDetail(recordId, itemId) {
                         📊 累計不合格次數：${totalFailCount} 次
                     </div>
                 ` : ''}
+                
+                ${isBackdated && record.backdateInfo ? `
+                    <div style="margin-top: 25px; padding: 20px; background: rgba(30, 144, 255, 0.2); border-radius: 10px; border: 2px dashed rgba(255,255,255,0.5);">
+                        <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
+                            <strong>📝 補登記錄資訊：</strong><br>
+                            📅 實際完成日期：${record.backdateInfo.actualDate}<br>
+                            👤 實際完成者：${record.backdateInfo.completedBy}<br>
+                            🔄 補登者：${record.backdateInfo.enteredByName || '未知'}<br>
+                            🕐 補登時間：${new Date(record.backdateInfo.enteredAt).toLocaleString('zh-TW')}<br><br>
+                            <strong>💬 備註：</strong><br>
+                            <div style="margin-top: 8px; padding: 10px; background: rgba(255,255,255,0.8); border-radius: 6px; white-space: pre-wrap;">
+                                ${record.backdateInfo.remark}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                
                 ${record.evaluationSignatures ? `
                     <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
                         <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
@@ -7070,10 +7094,20 @@ async function viewEvaluationResultDetail(recordId, itemId) {
                         </div>
                     </div>
                 ` : ''}
+                
+                ${overallComment ? `
+                    <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
+                        <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
+                            <strong>💬 主管總評語：</strong><br>
+                            <div style="margin-top: 10px; padding: 15px; background: rgba(255,255,255,0.5); border-radius: 8px; white-space: pre-wrap; line-height: 1.6;">
+                                ${overallComment}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
         
-        // ⭐⭐⭐ 顯示每個步驟的詳細結果 ⭐⭐⭐
         let stepCounter = 0;
         item.checklist.forEach((step, index) => {
             if (step.isSubtitle) {
