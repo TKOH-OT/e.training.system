@@ -299,19 +299,36 @@
             50% { opacity: 0.7; }
         }
 
-        /* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
+       /* ⭐⭐⭐ 評核不合格狀態 ⭐⭐⭐ */
 .item-card.eval-failed {
-    background: linear-gradient(135deg,  0%, #e84118 100%) !important;
-    color: white !important;
+    background: linear-gradient(135deg, #ff4757 0%, #e84118 100%) !important;
+    border: 3px solid #ff4757 !important;
     animation: pulseRed 2s infinite;
 }
 
-.item-card.eval-failed .card-title,
-.item-card.eval-failed .card-stats,
-.item-card.eval-failed .progress-percent,
-.item-card.eval-failed .progress-label,
+.item-card.eval-failed .card-title {
+    color: #1a1a1a !important;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+}
+
+.item-card.eval-failed .card-stats {
+    color: #2c3e50 !important;
+    font-weight: bold;
+}
+
+.item-card.eval-failed .progress-percent {
+    color: #1a1a1a !important;
+    text-shadow: 0 0 3px rgba(255,255,255,0.8);
+}
+
+.item-card.eval-failed .progress-label {
+    color: #2c3e50 !important;
+}
+
 .item-card.eval-failed .item-card-name {
-    color: white !important;
+    color: #1a1a1a !important;
+    text-shadow: 2px 2px 4px rgba(255,255,255,0.9);
+    font-weight: 900;
 }
 
 .item-card.eval-failed .progress-ring-circle {
