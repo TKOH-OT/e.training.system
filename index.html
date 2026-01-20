@@ -6162,12 +6162,12 @@ if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
                 💬 總評語（主管填寫）
             </div>
             <textarea 
-                id="overallComment_${item.docId}" 
-                class="overall-comment-textarea"
-                placeholder="請在此輸入對整個評核的總評語..."
-                onclick="event.stopPropagation()"
-                onchange="saveOverallComment('${item.docId}')"
-            >${overallComment}</textarea>
+    id="overallComment_${itemId}" 
+    class="overall-comment-textarea"
+    placeholder="請在此輸入對整個評核的總評語..."
+    onclick="event.stopPropagation()"
+    onblur="saveOverallComment('${itemId}')"
+>${overallComment}</textarea>
             <div style="margin-top: 10px; color: #666; font-size: 0.9em; text-align: right;">
                 💡 評語會自動儲存
             </div>
