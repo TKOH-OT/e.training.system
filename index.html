@@ -6166,7 +6166,7 @@ if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
                 class="overall-comment-textarea"
                 placeholder="請在此輸入對整個評核的總評語..."
                 onclick="event.stopPropagation()"
-                onblur="saveOverallComment('${item.docId}')"
+                onchange="saveOverallComment('${item.docId}')"
             >${overallComment}</textarea>
             <div style="margin-top: 10px; color: #666; font-size: 0.9em; text-align: right;">
                 💡 評語會自動儲存
