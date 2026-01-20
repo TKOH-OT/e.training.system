@@ -5914,18 +5914,18 @@ if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
                 💬 總評語（主管填寫）
             </div>
             <textarea 
-                id="trainingOverallComment_${item.docId}" 
+                id="overallComment_${item.docId}" 
                 class="overall-comment-textarea"
-                placeholder="請在此輸入對整個訓練的總評語..."
+                placeholder="請在此輸入對整個評核的總評語..."
                 onclick="event.stopPropagation()"
-                onchange="saveTrainingOverallComment('${item.docId}')"
-            >${overallComment}</textarea>
+                onchange="saveOverallComment('${item.docId}')"
+            >${checklistOverallComment}</textarea>
             <div style="margin-top: 10px; color: #666; font-size: 0.9em; text-align: right;">
                 💡 評語會自動儲存
             </div>
         </div>
     `;
-} else if (overallComment) {
+} else if (checklistOverallComment) {
     // 員工只能查看
     overallCommentHtml = `
         <div class="overall-comment-section">
@@ -5933,7 +5933,7 @@ if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
                 💬 主管總評語
             </div>
             <div class="overall-comment-display">
-                ${overallComment}
+                ${checklistOverallComment}
             </div>
         </div>
     `;
@@ -6150,8 +6150,8 @@ itemsHtml.push(`
                     `;
                 }).join('');
 
-                // ⭐⭐⭐ 新增：總評語區域（只有主管可編輯）⭐⭐⭐
-const overallComment = record?.overallComment || '';
+// ⭐⭐⭐ 修復：在 Checklist 區塊重新定義 overallComment ⭐⭐⭐
+const checklistOverallComment = record?.overallComment || '';
 let overallCommentHtml = '';
 
 if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
