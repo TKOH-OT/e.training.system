@@ -12242,6 +12242,59 @@ function hideZoomControls() {
     }
 }
 
+        // ⭐⭐⭐ 新增：儲存評核步驟的總評語 ⭐⭐⭐
+async function saveOverallComment(itemId) {
+    const commentText = document.getElementById(`overallComment_${itemId}`).value;
+
+    try {
+        // ⭐ 評核記錄可能是 pending 或 completed 狀態
+        let recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+
+        // 如果沒有 pending 記錄，查詢最新的 completed 記錄
+        if (recordsSnapshot.empty) {
+            recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentStaffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'completed')
+                .orderBy('completedAt', 'desc')
+                .limit(1)
+                .get();
+        }
+
+        if (recordsSnapshot.empty) {
+            // 如果完全沒有記錄，創建新的 pending 記錄
+            await db.collection('trainingRecords').add({
+                userId: currentStaffId,
+                itemId: itemId,
+                status: 'pending',
+                checklistStatus: {},
+                remarks: {},
+                overallComment: commentText,
+                commentUpdatedBy: currentUser.docId,
+                commentUpdatedAt: new Date().toISOString(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } else {
+            // 更新現有記錄
+            await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update({
+                overallComment: commentText,
+                commentUpdatedBy: currentUser.docId,
+                commentUpdatedAt: new Date().toISOString()
+            });
+        }
+
+        showToast('✅ 總評語已儲存', 'success');
+    } catch (error) {
+        console.error('儲存總評語失敗:', error);
+        showToast('❌ 儲存失敗', 'error');
+    }
+}
+        
         // ==================== Quiz 測驗密碼保護 ====================
 async function promptQuizPassword(categoryId, action) {
     closeModal();
