@@ -5796,28 +5796,34 @@ if (item.recordType === 'training') {
         }
     }
     
-    let isCompleted = false;
+ let isCompleted = false;
 
-    if (currentRecord && currentRecord.status === 'completed') {
-        completedSteps = totalSteps;
-        isCompleted = true;
-    } else if (currentRecord && currentRecord.stepRecords) {
-        const stepRecords = currentRecord.stepRecords || {};
-        
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle) {
-                const stepRecord = stepRecords[index];
-                if (stepRecord?.trainingDate && 
-                    stepRecord?.traineeSignature && 
-                    stepRecord?.mentorSignature &&
-                    stepRecord?.supervisorSignature) {
-                    completedSteps++;
-                }
+// ⭐⭐⭐ 關鍵修復：無論 status 如何，都要計算實際完成步驟數 ⭐⭐⭐
+if (currentRecord && currentRecord.stepRecords) {
+    const stepRecords = currentRecord.stepRecords || {};
+    
+    item.checklist.forEach((step, index) => {
+        if (!step.isSubtitle) {
+            const stepRecord = stepRecords[index];
+            if (stepRecord?.trainingDate && 
+                stepRecord?.traineeSignature && 
+                stepRecord?.mentorSignature &&
+                stepRecord?.supervisorSignature) {
+                completedSteps++;
             }
-        });
-        
-        isCompleted = (completedSteps === totalSteps);
-    }
+        }
+    });
+}
+
+// ⭐⭐⭐ 判斷完成狀態：優先檢查 status，但仍驗證步驟完成度 ⭐⭐⭐
+if (currentRecord && currentRecord.status === 'completed') {
+    // 已標記完成：直接設為完成（信任標記）
+    isCompleted = true;
+    completedSteps = totalSteps; // 強制顯示 100%
+} else if (completedSteps === totalSteps) {
+    // 所有步驟都完成了（但未標記完成）
+    isCompleted = false; // 不顯示為完成，需要主管標記
+}
 
     const completionRate = Math.round((completedSteps / totalSteps) * 100);
     
