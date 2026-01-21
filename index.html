@@ -5732,26 +5732,30 @@ async function showCategoryEvaluation(categoryId) {
             recordsByItem[itemId].push({ docId: doc.id, ...record });
         });
 
-        // ⭐⭐⭐ 智能選擇：優先 pending，否則取最新 completed ⭐⭐⭐
-        Object.keys(recordsByItem).forEach(itemId => {
-            const itemRecords = recordsByItem[itemId];
-            
-            const pendingRecord = itemRecords.find(r => r.status === 'pending');
-            
-            if (pendingRecord) {
-                records[itemId] = pendingRecord;
-            } else {
-                const completedRecords = itemRecords.filter(r => r.status === 'completed');
-                if (completedRecords.length > 0) {
-                    completedRecords.sort((a, b) => {
-                        const timeA = a.completedAt?.toDate?.() || new Date(0);
-                        const timeB = b.completedAt?.toDate?.() || new Date(0);
-                        return timeB - timeA;
-                    });
-                    records[itemId] = completedRecords[0];
-                }
-            }
+ // ⭐⭐⭐ 修正：標記完成後，應該刪除 pending 記錄，只保留 completed ⭐⭐⭐
+const records = {};
+Object.keys(recordsByItem).forEach(itemId => {
+    const itemRecords = recordsByItem[itemId];
+    
+    // ⭐ 優先取最新的 completed 記錄
+    const completedRecords = itemRecords.filter(r => r.status === 'completed');
+    
+    if (completedRecords.length > 0) {
+        // 有完成記錄：按時間排序，取最新
+        completedRecords.sort((a, b) => {
+            const timeA = a.completedAt?.toDate?.() || new Date(0);
+            const timeB = b.completedAt?.toDate?.() || new Date(0);
+            return timeB - timeA;
         });
+        records[itemId] = completedRecords[0];
+    } else {
+        // 沒有完成記錄：才取 pending
+        const pendingRecord = itemRecords.find(r => r.status === 'pending');
+        if (pendingRecord) {
+            records[itemId] = pendingRecord;
+        }
+    }
+});
 
         const itemsHtml = [];
 
