@@ -5733,7 +5733,6 @@ async function showCategoryEvaluation(categoryId) {
         });
 
  // ⭐⭐⭐ 修正：標記完成後，應該刪除 pending 記錄，只保留 completed ⭐⭐⭐
-const records = {};
 Object.keys(recordsByItem).forEach(itemId => {
     const itemRecords = recordsByItem[itemId];
     
