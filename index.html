@@ -12136,7 +12136,7 @@ async function viewQuizResult(recordId, fromSource = 'staff') {
                                 ${answer.remark && answer.remark.trim() ? `
                                     <div style="margin-top: 12px; padding: 10px; background: white; border-left: 4px solid #ffa502; border-radius: 6px;">
                                         <strong style="color: #ffa502;">💬 主管評語：</strong>
-                                        <div style="margin-top: 8px; color: #333;">${answer.remark}</div>
+ <div style="margin-top: 8px; color: #333; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;">${answer.remark}</div>
                                     </div>
                                 ` : ''}
                             </div>
