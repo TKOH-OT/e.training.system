@@ -8695,15 +8695,6 @@ await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).delete();
 
 showToast(`✅ 訓練記錄已完成（第 ${trainingCount} 次訓練）\n👥 參與人員：${participants}`, 'success');
 
-// ⭐⭐⭐ 關鍵修復：刷新培訓進度頁面（在背景更新分類進度）⭐⭐⭐
-setTimeout(async () => {
-    const currentPage = document.querySelector('.page.active').id;
-    if (currentPage === 'itemEvaluationPage') {
-        // 只更新數據，不切換頁面
-        await loadCategoryProgressData();
-    }
-}, 100);
-
 // ⭐⭐⭐ 顯示訓練完成選項（不同於評核）⭐⭐⭐
 showTrainingCompletedOptions(itemId);
         }
