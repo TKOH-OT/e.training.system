@@ -12770,6 +12770,7 @@ async function confirmBackdateRecord() {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
+    }
         
 // ==================== 確認補登記錄（改進版：創建 pending，讓主管逐步評核）====================
 async function confirmBackdateRecord() {
