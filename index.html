@@ -2843,11 +2843,9 @@
                 <div class="dashboard-title" id="progressStaffName">培訓進度</div>
                 <div class="dashboard-subtitle">Training Progress Dashboard</div>
             </div>
-<div style="text-align: right; margin-bottom: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+<div style="text-align: right; margin-bottom: 20px; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
     <button class="btn btn-info btn-small" onclick="exportToPDF()">📄 匯出 PDF</button>
-    ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
-        <button class="btn btn-warning btn-small" onclick="showBackdateRecordModal()">📝 補登歷史記錄</button>
-    ` : ''}
+    <button class="btn btn-warning btn-small" id="backdateRecordBtn" style="display: none;" onclick="showBackdateRecordModal()">📝 補登歷史記錄</button>
     <button class="btn btn-secondary btn-small" onclick="backToStaffList()">🔙 返回員工列表</button>
 </div>
             
@@ -12773,14 +12771,51 @@ async function confirmBackdateRecord() {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
         
-        // ⭐⭐⭐ 建立補登記錄（標記為 isBackdated = true）⭐⭐⭐
+// ==================== 確認補登記錄（改進版：創建 pending，讓主管逐步評核）====================
+async function confirmBackdateRecord() {
+    const itemId = document.getElementById('backdateItemSelect').value;
+    const actualDate = document.getElementById('backdateActualDate').value;
+    const completedBy = document.getElementById('backdateCompletedBy').value.trim();
+    const remark = document.getElementById('backdateRemark').value.trim();
+    
+    if (!itemId || !actualDate || !completedBy || !remark) {
+        showToast('❌ 請填寫所有欄位', 'error');
+        return;
+    }
+    
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        if (!itemDoc.exists) {
+            showToast('❌ 找不到該培訓項目', 'error');
+            return;
+        }
+        
+        const item = itemDoc.data();
+        
+        // ⭐⭐⭐ 檢查是否已存在 pending 記錄 ⭐⭐⭐
+        const existingPendingSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+        
+        if (!existingPendingSnapshot.empty) {
+            showToast('⚠️ 此項目已有進行中的評核，請先完成或刪除', 'warning');
+            return;
+        }
+        
+        if (!confirm(`❓ 確定要補登此培訓記錄嗎？\n\n📅 實際完成日期：${actualDate}\n👤 完成者：${completedBy}\n💬 備註：${remark}\n\n✅ 系統會創建評核記錄，讓你逐步標記合格/不合格`)) {
+            return;
+        }
+        
+        // ⭐⭐⭐ 關鍵修改：創建 pending 記錄（而非 completed）⭐⭐⭐
         const backdateRecordData = {
             userId: currentStaffId,
             itemId: itemId,
             categoryId: item.categoryId,
-            status: 'completed',
-            isPassed: true,
-            isBackdated: true,  // ⭐ 關鍵標記
+            status: 'pending',  // ⭐ 改為 pending，讓主管逐步評核
+            isBackdated: true,  // ⭐ 標記為補登記錄
             backdateInfo: {
                 actualDate: actualDate,
                 completedBy: completedBy,
@@ -12789,51 +12824,61 @@ async function confirmBackdateRecord() {
                 enteredByName: currentUser.name,
                 enteredAt: new Date().toISOString()
             },
-            completedAt: firebase.firestore.Timestamp.fromDate(new Date(actualDate)),  // ⭐ 使用實際日期
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()  // ⭐ 補登時間
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        // ⭐ 如果是評核類型，需要補充 checklistStatus
+        // ⭐ 評核 Checklist：初始化 checklistStatus（全部設為 pending）
         if (item.recordType === 'checklist' && item.hasChecklist) {
             const checklistStatus = {};
             item.checklist.forEach((step, index) => {
                 if (!step.isSubtitle) {
-                    checklistStatus[index] = 'pass';  // ⭐ 全部標記為合格
+                    checklistStatus[index] = 'pending';  // ⭐ 全部初始化為待評核
                 }
             });
             backdateRecordData.checklistStatus = checklistStatus;
-            backdateRecordData.completionRate = 100;
+            backdateRecordData.remarks = {};  // 初始化備註欄
+            backdateRecordData.failureCount = {};
         }
         
-        // ⭐ 如果是訓練記錄類型，需要補充 stepRecords
+        // ⭐ 訓練記錄：初始化 stepRecords（全部留空，讓主管填寫）
         if (item.recordType === 'training' && item.hasChecklist) {
             const stepRecords = {};
             item.checklist.forEach((step, index) => {
                 if (!step.isSubtitle) {
                     stepRecords[index] = {
-                        trainingDate: actualDate,
-                        traineeSignature: completedBy,
-                        mentorSignature: '歷史記錄（已補登）',
-                        supervisorSignature: currentUser.name
+                        trainingDate: actualDate,  // ⭐ 預填實際日期
+                        traineeSignature: '',      // ⭐ 留空，讓主管簽
+                        mentorSignature: '',
+                        supervisorSignature: ''
                     };
                 }
             });
             backdateRecordData.stepRecords = stepRecords;
-            backdateRecordData.participants = `${completedBy}, ${currentUser.name}`;
         }
         
         await db.collection('trainingRecords').add(backdateRecordData);
         
-        showToast(`✅ 已成功補登「${item.name}」的歷史記錄`, 'success');
+        showToast(`✅ 已建立「${item.name}」的補登記錄（待評核）`, 'success');
         closeModal();
-        showTrainingProgress(currentStaffId);  // ⭐ 刷新培訓進度頁面
+        
+        // ⭐⭐⭐ 關鍵：直接跳轉到該項目的評核頁面 ⭐⭐⭐
+        currentCategoryId = item.categoryId;
+        await showCategoryEvaluation(item.categoryId);
+        
+        // ⭐ 自動展開該項目卡片
+        setTimeout(() => {
+            const card = document.getElementById(`eval_item_${itemId}`);
+            if (card && !card.classList.contains('expanded')) {
+                card.classList.add('expanded');
+            }
+        }, 300);
         
     } catch (error) {
         console.error('補登記錄失敗:', error);
         showToast('❌ 補登失敗: ' + error.message, 'error');
     }
 }
-
+        
 // ==================== 主管查看員工測驗結果詳情 ====================
 async function viewQuizResultBySupervisor(recordId) {
     // ⭐ 暫存當前選中的員工 ID
