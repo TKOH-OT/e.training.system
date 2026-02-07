@@ -12751,28 +12751,118 @@ async function loadBackdateItems() {
     }
 }
 
-// 確認補登記錄
-async function confirmBackdateRecord() {
-    const itemId = document.getElementById('backdateItemSelect').value;
-    const actualDate = document.getElementById('backdateActualDate').value;
-    const completedBy = document.getElementById('backdateCompletedBy').value.trim();
-    const remark = document.getElementById('backdateRemark').value.trim();
-    
-    if (!itemId || !actualDate || !completedBy || !remark) {
-        showToast('❌ 請填寫所有欄位', 'error');
-        return;
+// ==================== 📝 補登歷史記錄功能（改進版：創建 pending）====================
+
+// 顯示補登記錄選單
+async function showBackdateRecordModal() {
+    try {
+        // ⭐ 讀取該員工的職級，決定顯示哪些分類
+        const staffDoc = await db.collection('accounts').doc(currentStaffId).get();
+        const staff = staffDoc.data();
+        const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
+        
+        const categoriesSnapshot = await db.collection('trainingCategories')
+            .where('trainingType', '==', staffTrainingType)
+            .orderBy('order', 'asc')
+            .get();
+        
+        let categoryOptions = '<option value="">-- 請選擇培訓分類 --</option>';
+        
+        categoriesSnapshot.forEach(doc => {
+            const category = doc.data();
+            categoryOptions += `<option value="${doc.id}">${category.emoji} ${category.name}</option>`;
+        });
+        
+        const modalBody = `
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196f3;">
+                <strong>📌 補登對象：</strong>${staff.name} (${staff.level})<br>
+                <strong>💡 說明：</strong>補登後會創建【待評核】記錄，你可以逐步標記合格/不合格
+            </div>
+            
+            <div class="input-group">
+                <label>📚 選擇培訓分類</label>
+                <select id="backdateCategorySelect" onchange="loadBackdateItems()">
+                    ${categoryOptions}
+                </select>
+            </div>
+            
+            <div id="backdateItemsContainer" style="display: none;">
+                <div class="input-group">
+                    <label>📋 選擇培訓項目</label>
+                    <select id="backdateItemSelect">
+                        <option value="">-- 請先選擇分類 --</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label>📅 實際完成日期（參考用）</label>
+                    <input type="date" id="backdateActualDate" max="${new Date().toISOString().split('T')[0]}">
+                    <small style="color: #666; margin-top: 5px; display: block;">
+                        💡 此日期只作記錄參考，不影響評核流程
+                    </small>
+                </div>
+                
+                <div class="input-group">
+                    <label>👤 實際完成者（員工簽名）</label>
+                    <input type="text" id="backdateCompletedBy" value="${staff.name}" placeholder="請輸入員工姓名">
+                </div>
+                
+                <div class="input-group">
+                    <label>💬 補登原因/備註</label>
+                    <textarea id="backdateRemark" rows="3" placeholder="例如：該員工已升職為 PCA2，補登 PCA3 時期的培訓記錄"></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="confirmBackdateRecord()">✅ 確認補登</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('📝 補登歷史培訓記錄', modalBody);
+        
+    } catch (error) {
+        console.error('載入補登介面失敗:', error);
+        showToast('❌ 載入失敗', 'error');
     }
+}
+
+// 載入選定分類的培訓項目
+async function loadBackdateItems() {
+    const categoryId = document.getElementById('backdateCategorySelect').value;
+    const container = document.getElementById('backdateItemsContainer');
+    const itemSelect = document.getElementById('backdateItemSelect');
     
-    if (!confirm(`❓ 確定要補登此培訓記錄嗎？\n\n📅 實際完成日期：${actualDate}\n👤 完成者：${completedBy}\n💬 備註：${remark}`)) {
+    if (!categoryId) {
+        container.style.display = 'none';
         return;
     }
     
     try {
-        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
-        const item = itemDoc.data();
-    }
+        const itemsSnapshot = await db.collection('trainingItems')
+            .where('categoryId', '==', categoryId)
+            .orderBy('order', 'asc')
+            .get();
         
-// ==================== 確認補登記錄（改進版：創建 pending，讓主管逐步評核）====================
+        let itemOptions = '<option value="">-- 請選擇培訓項目 --</option>';
+        
+        itemsSnapshot.forEach(doc => {
+            const item = doc.data();
+            const typeLabel = item.recordType === 'training' ? '📝 訓練' : '📋 評核';
+            const levelLabel = item.pcaLevel && item.pcaLevel !== 'ALL' ? ` [${item.pcaLevel}]` : '';
+            itemOptions += `<option value="${doc.id}">${typeLabel} ${item.name}${levelLabel}</option>`;
+        });
+        
+        itemSelect.innerHTML = itemOptions;
+        container.style.display = 'block';
+        
+    } catch (error) {
+        console.error('載入項目失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// ==================== 確認補登記錄（創建 pending，讓主管逐步評核）====================
 async function confirmBackdateRecord() {
     const itemId = document.getElementById('backdateItemSelect').value;
     const actualDate = document.getElementById('backdateActualDate').value;
@@ -12810,13 +12900,13 @@ async function confirmBackdateRecord() {
             return;
         }
         
-        // ⭐⭐⭐ 關鍵修改：創建 pending 記錄（而非 completed）⭐⭐⭐
+        // ⭐⭐⭐ 關鍵：創建 pending 記錄（而非 completed）⭐⭐⭐
         const backdateRecordData = {
             userId: currentStaffId,
             itemId: itemId,
             categoryId: item.categoryId,
-            status: 'pending',  // ⭐ 改為 pending，讓主管逐步評核
-            isBackdated: true,  // ⭐ 標記為補登記錄
+            status: 'pending',  // ⭐ pending 狀態
+            isBackdated: true,  // ⭐ 標記為補登
             backdateInfo: {
                 actualDate: actualDate,
                 completedBy: completedBy,
@@ -12828,27 +12918,27 @@ async function confirmBackdateRecord() {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        // ⭐ 評核 Checklist：初始化 checklistStatus（全部設為 pending）
+        // ⭐ 評核 Checklist：初始化所有步驟為 pending
         if (item.recordType === 'checklist' && item.hasChecklist) {
             const checklistStatus = {};
             item.checklist.forEach((step, index) => {
                 if (!step.isSubtitle) {
-                    checklistStatus[index] = 'pending';  // ⭐ 全部初始化為待評核
+                    checklistStatus[index] = 'pending';  // ⭐ 待評核
                 }
             });
             backdateRecordData.checklistStatus = checklistStatus;
-            backdateRecordData.remarks = {};  // 初始化備註欄
+            backdateRecordData.remarks = {};
             backdateRecordData.failureCount = {};
         }
         
-        // ⭐ 訓練記錄：初始化 stepRecords（全部留空，讓主管填寫）
+        // ⭐ 訓練記錄：初始化 stepRecords（預填日期，簽名留空）
         if (item.recordType === 'training' && item.hasChecklist) {
             const stepRecords = {};
             item.checklist.forEach((step, index) => {
                 if (!step.isSubtitle) {
                     stepRecords[index] = {
                         trainingDate: actualDate,  // ⭐ 預填實際日期
-                        traineeSignature: '',      // ⭐ 留空，讓主管簽
+                        traineeSignature: '',      // ⭐ 留空
                         mentorSignature: '',
                         supervisorSignature: ''
                     };
@@ -12859,7 +12949,7 @@ async function confirmBackdateRecord() {
         
         await db.collection('trainingRecords').add(backdateRecordData);
         
-        showToast(`✅ 已建立「${item.name}」的補登記錄（待評核）`, 'success');
+        showToast(`✅ 已建立「${item.name}」的補登記錄`, 'success');
         closeModal();
         
         // ⭐⭐⭐ 關鍵：直接跳轉到該項目的評核頁面 ⭐⭐⭐
@@ -12872,7 +12962,7 @@ async function confirmBackdateRecord() {
             if (card && !card.classList.contains('expanded')) {
                 card.classList.add('expanded');
             }
-        }, 300);
+        }, 500);
         
     } catch (error) {
         console.error('補登記錄失敗:', error);
