@@ -2843,11 +2843,14 @@
                 <div class="dashboard-title" id="progressStaffName">培訓進度</div>
                 <div class="dashboard-subtitle">Training Progress Dashboard</div>
             </div>
-            <div style="text-align: right; margin-bottom: 20px;">
-                <button class="btn btn-info btn-small" onclick="exportToPDF()">📄 匯出 PDF</button>
-                <button class="btn btn-secondary btn-small" onclick="backToStaffList()">🔙 返回員工列表</button>
-            </div>
-
+<div style="text-align: right; margin-bottom: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+    <button class="btn btn-info btn-small" onclick="exportToPDF()">📄 匯出 PDF</button>
+    ${currentUser.role === 'admin' || currentUser.role === 'supervisor' ? `
+        <button class="btn btn-warning btn-small" onclick="showBackdateRecordModal()">📝 補登歷史記錄</button>
+    ` : ''}
+    <button class="btn btn-secondary btn-small" onclick="backToStaffList()">🔙 返回員工列表</button>
+</div>
+            
             <!-- 重要評核時間表 -->
             <div class="important-timeline" id="importantTimeline" style="display:none;">
                 <div class="timeline-header">
@@ -5219,6 +5222,16 @@ function filterStaffList() {
                 const staff = staffDoc.data();
 
                 document.getElementById('progressStaffName').textContent = `${staff.name} - 培訓進度`;
+
+                // ⭐⭐⭐ 控制補登按鈕顯示（只有 Admin/Supervisor 可見）⭐⭐⭐
+const backdateBtn = document.getElementById('backdateRecordBtn');
+if (backdateBtn) {
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        backdateBtn.style.display = 'inline-block';
+    } else {
+        backdateBtn.style.display = 'none';
+    }
+}
 
                 // 根據員工職級決定要顯示哪個類型的培訓
                 const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
@@ -12634,6 +12647,201 @@ function backToEvalRecordsList() {
             backToEvaluationFromRecords();
         }
     }
+}
+
+        // ==================== 補登歷史記錄功能 ====================
+
+// 顯示補登記錄選單
+async function showBackdateRecordModal() {
+    try {
+        // 讀取所有 PCA 培訓分類
+        const categoriesSnapshot = await db.collection('trainingCategories')
+            .where('trainingType', '==', 'PCA')
+            .orderBy('order', 'asc')
+            .get();
+        
+        let categoryOptions = '<option value="">-- 請選擇培訓分類 --</option>';
+        
+        categoriesSnapshot.forEach(doc => {
+            const category = doc.data();
+            categoryOptions += `<option value="${doc.id}">${category.emoji} ${category.name}</option>`;
+        });
+        
+        const modalBody = `
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
+                <strong>💡 說明：</strong>此功能用於補登升職前完成的培訓記錄<br>
+                <small style="color: #666;">例如：現為 PCA2 的同事，補登當年 PCA3 時期的培訓</small>
+            </div>
+            
+            <div class="input-group">
+                <label>📚 選擇培訓分類</label>
+                <select id="backdateCategorySelect" onchange="loadBackdateItems()">
+                    ${categoryOptions}
+                </select>
+            </div>
+            
+            <div id="backdateItemsContainer" style="display: none;">
+                <div class="input-group">
+                    <label>📋 選擇培訓項目</label>
+                    <select id="backdateItemSelect">
+                        <option value="">-- 請先選擇分類 --</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label>📅 實際完成日期</label>
+                    <input type="date" id="backdateActualDate" max="${new Date().toISOString().split('T')[0]}">
+                </div>
+                
+                <div class="input-group">
+                    <label>👤 實際完成者（員工簽名）</label>
+                    <input type="text" id="backdateCompletedBy" placeholder="請輸入員工姓名">
+                </div>
+                
+                <div class="input-group">
+                    <label>💬 補登原因/備註</label>
+                    <textarea id="backdateRemark" rows="3" placeholder="例如：該員工已升職為 PCA2，補登 PCA3 時期的培訓記錄"></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="confirmBackdateRecord()">✅ 確認補登</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('📝 補登歷史培訓記錄', modalBody);
+        
+    } catch (error) {
+        console.error('載入補登介面失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// 載入選定分類的培訓項目
+async function loadBackdateItems() {
+    const categoryId = document.getElementById('backdateCategorySelect').value;
+    const container = document.getElementById('backdateItemsContainer');
+    const itemSelect = document.getElementById('backdateItemSelect');
+    
+    if (!categoryId) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const itemsSnapshot = await db.collection('trainingItems')
+            .where('categoryId', '==', categoryId)
+            .orderBy('order', 'asc')
+            .get();
+        
+        let itemOptions = '<option value="">-- 請選擇培訓項目 --</option>';
+        
+        itemsSnapshot.forEach(doc => {
+            const item = doc.data();
+            const typeLabel = item.recordType === 'training' ? '📝 訓練' : '📋 評核';
+            const levelLabel = item.pcaLevel && item.pcaLevel !== 'ALL' ? ` [${item.pcaLevel}]` : '';
+            itemOptions += `<option value="${doc.id}">${typeLabel} ${item.name}${levelLabel}</option>`;
+        });
+        
+        itemSelect.innerHTML = itemOptions;
+        container.style.display = 'block';
+        
+    } catch (error) {
+        console.error('載入項目失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+// 確認補登記錄
+async function confirmBackdateRecord() {
+    const itemId = document.getElementById('backdateItemSelect').value;
+    const actualDate = document.getElementById('backdateActualDate').value;
+    const completedBy = document.getElementById('backdateCompletedBy').value.trim();
+    const remark = document.getElementById('backdateRemark').value.trim();
+    
+    if (!itemId || !actualDate || !completedBy || !remark) {
+        showToast('❌ 請填寫所有欄位', 'error');
+        return;
+    }
+    
+    if (!confirm(`❓ 確定要補登此培訓記錄嗎？\n\n📅 實際完成日期：${actualDate}\n👤 完成者：${completedBy}\n💬 備註：${remark}`)) {
+        return;
+    }
+    
+    try {
+        const itemDoc = await db.collection('trainingItems').doc(itemId).get();
+        const item = itemDoc.data();
+        
+        // ⭐⭐⭐ 建立補登記錄（標記為 isBackdated = true）⭐⭐⭐
+        const backdateRecordData = {
+            userId: currentStaffId,
+            itemId: itemId,
+            categoryId: item.categoryId,
+            status: 'completed',
+            isPassed: true,
+            isBackdated: true,  // ⭐ 關鍵標記
+            backdateInfo: {
+                actualDate: actualDate,
+                completedBy: completedBy,
+                remark: remark,
+                enteredBy: currentUser.docId,
+                enteredByName: currentUser.name,
+                enteredAt: new Date().toISOString()
+            },
+            completedAt: firebase.firestore.Timestamp.fromDate(new Date(actualDate)),  // ⭐ 使用實際日期
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()  // ⭐ 補登時間
+        };
+        
+        // ⭐ 如果是評核類型，需要補充 checklistStatus
+        if (item.recordType === 'checklist' && item.hasChecklist) {
+            const checklistStatus = {};
+            item.checklist.forEach((step, index) => {
+                if (!step.isSubtitle) {
+                    checklistStatus[index] = 'pass';  // ⭐ 全部標記為合格
+                }
+            });
+            backdateRecordData.checklistStatus = checklistStatus;
+            backdateRecordData.completionRate = 100;
+        }
+        
+        // ⭐ 如果是訓練記錄類型，需要補充 stepRecords
+        if (item.recordType === 'training' && item.hasChecklist) {
+            const stepRecords = {};
+            item.checklist.forEach((step, index) => {
+                if (!step.isSubtitle) {
+                    stepRecords[index] = {
+                        trainingDate: actualDate,
+                        traineeSignature: completedBy,
+                        mentorSignature: '歷史記錄（已補登）',
+                        supervisorSignature: currentUser.name
+                    };
+                }
+            });
+            backdateRecordData.stepRecords = stepRecords;
+            backdateRecordData.participants = `${completedBy}, ${currentUser.name}`;
+        }
+        
+        await db.collection('trainingRecords').add(backdateRecordData);
+        
+        showToast(`✅ 已成功補登「${item.name}」的歷史記錄`, 'success');
+        closeModal();
+        showTrainingProgress(currentStaffId);  // ⭐ 刷新培訓進度頁面
+        
+    } catch (error) {
+        console.error('補登記錄失敗:', error);
+        showToast('❌ 補登失敗: ' + error.message, 'error');
+    }
+}
+
+// ==================== 主管查看員工測驗結果詳情 ====================
+async function viewQuizResultBySupervisor(recordId) {
+    // ⭐ 暫存當前選中的員工 ID
+    const currentSelectedEmployee = document.getElementById('employeeProgressSelect')?.value;
+    window.previousSelectedEmployee = currentSelectedEmployee;
+    
+    // ⭐⭐⭐ 關鍵修改：傳入 'supervisor' 標記 ⭐⭐⭐
+    await viewQuizResult(recordId, 'supervisor');
 }
     </script>
 </body>
