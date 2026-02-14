@@ -5779,31 +5779,41 @@ async function showCategoryEvaluation(categoryId) {
             }
         });
 
-        const items = [];
-        itemsSnapshot.forEach(doc => {
-            const item = doc.data();
-            
-            // ⭐⭐⭐ 關鍵修正：允許補登記錄跨級別顯示 ⭐⭐⭐
-            if (category.trainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
-                // ✅ 如果該項目有補登記錄，強制顯示
-                if (backdatedItems.has(doc.id)) {
-                    console.log(`📌 補登項目：${item.name}（原級別：${item.pcaLevel}，當前級別：${staff.level}）- 強制顯示`);
-                    items.push({ docId: doc.id, ...item });
-                }
-                // ✅ 否則按正常級別過濾
-                else if (item.pcaLevel === staff.level) {
-                    items.push({ docId: doc.id, ...item });
-                }
-                // ❌ 級別不符且無補登記錄，跳過
-                else {
-                    console.log(`⏭️ 跳過項目：${item.name}（級別：${item.pcaLevel}，當前：${staff.level}）`);
-                    return;
-                }
-            } else {
-                // OTA 或 pcaLevel === 'ALL'，直接加入
-                items.push({ docId: doc.id, ...item });
+// ⭐⭐⭐ 新增：讀取員工的升級歷史 ⭐⭐⭐
+const upgradeHistory = staff.upgradeHistory || [];
+
+// 收集所有歷史職級
+const historicalLevels = new Set([staff.level]); // 當前職級
+upgradeHistory.forEach(upgrade => {
+    historicalLevels.add(upgrade.fromLevel); // 加入所有舊職級
+});
+
+const items = [];
+itemsSnapshot.forEach(doc => {
+    const item = doc.data();
+    
+    if (category.trainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+        // ⭐⭐⭐ 新邏輯：顯示當前職級 + 有記錄的舊職級項目 ⭐⭐⭐
+        
+        // 1️⃣ 如果是補登記錄，直接顯示
+        if (backdatedItems.has(doc.id)) {
+            items.push({ docId: doc.id, ...item, isHistorical: false });
+        }
+        // 2️⃣ 如果是當前職級，顯示
+        else if (item.pcaLevel === staff.level) {
+            items.push({ docId: doc.id, ...item, isHistorical: false });
+        }
+        // 3️⃣ 如果是舊職級，但有完成記錄，也顯示（標記為歷史記錄）
+        else if (historicalLevels.has(item.pcaLevel)) {
+            const hasRecord = records[doc.id] && records[doc.id].status === 'completed';
+            if (hasRecord) {
+                items.push({ docId: doc.id, ...item, isHistorical: true });
             }
-        });
+        }
+    } else {
+        items.push({ docId: doc.id, ...item, isHistorical: false });
+    }
+});
         
         items.sort((a, b) => (a.order || 0) - (b.order || 0));
 
@@ -5834,6 +5844,11 @@ async function showCategoryEvaluation(categoryId) {
                 if (item.isImportant) {
                     badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
                 }
+
+                // ⭐⭐⭐ 新增：顯示舊職級記錄標記 ⭐⭐⭐
+if (item.isHistorical) {
+    badges += '<span class="badge badge-info">📜 舊職級記錄 (已升級)</span>';
+}
                 
                 badges += '<span class="badge badge-info">📝 訓練記錄</span>';
                 badges += backdateBadge; // ⭐ 加入補登標記
@@ -6056,16 +6071,22 @@ async function showCategoryEvaluation(categoryId) {
                                 </div>
                             </div>
 
-                            <div class="item-card-actions">
-                                ${hasEditPermission || currentUser.role === 'supervisor' ? `
-                                    ${currentRecord?.status !== 'completed' ? `
-                                        <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markTrainingComplete('${item.docId}')">✅ 標記完成</button>
-                                    ` : ''}
-                                    ${currentRecord?.status === 'completed' ? `
-                                        <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>
-                                    ` : ''}
-                                ` : ''}
-                            </div>
+                           <div class="item-card-actions">
+    ${hasEditPermission || currentUser.role === 'supervisor' ? `
+        ${!item.isHistorical ? `
+            ${currentRecord?.status !== 'completed' ? `
+                <button class="btn btn-success btn-small" onclick="event.stopPropagation(); markTrainingComplete('${item.docId}')">✅ 標記完成</button>
+            ` : ''}
+            ${currentRecord?.status === 'completed' ? `
+                <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); resetAllTraining('${item.docId}')">🔄 重設全部</button>
+            ` : ''}
+        ` : `
+            <div style="padding: 10px; background: #e3f2fd; border-radius: 8px; text-align: center;">
+                <strong style="color: #2196f3;">📜 舊職級記錄（只能查看）</strong>
+            </div>
+        `}
+    ` : ''}
+</div>
                         </div>
 
                         <div class="item-card-content">
