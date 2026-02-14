@@ -5527,7 +5527,6 @@ importantItems.forEach(item => {
     const record = records[item.docId];
     let isCompleted = false;
 
-    // ⭐⭐⭐ 修復：正確判斷訓練記錄和評核的完成狀態 ⭐⭐⭐
     if (item.recordType === 'training') {
         isCompleted = record && record.status === 'completed' && record.isPassed === true;
     } else if (item.hasChecklist && record) {
@@ -5558,27 +5557,31 @@ importantItems.forEach(item => {
         isCompleted = record.status === 'completed' && record.isPassed !== false;
     }
 
-    // ⭐⭐⭐ 新增：Competency Assessment Form 特殊邏輯 ⭐⭐⭐
-    if (item.recurringSequence && item.originalName) {
-        // 檢查是否為 Competency Assessment Form 系列（關鍵字匹配）
-        const nameToCheck = (item.originalName + ' ' + item.name).toLowerCase();
-        const isCompetencyForm = nameToCheck.includes('competency') || 
-                                 nameToCheck.includes('assessment form');
-        
-        if (isCompetencyForm && record && record.status === 'completed') {
-            // ✅ 只要有 completed 記錄（無論合格與否），都視為已完成
-            // ⭐ 不再顯示在時間表上
-            console.log(`✅ Competency Form 已評核（無論合格與否）：${item.name}`);
-            return; // 跳過此項目，不顯示在時間表
-        }
+    // ⭐⭐⭐ Competency Assessment Form 特殊處理：完整名稱匹配 ⭐⭐⭐
+    const competencyFormNames = [
+        'PCA I Competency Assessment Form (3個月)',
+        'PCA I Competency Assessment Form (6個月)',
+        'PCA I Competency Assessment Form (12個月)',
+        'PCA II Competency Assessment Form (3個月)',
+        'PCA II Competency Assessment Form (6個月)',
+        'PCA II Competency Assessment Form (12個月)',
+        'PCA III Competency Assessment Form (3個月)',
+        'PCA III Competency Assessment Form (6個月)',
+        'PCA III Competency Assessment Form (12個月)'
+    ];
+    
+    const isCompetencyForm = competencyFormNames.includes(item.name) || 
+                            competencyFormNames.includes(item.originalName);
+    
+    if (isCompetencyForm && record && record.status === 'completed') {
+        console.log(`✅ Competency Form 已評核完成，從時間表移除：${item.name}（${record.isPassed ? '合格' : '不合格'}）`);
+        return;
     }
 
-    // ⭐⭐⭐ 原有邏輯：一般評核需要合格才算完成 ⭐⭐⭐
     if (isCompleted) {
-        return; // 不顯示已完成的項目
+        return;
     }
 
-    // 只有未完成的項目才會顯示
     if (deadline && daysRemaining < 0) {
         statusClass = 'overdue';
         statusText = `⚠️ 已逾期 ${Math.abs(daysRemaining)} 天`;
