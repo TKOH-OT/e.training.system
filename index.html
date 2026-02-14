@@ -7539,8 +7539,19 @@ function closeModal() {
 // ==================== 一鍵多簽彈窗（改良版：登入 + 步驟選擇） ====================
 async function openBatchSignModal(itemId, type = "trainee") {
     try {
-        // 先進行簽名登入驗證
-        const signerName = await verifyUserBeforeSign().catch(() => null);
+        // ⭐⭐⭐ 修復：根據 type 傳入正確的 role ⭐⭐⭐
+        let role = 'staff'; // 預設
+        
+        if (type === 'trainee') {
+            role = 'staff'; // 新同事 = 受訓員工
+        } else if (type === 'mentor') {
+            role = 'mentor'; // 陪帶同事
+        } else if (type === 'supervisor') {
+            role = 'supervisor'; // Supervisor
+        }
+        
+        // 先進行簽名登入驗證（傳入正確角色）
+        const signerName = await verifyUserBeforeSign(role).catch(() => null);
         if (!signerName) return;
 
         // 登入完成 → 顯示步驟選擇清單
