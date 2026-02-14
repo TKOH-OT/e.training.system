@@ -2845,7 +2845,9 @@
             </div>
 <div style="text-align: right; margin-bottom: 20px; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
     <button class="btn btn-info btn-small" onclick="exportToPDF()">📄 匯出 PDF</button>
-    <button class="btn btn-warning btn-small" id="backdateRecordBtn" style="display: none;" onclick="showBackdateRecordModal()">📝 補登歷史記錄</button>
+
+       <button class="btn btn-success btn-small" id="pcaUpgradeBtn" style="display: none;" onclick="showPCAUpgradeModal()">⬆️ PCA 升級</button>
+    
     <button class="btn btn-secondary btn-small" onclick="backToStaffList()">🔙 返回員工列表</button>
 </div>
             
@@ -5221,16 +5223,15 @@ function filterStaffList() {
 
                 document.getElementById('progressStaffName').textContent = `${staff.name} - 培訓進度`;
 
-                // ⭐⭐⭐ 控制補登按鈕顯示（只有 Admin/Supervisor 可見）⭐⭐⭐
-const backdateBtn = document.getElementById('backdateRecordBtn');
-if (backdateBtn) {
-    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-        backdateBtn.style.display = 'inline-block';
-    } else {
-        backdateBtn.style.display = 'none';
-    }
-}
-
+                // ⭐⭐⭐ 新增：控制 PCA 升級按鈕顯示 ⭐⭐⭐
+        const upgradeBtn = document.getElementById('pcaUpgradeBtn');
+        if (upgradeBtn) {
+            // 只有 Admin/Supervisor 查看 PCA2/PCA3 員工時才顯示
+            const canShowUpgrade = (currentUser.role === 'admin' || currentUser.role === 'supervisor') &&
+                                   (staff.level === 'PCA3' || staff.level === 'PCA2');
+            upgradeBtn.style.display = canShowUpgrade ? 'inline-block' : 'none';
+        }
+                
                 // 根據員工職級決定要顯示哪個類型的培訓
                 const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
 
@@ -12996,6 +12997,112 @@ async function viewQuizResultBySupervisor(recordId) {
     
     // ⭐⭐⭐ 關鍵修改：傳入 'supervisor' 標記 ⭐⭐⭐
     await viewQuizResult(recordId, 'supervisor');
+}
+
+        // ==================== PCA 升級功能 ====================
+
+async function showPCAUpgradeModal() {
+    try {
+        const staffDoc = await db.collection('accounts').doc(currentStaffId).get();
+        const staff = staffDoc.data();
+        
+        let targetLevel = '';
+        if (staff.level === 'PCA3') {
+            targetLevel = 'PCA2';
+        } else if (staff.level === 'PCA2') {
+            targetLevel = 'PCA1';
+        } else {
+            showToast('❌ 此員工無法升級', 'error');
+            return;
+        }
+        
+        const modalBody = `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3em; margin-bottom: 15px;">⬆️</div>
+                <h3 style="color: #2ed573;">PCA 職級升級</h3>
+            </div>
+            
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2196f3;">
+                <strong>👤 員工：</strong>${staff.name}<br>
+                <strong>📊 當前職級：</strong><span class="badge badge-${staff.level}">${staff.level}</span><br>
+                <strong>⬆️ 升級至：</strong><span class="badge badge-${targetLevel}">${targetLevel}</span>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
+                <strong>✅ 升級後的變化：</strong><br>
+                <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                    <li>職級從 <strong>${staff.level}</strong> 升至 <strong>${targetLevel}</strong></li>
+                    <li>✅ 所有培訓記錄<strong>完整保留</strong></li>
+                    <li>✅ 新職級的培訓項目會自動顯示</li>
+                    <li>✅ 舊職級的記錄仍可查看</li>
+                </ul>
+            </div>
+            
+            <div class="input-group">
+                <label>📅 升級日期</label>
+                <input type="date" id="upgradeDate" value="${new Date().toISOString().split('T')[0]}" max="${new Date().toISOString().split('T')[0]}">
+            </div>
+            
+            <div class="input-group">
+                <label>💬 升級備註（可選）</label>
+                <textarea id="upgradeRemark" rows="3" placeholder="例如：表現優秀，提前升級"></textarea>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="confirmPCAUpgrade('${staff.level}', '${targetLevel}')">✅ 確認升級</button>
+                <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+            </div>
+        `;
+        
+        showModal('⬆️ PCA 職級升級', modalBody);
+        
+    } catch (error) {
+        console.error('載入升級介面失敗:', error);
+        showToast('❌ 載入失敗', 'error');
+    }
+}
+
+async function confirmPCAUpgrade(fromLevel, toLevel) {
+    const upgradeDate = document.getElementById('upgradeDate').value;
+    const remark = document.getElementById('upgradeRemark').value.trim();
+    
+    if (!upgradeDate) {
+        showToast('❌ 請選擇升級日期', 'error');
+        return;
+    }
+    
+    if (!confirm(`❓ 確定要將此員工從 ${fromLevel} 升級至 ${toLevel} 嗎？\n\n✅ 所有培訓記錄會完整保留\n✅ 新職級的培訓項目會自動顯示`)) {
+        return;
+    }
+    
+    try {
+        const staffDoc = await db.collection('accounts').doc(currentStaffId).get();
+        const staff = staffDoc.data();
+        
+        // ⭐⭐⭐ 更新員工職級 ⭐⭐⭐
+        await db.collection('accounts').doc(currentStaffId).update({
+            level: toLevel,
+            upgradeHistory: firebase.firestore.FieldValue.arrayUnion({
+                fromLevel: fromLevel,
+                toLevel: toLevel,
+                upgradeDate: upgradeDate,
+                remark: remark,
+                upgradedBy: currentUser.docId,
+                upgradedByName: currentUser.name,
+                upgradedAt: new Date().toISOString()
+            })
+        });
+        
+        showToast(`✅ 已成功將 ${staff.name} 從 ${fromLevel} 升級至 ${toLevel}！`, 'success');
+        closeModal();
+        
+        // ⭐⭐⭐ 重新載入培訓進度（會自動顯示新職級的項目）⭐⭐⭐
+        await showTrainingProgress(currentStaffId);
+        
+    } catch (error) {
+        console.error('升級失敗:', error);
+        showToast('❌ 升級失敗: ' + error.message, 'error');
+    }
 }
     </script>
 </body>
