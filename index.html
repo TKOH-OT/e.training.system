@@ -2844,7 +2844,7 @@
                 <div class="dashboard-subtitle">Training Progress Dashboard</div>
             </div>
 <div style="text-align: right; margin-bottom: 20px; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
-    <button class="btn btn-info btn-small" onclick="exportToPDF()">📄 匯出 PDF</button>
+    <button class="btn btn-info btn-small" onclick="exportToExcel()">📊 匯出 Excel</button>
 
        <button class="btn btn-success btn-small" id="pcaUpgradeBtn" style="display: none;" onclick="showPCAUpgradeModal()">⬆️ PCA 升級</button>
     
@@ -3165,6 +3165,9 @@
     <!-- jsPDF -->
     <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
+    <!-- SheetJS for Excel export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
     <script>
         // ==================== Firebase 初始化 ====================
         const firebaseConfig = {
@@ -7400,121 +7403,362 @@ function closeModalAndRefresh() {
             }
         }
 
-        // ==================== 匯出 PDF ====================
-        async function exportToPDF() {
-            try {
-                showToast('📄 正在生成 PDF...', 'warning');
+// ==================== 匯出 Excel 表格 ====================
+async function exportToExcel() {
+    try {
+        showToast('📊 正在生成 Excel 表格...', 'warning');
 
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
+        const staffDoc = await db.collection('accounts').doc(currentStaffId).get();
+        const staff = staffDoc.data();
 
-                const staffDoc = await db.collection('accounts').doc(currentStaffId).get();
-                const staff = staffDoc.data();
+        const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
 
-                doc.setFontSize(20);
-                doc.text('TKOH OT Training System', 105, 20, { align: 'center' });
+        const categoriesSnapshot = await db.collection('trainingCategories')
+            .where('trainingType', '==', staffTrainingType)
+            .get();
+        
+        const categories = [];
+        categoriesSnapshot.forEach(doc => {
+            categories.push({ docId: doc.id, ...doc.data() });
+        });
+        categories.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        // ⭐⭐⭐ 讀取所有記錄 ⭐⭐⭐
+        const allRecordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', currentStaffId)
+            .get();
+
+        const records = {};
+        const recordsByItem = {};
+
+        allRecordsSnapshot.forEach(doc => {
+            const record = doc.data();
+            const itemId = record.itemId;
+            
+            if (!recordsByItem[itemId]) {
+                recordsByItem[itemId] = [];
+            }
+            recordsByItem[itemId].push({ docId: doc.id, ...record });
+        });
+
+        // ⭐⭐⭐ 智能選擇記錄 ⭐⭐⭐
+        Object.keys(recordsByItem).forEach(itemId => {
+            const itemRecords = recordsByItem[itemId];
+            const pendingRecord = itemRecords.find(r => r.status === 'pending');
+            
+            if (pendingRecord) {
+                records[itemId] = pendingRecord;
+            } else {
+                const completedRecords = itemRecords.filter(r => r.status === 'completed');
+                if (completedRecords.length > 0) {
+                    completedRecords.sort((a, b) => {
+                        const timeA = a.completedAt?.toDate?.() || new Date(0);
+                        const timeB = b.completedAt?.toDate?.() || new Date(0);
+                        return timeB - timeA;
+                    });
+                    records[itemId] = completedRecords[0];
+                }
+            }
+        });
+
+        // ⭐⭐⭐ 創建 Excel 工作簿 ⭐⭐⭐
+        const workbook = XLSX.utils.book_new();
+
+        // ⭐⭐⭐ 第一個工作表：摘要 ⭐⭐⭐
+        const summaryData = [
+            ['TKOH A&OT Training System'],
+            ['培訓記錄匯出'],
+            [],
+            ['員工姓名', staff.name],
+            ['職級', staff.level],
+            ['入職日期', staff.joinDate || '未設定'],
+            ['匯出日期', new Date().toLocaleDateString('zh-TW')],
+            []
+        ];
+
+        // 計算整體統計
+        let totalItems = 0;
+        let completedItems = 0;
+
+        for (const category of categories) {
+            const itemsSnapshot = await db.collection('trainingItems')
+                .where('categoryId', '==', category.docId)
+                .get();
+
+            itemsSnapshot.forEach(doc => {
+                const item = doc.data();
                 
-                doc.setFontSize(16);
-                doc.text(`Staff: ${staff.name}`, 105, 30, { align: 'center' });
-                doc.text(`Level: ${staff.level}`, 105, 40, { align: 'center' });
-                doc.text(`Join Date: ${staff.joinDate}`, 105, 50, { align: 'center' });
-
-                let yPos = 70;
-
-                const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
-
-                const categoriesSnapshot = await db.collection('trainingCategories')
-                    .where('trainingType', '==', staffTrainingType)
-                    .get();
-                
-                const categories = [];
-                categoriesSnapshot.forEach(doc => {
-                    categories.push({ docId: doc.id, ...doc.data() });
-                });
-                categories.sort((a, b) => (a.order || 0) - (b.order || 0));
-                
-                const recordsSnapshot = await db.collection('trainingRecords')
-                    .where('userId', '==', currentStaffId)
-                    .get();
-
-                const records = {};
-                recordsSnapshot.forEach(doc => {
-                    const record = doc.data();
-                    records[record.itemId] = record;
-                });
-
-                for (const category of categories) {
-                    if (yPos > 250) {
-                        doc.addPage();
-                        yPos = 20;
+                // 過濾職級
+                if (staffTrainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+                    if (item.pcaLevel !== staff.level) {
+                        return;
                     }
-
-                    doc.setFontSize(14);
-                    doc.setFont(undefined, 'bold');
-                    doc.text(`${category.emoji} ${category.name}`, 20, yPos);
-                    yPos += 10;
-
-                    const itemsSnapshot = await db.collection('trainingItems')
-                        .where('categoryId', '==', category.docId)
-                        .get();
-
-                    const items = [];
-                    itemsSnapshot.forEach(doc => {
-                        items.push({ docId: doc.id, ...doc.data() });
-                    });
-                    items.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-                    doc.setFontSize(10);
-                    doc.setFont(undefined, 'normal');
-
-                    items.forEach(item => {
-                        const record = records[item.docId];
-
-                        let status = 'Pending';
-                        let completion = '0%';
-                        
-                        if (item.hasChecklist && record?.checklistStatus) {
-                            let passedSteps = 0;
-                            
-                            item.checklist.forEach((step, index) => {
-                                if (record.checklistStatus[index] === 'pass') {
-                                    passedSteps++;
-                                }
-                            });
-                            
-                            const completionRate = Math.round((passedSteps / item.checklist.length) * 100);
-                            
-                            const allCriticalPassed = item.checklist.every((step, index) => {
-                                if (!step.critical) return true;
-                                return record.checklistStatus[index] === 'pass';
-                            });
-                            
-                            completion = `${completionRate}%`;
-                            status = allCriticalPassed && completionRate === 100 && record.status === 'completed' ? 'Completed' : 'Pending';
-                        } else if (record) {
-                            status = record.status === 'completed' ? 'Completed' : 'Failed';
-                            completion = status === 'Completed' ? '100%' : '0%';
-                        }
-
-                        if (yPos > 270) {
-                            doc.addPage();
-                            yPos = 20;
-                        }
-
-                        doc.text(`- ${item.name}: ${status} [${completion}]`, 25, yPos);
-                        yPos += 7;
-                    });
-
-                    yPos += 5;
                 }
 
-                doc.save(`${staff.name}_Training_Report.pdf`);
-                showToast('✅ PDF 已匯出', 'success');
-            } catch (error) {
-                console.error('匯出 PDF 失敗:', error);
-                showToast('❌ 匯出 PDF 失敗', 'error');
-            }
+                totalItems++;
+                const record = records[doc.id];
+
+                if (item.recordType === 'training' && record && record.status === 'completed') {
+                    completedItems++;
+                } else if (item.hasChecklist && record) {
+                    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                    let passedSteps = 0;
+                    
+                    item.checklist.forEach((step, index) => {
+                        if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
+                            passedSteps++;
+                        }
+                    });
+                    
+                    const allCriticalPassed = item.checklist.every((step, index) => {
+                        if (step.isSubtitle || !step.critical) return true;
+                        return record.checklistStatus && record.checklistStatus[index] === 'pass';
+                    });
+                    
+                    if (record.status === 'completed' && record.isPassed === true) {
+                        completedItems++;
+                    } else if (record.isPassed !== false && allCriticalPassed && passedSteps === actualSteps.length) {
+                        completedItems++;
+                    }
+                }
+            });
         }
+
+        const completionPercentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+        summaryData.push(
+            ['整體進度統計'],
+            ['總培訓項目', totalItems],
+            ['已完成項目', completedItems],
+            ['完成率', `${completionPercentage}%`]
+        );
+
+        const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+        
+        // 設定欄位寬度
+        summarySheet['!cols'] = [
+            { wch: 20 },
+            { wch: 30 }
+        ];
+        
+        XLSX.utils.book_append_sheet(workbook, summarySheet, '摘要');
+
+        // ⭐⭐⭐ 為每個分類創建工作表 ⭐⭐⭐
+        for (const category of categories) {
+            const itemsSnapshot = await db.collection('trainingItems')
+                .where('categoryId', '==', category.docId)
+                .get();
+
+            const items = [];
+            itemsSnapshot.forEach(doc => {
+                const item = doc.data();
+                
+                // 過濾職級
+                if (staffTrainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+                    if (item.pcaLevel !== staff.level) {
+                        return;
+                    }
+                }
+                
+                items.push({ docId: doc.id, ...item });
+            });
+            items.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            if (items.length === 0) continue;
+
+            const categoryData = [
+                [category.name],
+                []
+            ];
+
+            // ⭐⭐⭐ 逐項目生成資料 ⭐⭐⭐
+            for (const item of items) {
+                const record = records[item.docId];
+
+                categoryData.push([`項目: ${item.name}`]);
+                categoryData.push(['類型', item.recordType === 'training' ? '訓練記錄' : '評核 Checklist']);
+
+                if (item.recordType === 'training') {
+                    // ========== 訓練記錄類型 ==========
+                    const stepRecords = record?.stepRecords || {};
+                    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                    
+                    let completedSteps = 0;
+                    item.checklist.forEach((step, index) => {
+                        if (!step.isSubtitle) {
+                            const stepRecord = stepRecords[index];
+                            if (stepRecord?.trainingDate && 
+                                stepRecord?.traineeSignature && 
+                                stepRecord?.mentorSignature &&
+                                stepRecord?.supervisorSignature) {
+                                completedSteps++;
+                            }
+                        }
+                    });
+
+                    const isCompleted = record && record.status === 'completed';
+                    
+                    categoryData.push(
+                        ['狀態', isCompleted ? '已完成' : '進行中'],
+                        ['完成步驟', `${completedSteps} / ${actualSteps.length}`]
+                    );
+
+                    if (isCompleted) {
+                        categoryData.push(
+                            ['完成日期', record.completedAt ? new Date(record.completedAt.toDate()).toLocaleDateString('zh-TW') : '未記錄'],
+                            ['參與人員', record.participants || '未記錄']
+                        );
+                    }
+
+                    // ⭐ 逐步驟顯示
+                    categoryData.push([], ['步驟明細']);
+                    categoryData.push(['步驟', '教授日期', '新同事簽名', '陪帶同事簽名', 'Supervisor簽名', '狀態']);
+
+                    let stepCounter = 0;
+                    item.checklist.forEach((step, index) => {
+                        if (step.isSubtitle) {
+                            categoryData.push([`--- ${step.step} ---`, '', '', '', '', '']);
+                        } else {
+                            stepCounter++;
+                            const stepRecord = stepRecords[index] || {};
+                            const stepCompleted = stepRecord.trainingDate && 
+                                                 stepRecord.traineeSignature && 
+                                                 stepRecord.mentorSignature &&
+                                                 stepRecord.supervisorSignature;
+                            
+                            categoryData.push([
+                                `Step ${stepCounter}: ${step.step}`,
+                                stepRecord.trainingDate || '未填寫',
+                                stepRecord.traineeSignature || '未簽名',
+                                stepRecord.mentorSignature || '未簽名',
+                                stepRecord.supervisorSignature || '未簽名',
+                                stepCompleted ? '已完成' : '待完成'
+                            ]);
+                        }
+                    });
+
+                    if (record?.overallComment) {
+                        categoryData.push([], ['主管總評語', record.overallComment]);
+                    }
+
+                } else {
+                    // ========== 評核 Checklist 類型 ==========
+                    const checklistStatus = record?.checklistStatus || {};
+                    const remarks = record?.remarks || {};
+                    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                    
+                    let passedSteps = 0;
+                    item.checklist.forEach((step, index) => {
+                        if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                            passedSteps++;
+                        }
+                    });
+
+                    const completionRate = actualSteps.length > 0 
+                        ? Math.round((passedSteps / actualSteps.length) * 100) 
+                        : 0;
+
+                    let status = '待評核';
+                    if (record?.status === 'completed') {
+                        status = record.isPassed ? '已完成 (合格)' : '已完成 (不合格)';
+                    } else if (record?.status === 'pending') {
+                        status = '評核中';
+                    }
+
+                    categoryData.push(
+                        ['狀態', status],
+                        ['完成率', `${completionRate}%`],
+                        ['已通過步驟', `${passedSteps} / ${actualSteps.length}`]
+                    );
+
+                    if (record?.status === 'completed') {
+                        categoryData.push(
+                            ['評核日期', record.evaluatedAt ? new Date(record.evaluatedAt).toLocaleDateString('zh-TW') : '未記錄'],
+                            ['評核者', record.evaluatedByName || '未記錄']
+                        );
+
+                        if (record.evaluationSignatures) {
+                            categoryData.push(
+                                ['員工簽名', record.evaluationSignatures.staff],
+                                ['主管簽名', record.evaluationSignatures.supervisor]
+                            );
+                        }
+                    }
+
+                    // ⭐ 逐步驟顯示
+                    categoryData.push([], ['步驟評核明細']);
+                    categoryData.push(['步驟', '是否Critical', '評核結果', '備註']);
+
+                    let stepCounter = 0;
+                    item.checklist.forEach((step, index) => {
+                        if (step.isSubtitle) {
+                            categoryData.push([`--- ${step.step} ---`, '', '', '']);
+                        } else {
+                            stepCounter++;
+                            const status = checklistStatus[index] || 'pending';
+                            let statusText = '';
+                            
+                            if (status === 'pass') {
+                                statusText = '合格';
+                            } else if (status === 'fail') {
+                                statusText = '不合格';
+                            } else {
+                                statusText = '待評核';
+                            }
+
+                            categoryData.push([
+                                `Step ${stepCounter}: ${step.step}`,
+                                step.critical ? 'Critical' : '一般',
+                                statusText,
+                                remarks[index] || ''
+                            ]);
+                        }
+                    });
+
+                    if (record?.overallComment) {
+                        categoryData.push([], ['主管總評語', record.overallComment]);
+                    }
+                }
+
+                categoryData.push([], []); // 項目之間空兩行
+            }
+
+            // ⭐⭐⭐ 清理分類名稱（移除 Emoji，Excel 不支援）⭐⭐⭐
+            let sheetName = category.name.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+            
+            // Excel 工作表名稱限制：最多 31 字元，不能包含特殊符號
+            sheetName = sheetName.substring(0, 31).replace(/[:\\\/?*\[\]]/g, '');
+            
+            if (!sheetName) {
+                sheetName = `Category_${category.order || 1}`;
+            }
+
+            const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
+            
+            // 設定欄位寬度
+            categorySheet['!cols'] = [
+                { wch: 50 },  // 項目/步驟名稱
+                { wch: 15 },  // 日期/狀態
+                { wch: 15 },  // 簽名
+                { wch: 15 },  // 簽名
+                { wch: 15 },  // 簽名
+                { wch: 30 }   // 備註
+            ];
+            
+            XLSX.utils.book_append_sheet(workbook, categorySheet, sheetName);
+        }
+
+        // ⭐⭐⭐ 匯出 Excel 檔案 ⭐⭐⭐
+        const fileName = `${staff.name}_培訓記錄_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        
+        showToast('✅ Excel 表格已匯出', 'success');
+        
+    } catch (error) {
+        console.error('❌ 匯出 Excel 失敗:', error);
+        showToast('❌ 匯出 Excel 失敗: ' + error.message, 'error');
+    }
+}
 
         // ==================== 工具函數 ====================
         function showPage(pageId) {
