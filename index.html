@@ -5513,10 +5513,11 @@ Object.keys(recordsByItem).forEach(itemId => {
     }
 });
 
-                const now = new Date();
-                const timelineHtml = [];
+const now = new Date();
+const timelineHtml = [];
 
-importantItems.forEach(item => {
+// ⭐⭐⭐ 改用 for...of 以支援 await ⭐⭐⭐
+for (const item of importantItems) {
     let deadline = null;
     let daysRemaining = null;
     let statusClass = '';
@@ -5528,7 +5529,19 @@ importantItems.forEach(item => {
         daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
 
-    const record = records[item.docId];
+    // ⭐⭐⭐ 關鍵修復：強制重新查詢最新記錄 ⭐⭐⭐
+    const latestRecordSnapshot = await db.collection('trainingRecords')
+        .where('userId', '==', staffId)
+        .where('itemId', '==', item.docId)
+        .orderBy('completedAt', 'desc')
+        .limit(1)
+        .get();
+
+    let record = null;
+    if (!latestRecordSnapshot.empty) {
+        record = latestRecordSnapshot.docs[0].data();
+    }
+
     let isCompleted = false;
 
     // ========== 判斷是否已完成（合格） ==========
@@ -5562,7 +5575,7 @@ importantItems.forEach(item => {
         isCompleted = record.status === 'completed' && record.isPassed !== false;
     }
 
-    // ⭐⭐⭐ 新增：PCAIII Competency Assessment Form 特殊處理 ⭐⭐⭐
+    // ⭐⭐⭐ PCAIII Competency Assessment Form 特殊處理 ⭐⭐⭐
     const competencyFormNames = [
         'PCA I Competency Assessment Form (3個月)',
         'PCA I Competency Assessment Form (6個月)',
@@ -5578,15 +5591,15 @@ importantItems.forEach(item => {
     const isCompetencyForm = competencyFormNames.includes(item.name) || 
                             competencyFormNames.includes(item.originalName);
     
-    // ⭐⭐⭐ 關鍵邏輯：Competency Form 只要有 completed 記錄就移除（不論合格/不合格） ⭐⭐⭐
+    // ⭐⭐⭐ 關鍵：只要有 completed 記錄就移除（不論合格/不合格） ⭐⭐⭐
     if (isCompetencyForm && record && record.status === 'completed') {
-        console.log(`🔄 Competency Form 已評核，從時間表移除：${item.name}（${record.isPassed ? '✅ 合格' : '❌ 不合格'}）`);
-        return; // ⭐ 直接跳過此項目，不顯示在時間表
+        console.log(`🔄 Competency Form 已評核完成，從時間表移除：${item.name}（${record.isPassed ? '✅ 合格' : '❌ 不合格'}）`);
+        continue; // ⭐ 跳過此項目
     }
 
     // ⭐⭐⭐ 其他項目：只有「合格」才移除 ⭐⭐⭐
     if (isCompleted) {
-        return;
+        continue;
     }
 
     // ========== 未完成的項目：顯示在時間表 ==========
