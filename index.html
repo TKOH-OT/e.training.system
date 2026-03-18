@@ -5918,65 +5918,12 @@ importantItems.forEach(item => {
     }
 
     const record = records[item.docId];
-    let isCompleted = false;
+// ⭐⭐⭐ 【關鍵修正】只要 status === 'completed'，無論是否合格，都從時間表移除 ⭐⭐⭐
+if (record && record.status === 'completed') {
+    console.log(`✅ 項目已評核完成，從時間表移除：${item.name}（${record.isPassed ? '合格✅' : '不合格❌'}）`);
+    return; // ⭐ 不顯示已完成的項目
+}
 
-    if (item.recordType === 'training') {
-        isCompleted = record && record.status === 'completed' && record.isPassed === true;
-    } else if (item.hasChecklist && record) {
-        const allCriticalPassed = item.checklist.every((step, index) => {
-            if (step.isSubtitle || !step.critical) return true;
-            return record.checklistStatus && record.checklistStatus[index] === 'pass';
-        });
-        
-        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-        let passedSteps = 0;
-        
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
-                passedSteps++;
-            }
-        });
-        
-        const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
-        
-        if (record.status === 'completed') {
-            if (record.isPassed === true) {
-                isCompleted = true;
-            } else if (record.isPassed !== false && allCriticalPassed && completionRate === 100) {
-                isCompleted = true;
-            }
-        }
-    } else if (record) {
-        isCompleted = record.status === 'completed' && record.isPassed !== false;
-    }
-
-    // ⭐⭐⭐ Competency Assessment Form 特殊處理：完整名稱匹配 ⭐⭐⭐
-    const competencyFormNames = [
-        'PCA I Competency Assessment Form (3個月)',
-        'PCA I Competency Assessment Form (6個月)',
-        'PCA I Competency Assessment Form (12個月)',
-        'PCA II Competency Assessment Form (3個月)',
-        'PCA II Competency Assessment Form (6個月)',
-        'PCA II Competency Assessment Form (12個月)',
-        'PCA III Competency Assessment Form (3個月)',
-        'PCA III Competency Assessment Form (6個月)',
-        'PCA III Competency Assessment Form (12個月)'
-    ];
-    
-    const isCompetencyForm = competencyFormNames.includes(item.name) || 
-                            competencyFormNames.includes(item.originalName);
-    
-    if (isCompetencyForm && record && record.status === 'completed') {
-        console.log(`✅ Competency Form 已評核完成，從時間表移除：${item.name}（${record.isPassed ? '合格' : '不合格'}）`);
-        return;
-    }
-
-// ⭐⭐⭐ 關鍵修改：無論合格或不合格，已完成就移除 ⭐⭐⭐
-    if (isCompleted) {
-        return; // ⭐ 不顯示已完成的項目
-    }
-
-    
     // 後面的代碼：計算截止日期狀態
     if (deadline && daysRemaining < 0) {
         statusClass = 'overdue';
