@@ -2657,6 +2657,169 @@
     text-align: center;         /* ⭐ 置中 */
 }
 }
+
+        /* ⭐⭐⭐ 不合格提醒通知視窗 ⭐⭐⭐ */
+.fail-notification-panel {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    width: 400px;
+    max-height: 70vh;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(255, 71, 87, 0.4);
+    border: 3px solid #ff4757;
+    z-index: 1500;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    animation: slideInFromRight 0.5s ease;
+}
+
+@keyframes slideInFromRight {
+    from { transform: translateX(450px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.fail-notification-panel.minimized {
+    width: 80px;
+    height: 80px;
+    max-height: none;
+    cursor: pointer;
+}
+
+.fail-notification-panel.minimized .notification-header {
+    padding: 10px;
+    text-align: center;
+}
+
+.fail-notification-panel.minimized .notification-body,
+.fail-notification-panel.minimized .notification-footer,
+.fail-notification-panel.minimized .minimize-btn,
+.fail-notification-panel.minimized .close-btn {
+    display: none;
+}
+
+.fail-notification-panel.minimized .notification-count-badge {
+    display: block;
+}
+
+.notification-header {
+    background: linear-gradient(135deg, #ff4757 0%, #e84118 100%);
+    color: white;
+    padding: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+
+.notification-count-badge {
+    background: white;
+    color: #ff4757;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-left: auto;
+    display: none;
+}
+
+.fail-notification-panel.minimized .notification-count-badge {
+    display: block;
+    margin: 0 auto;
+    padding: 5px 10px;
+    font-size: 2em;
+}
+
+.notification-body {
+    padding: 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.notification-item {
+    background: #fff5f5;
+    border-left: 4px solid #ff4757;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.notification-item:hover {
+    background: #ffe6e6;
+    transform: translateX(-5px);
+    box-shadow: 0 3px 10px rgba(255, 71, 87, 0.2);
+}
+
+.notification-item-name {
+    font-weight: bold;
+    color: #ff4757;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+}
+
+.notification-item-details {
+    color: #666;
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+.notification-footer {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+}
+
+.minimize-btn, .close-btn {
+    position: absolute;
+    top: 15px;
+    width: 35px;
+    height: 35px;
+    border: none;
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.minimize-btn:hover, .close-btn:hover {
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.minimize-btn {
+    right: 60px;
+}
+
+.close-btn {
+    right: 15px;
+}
+
+@media screen and (max-width: 767px) {
+    .fail-notification-panel {
+        right: 10px;
+        left: 10px;
+        width: auto;
+        top: 70px;
+    }
+    
+    .fail-notification-panel.minimized {
+        width: 70px;
+        height: 70px;
+        left: auto;
+        right: 10px;
+    }
+}
     </style>
 </head>
 <body>
@@ -3158,6 +3321,24 @@
         </div>
     </div>
 
+    <!-- ⭐⭐⭐ 不合格提醒通知視窗 ⭐⭐⭐ -->
+<div id="failNotificationPanel" class="fail-notification-panel" style="display: none;">
+    <div class="notification-header">
+        <span>⚠️ 不合格提醒</span>
+        <span class="notification-count-badge" id="failCountBadge">0</span>
+        <button class="minimize-btn" onclick="toggleNotificationPanel()" title="縮小視窗">➖</button>
+        <button class="close-btn" onclick="closeNotificationPanel()" title="關閉通知">✖</button>
+    </div>
+    <div class="notification-body" id="failNotificationBody">
+        <!-- 動態生成不合格項目 -->
+    </div>
+    <div class="notification-footer">
+        <button class="btn btn-info btn-small" onclick="toggleNotificationPanel()" style="width: 100%;">
+            🔼 縮小視窗
+        </button>
+    </div>
+</div>
+    
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -3553,8 +3734,12 @@ function showMainPage() {
     }
     
     document.getElementById('mainMenu').innerHTML = menuHtml.join('');
-    showPage('mainPage');
-} // ⭐⭐⭐ 關鍵：這個 } 閉合整個 showMainPage() 函數 ⭐⭐⭐
+showPage('mainPage');
+
+// ⭐⭐⭐ 新增：登入後自動載入不合格通知 ⭐⭐⭐
+setTimeout(() => {
+    loadFailedRecordsNotification();
+}, 1000); // 延遲 1 秒載入，避免阻塞主選單
 
         // ==================== 選擇培訓類型 ====================
         function selectTrainingType(type) {
@@ -3562,6 +3747,208 @@ function showMainPage() {
             showTrainingManage();
         }
 
+        // ==================== 不合格提醒通知系統 ====================
+
+// 顯示通知面板
+function showNotificationPanel() {
+    const panel = document.getElementById('failNotificationPanel');
+    if (panel) {
+        panel.style.display = 'block';
+        panel.classList.remove('minimized');
+    }
+}
+
+// 關閉通知面板
+function closeNotificationPanel() {
+    const panel = document.getElementById('failNotificationPanel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+}
+
+// 切換最小化/最大化
+function toggleNotificationPanel() {
+    const panel = document.getElementById('failNotificationPanel');
+    if (panel) {
+        panel.classList.toggle('minimized');
+    }
+}
+
+// 點擊最小化狀態時恢復
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('failNotificationPanel');
+    if (panel && panel.classList.contains('minimized') && e.target.closest('.fail-notification-panel')) {
+        panel.classList.remove('minimized');
+    }
+});
+
+// ==================== 載入不合格記錄 ====================
+async function loadFailedRecordsNotification() {
+    try {
+        let failedRecords = [];
+        
+        if (currentUser.role === 'supervisor' || currentUser.role === 'admin') {
+            // 📊 主管：查看所有員工的不合格記錄
+            const staffSnapshot = await db.collection('accounts')
+                .where('role', '==', 'staff')
+                .get();
+            
+            for (const staffDoc of staffSnapshot.docs) {
+                const staff = staffDoc.data();
+                const staffId = staffDoc.id;
+                
+                // 查詢該員工的所有 completed + isPassed=false 的記錄
+                const recordsSnapshot = await db.collection('trainingRecords')
+                    .where('userId', '==', staffId)
+                    .where('status', '==', 'completed')
+                    .where('isPassed', '==', false)
+                    .get();
+                
+                for (const recordDoc of recordsSnapshot.docs) {
+                    const record = recordDoc.data();
+                    
+                    // 讀取項目資訊
+                    const itemDoc = await db.collection('trainingItems').doc(record.itemId).get();
+                    if (!itemDoc.exists) continue;
+                    const item = itemDoc.data();
+                    
+                    // 讀取分類資訊
+                    const categoryDoc = await db.collection('trainingCategories').doc(item.categoryId).get();
+                    if (!categoryDoc.exists) continue;
+                    const category = categoryDoc.data();
+                    
+                    failedRecords.push({
+                        staffId: staffId,
+                        staffName: staff.name,
+                        staffLevel: staff.level,
+                        itemId: record.itemId,
+                        itemName: item.name,
+                        categoryId: item.categoryId,
+                        categoryName: category.name,
+                        categoryEmoji: category.emoji,
+                        completedAt: record.completedAt,
+                        attemptNumber: record.attemptNumber || record.totalFailCount || 1
+                    });
+                }
+            }
+            
+        } else if (currentUser.role === 'staff') {
+            // 👤 員工：只查看自己的不合格記錄
+            const recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', currentUser.docId)
+                .where('status', '==', 'completed')
+                .where('isPassed', '==', false)
+                .get();
+            
+            for (const recordDoc of recordsSnapshot.docs) {
+                const record = recordDoc.data();
+                
+                const itemDoc = await db.collection('trainingItems').doc(record.itemId).get();
+                if (!itemDoc.exists) continue;
+                const item = itemDoc.data();
+                
+                const categoryDoc = await db.collection('trainingCategories').doc(item.categoryId).get();
+                if (!categoryDoc.exists) continue;
+                const category = categoryDoc.data();
+                
+                failedRecords.push({
+                    staffId: currentUser.docId,
+                    staffName: currentUser.name,
+                    staffLevel: currentUser.level,
+                    itemId: record.itemId,
+                    itemName: item.name,
+                    categoryId: item.categoryId,
+                    categoryName: category.name,
+                    categoryEmoji: category.emoji,
+                    completedAt: record.completedAt,
+                    attemptNumber: record.attemptNumber || record.totalFailCount || 1
+                });
+            }
+        }
+        
+        // ⭐⭐⭐ 顯示通知 ⭐⭐⭐
+        if (failedRecords.length > 0) {
+            displayFailNotification(failedRecords);
+        }
+        
+    } catch (error) {
+        console.error('載入不合格記錄失敗:', error);
+    }
+}
+
+// ==================== 顯示不合格通知 ====================
+function displayFailNotification(failedRecords) {
+    const panel = document.getElementById('failNotificationPanel');
+    const body = document.getElementById('failNotificationBody');
+    const badge = document.getElementById('failCountBadge');
+    
+    if (!panel || !body || !badge) return;
+    
+    // 更新數量
+    badge.textContent = failedRecords.length;
+    
+    // 生成通知項目
+    let notificationHtml = '';
+    
+    failedRecords.forEach(record => {
+        const dateStr = record.completedAt ? 
+            new Date(record.completedAt.toDate()).toLocaleDateString('zh-TW') : 
+            '未知日期';
+        
+        notificationHtml += `
+            <div class="notification-item" onclick="goToFailedItem('${record.staffId}', '${record.categoryId}', '${record.itemId}')">
+                <div class="notification-item-name">
+                    ${record.categoryEmoji} ${record.itemName}
+                </div>
+                <div class="notification-item-details">
+                    ${currentUser.role !== 'staff' ? `👤 員工：${record.staffName} (${record.staffLevel})<br>` : ''}
+                    📂 分類：${record.categoryName}<br>
+                    📅 評核日期：${dateStr}<br>
+                    ❌ 評核結果：不合格（第 ${record.attemptNumber} 次）
+                </div>
+            </div>
+        `;
+    });
+    
+    body.innerHTML = notificationHtml;
+    
+    // 顯示通知面板
+    showNotificationPanel();
+    
+    // ⭐ 播放提示音效（可選）
+    console.log(`⚠️ 發現 ${failedRecords.length} 項不合格培訓記錄`);
+}
+
+// ==================== 點擊不合格項目，跳轉到評核頁面 ====================
+async function goToFailedItem(staffId, categoryId, itemId) {
+    closeNotificationPanel();
+    
+    // 設定全域變數
+    currentStaffId = staffId;
+    currentCategoryId = categoryId;
+    
+    // 跳轉到培訓進度頁面
+    if (currentUser.role === 'staff') {
+        await showTrainingProgress(staffId);
+    } else {
+        await showTrainingProgress(staffId);
+    }
+    
+    // 等待頁面載入完成後，展開該分類
+    setTimeout(async () => {
+        await showCategoryEvaluation(categoryId);
+        
+        // 再展開該項目卡片
+        setTimeout(() => {
+            const card = document.getElementById(`eval_item_${itemId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.classList.add('expanded');
+            }
+        }, 500);
+    }, 500);
+}
+        
         // ==================== 員工查看自己的進度 ====================
         function viewMyProgress() {
             currentStaffId = currentUser.docId;
@@ -5582,10 +5969,13 @@ importantItems.forEach(item => {
         return;
     }
 
+// ⭐⭐⭐ 關鍵修改：無論合格或不合格，已完成就移除 ⭐⭐⭐
     if (isCompleted) {
-        return;
+        return; // ⭐ 不顯示已完成的項目
     }
 
+    
+    // 後面的代碼：計算截止日期狀態
     if (deadline && daysRemaining < 0) {
         statusClass = 'overdue';
         statusText = `⚠️ 已逾期 ${Math.abs(daysRemaining)} 天`;
@@ -5598,6 +5988,7 @@ importantItems.forEach(item => {
         statusText = '⏳ 待完成';
     }
 
+     // 生成時間表項目 HTML
     timelineHtml.push(`
         <div class="timeline-item ${statusClass}" onclick="quickEvaluate('${item.categoryName}', '${item.docId}')">
             <div class="timeline-item-info">
@@ -6457,16 +6848,16 @@ async function toggleEvalItemCard(itemId) {
         const card = document.getElementById(`eval_item_${itemId}`);
         const allCards = document.querySelectorAll('#evaluationContent .item-card');
         
-        // ⭐⭐⭐ 修改：只允許展開，不允許收起 ⭐⭐⭐
+        // ⭐⭐⭐ 只允許展開，不允許收起 ⭐⭐⭐
         if (card.classList.contains('expanded')) {
-            // 已展開時，點擊卡片不做任何事
-            return;
+            return; // 已展開時不做任何事
         }
         
-        // ⭐⭐⭐ 取得項目類型 ⭐⭐⭐
+        // ⭐⭐⭐ 讀取項目資料 ⭐⭐⭐
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
         
+        // ⭐⭐⭐ 智能選擇記錄 ⭐⭐⭐
         const allRecordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
@@ -6497,17 +6888,15 @@ async function toggleEvalItemCard(itemId) {
         
         // ⭐⭐⭐ 已完成記錄 → 顯示選項彈窗 ⭐⭐⭐
         if (record && record.status === 'completed') {
-            // ⭐ 判斷類型：訓練記錄 vs 評核 Checklist
             if (item.recordType === 'training') {
-                showTrainingCompletedOptions(itemId); // 訓練記錄選項
+                showTrainingCompletedOptions(itemId);
             } else {
-                showCompletedItemOptions(itemId, record.isPassed || false); // 評核選項
+                showCompletedItemOptions(itemId, record.isPassed || false);
             }
         }
 
-        // 先收起所有卡片
+        // 先收起所有卡片，再展開當前卡片
         allCards.forEach(c => c.classList.remove('expanded'));
-        // 展開當前卡片
         card.classList.add('expanded');
         
     } catch (error) {
