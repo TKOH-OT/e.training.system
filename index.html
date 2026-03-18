@@ -3740,7 +3740,9 @@ showPage('mainPage');
 setTimeout(() => {
     loadFailedRecordsNotification();
 }, 1000); // 延遲 1 秒載入，避免阻塞主選單
-
+    
+} // ⭐ 閉合 showMainPage() 函數
+        
         // ==================== 選擇培訓類型 ====================
         function selectTrainingType(type) {
             currentTrainingType = type;
