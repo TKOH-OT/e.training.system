@@ -2694,10 +2694,11 @@
 
 .fail-notification-panel.minimized .notification-body,
 .fail-notification-panel.minimized .notification-footer,
-.fail-notification-panel.minimized .minimize-btn,
 .fail-notification-panel.minimized .close-btn {
     display: none;
 }
+
+/* ⭐⭐⭐ 移除 .minimize-btn，讓它保持顯示 ⭐⭐⭐ */
 
 .fail-notification-panel.minimized .notification-count-badge {
     display: block;
@@ -3736,9 +3737,11 @@ function showMainPage() {
     document.getElementById('mainMenu').innerHTML = menuHtml.join('');
 showPage('mainPage');
 
-// ⭐⭐⭐ 新增：登入後自動載入不合格通知 ⭐⭐⭐
+// ⭐⭐⭐ 新增：登入後自動載入不合格通知（只有主管和管理員）⭐⭐⭐
 setTimeout(() => {
-    loadFailedRecordsNotification();
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        loadFailedRecordsNotification();
+    }
 }, 1000); // 延遲 1 秒載入，避免阻塞主選單
     
 } // ⭐ 閉合 showMainPage() 函數
@@ -3765,28 +3768,71 @@ function closeNotificationPanel() {
     const panel = document.getElementById('failNotificationPanel');
     if (panel) {
         panel.style.display = 'none';
+        // ⭐⭐⭐ 新增：清空通知內容 ⭐⭐⭐
+        const body = document.getElementById('failNotificationBody');
+        if (body) {
+            body.innerHTML = '';
+        }
+        const badge = document.getElementById('failCountBadge');
+        if (badge) {
+            badge.textContent = '0';
+        }
     }
 }
 
 // 切換最小化/最大化
 function toggleNotificationPanel() {
     const panel = document.getElementById('failNotificationPanel');
+    const minimizeBtn = document.querySelector('.minimize-btn');
+    
     if (panel) {
-        panel.classList.toggle('minimized');
+        const isMinimized = panel.classList.contains('minimized');
+        
+        if (isMinimized) {
+            // 展開狀態
+            panel.classList.remove('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.textContent = '➖';
+                minimizeBtn.title = '縮小視窗';
+            }
+        } else {
+            // 縮小狀態
+            panel.classList.add('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.textContent = '🔼';
+                minimizeBtn.title = '展開視窗';
+            }
+        }
     }
 }
 
-// 點擊最小化狀態時恢復
+// ⭐⭐⭐ 修改：只在點擊數字區域時恢復 ⭐⭐⭐
 document.addEventListener('click', (e) => {
     const panel = document.getElementById('failNotificationPanel');
-    if (panel && panel.classList.contains('minimized') && e.target.closest('.fail-notification-panel')) {
-        panel.classList.remove('minimized');
+    if (panel && panel.classList.contains('minimized')) {
+        // 只在點擊數字 badge 或標題時恢復
+        if (e.target.closest('.notification-count-badge') || 
+            (e.target.closest('.notification-header') && !e.target.closest('.minimize-btn') && !e.target.closest('.close-btn'))) {
+            panel.classList.remove('minimized');
+            const minimizeBtn = document.querySelector('.minimize-btn');
+            if (minimizeBtn) {
+                minimizeBtn.textContent = '➖';
+                minimizeBtn.title = '縮小視窗';
+            }
+        }
     }
 });
 
 // ==================== 載入不合格記錄 ====================
 async function loadFailedRecordsNotification() {
     try {
+        // ⭐⭐⭐ 新增：只有主管和管理員可以查看 ⭐⭐⭐
+        if (currentUser.role !== 'admin' && currentUser.role !== 'supervisor') {
+            console.log('👤 員工帳戶不顯示不合格提醒');
+            closeNotificationPanel();
+            return;
+        }
+        
         let failedRecords = [];
         
         if (currentUser.role === 'supervisor' || currentUser.role === 'admin') {
@@ -3837,44 +3883,6 @@ async function loadFailedRecordsNotification() {
                         attemptNumber: record.attemptNumber || record.totalFailCount || 1
                     });
                 }
-            }
-            
-        } else if (currentUser.role === 'staff') {
-            // 👤 員工：只查看自己的不合格記錄
-            const recordsSnapshot = await db.collection('trainingRecords')
-                .where('userId', '==', currentUser.docId)
-                .where('status', '==', 'completed')
-                .where('isPassed', '==', false)
-                .get();
-            
-            for (const recordDoc of recordsSnapshot.docs) {
-                const record = recordDoc.data();
-                
-                // ⭐⭐⭐ 跳過已確認的記錄 ⭐⭐⭐
-                if (record.failConfirmed === true) {
-                    continue;
-                }
-                
-                const itemDoc = await db.collection('trainingItems').doc(record.itemId).get();
-                if (!itemDoc.exists) continue;
-                const item = itemDoc.data();
-                
-                const categoryDoc = await db.collection('trainingCategories').doc(item.categoryId).get();
-                if (!categoryDoc.exists) continue;
-                const category = categoryDoc.data();
-                
-                failedRecords.push({
-                    staffId: currentUser.docId,
-                    staffName: currentUser.name,
-                    staffLevel: currentUser.level,
-                    itemId: record.itemId,
-                    itemName: item.name,
-                    categoryId: item.categoryId,
-                    categoryName: category.name,
-                    categoryEmoji: category.emoji,
-                    completedAt: record.completedAt,
-                    attemptNumber: record.attemptNumber || record.totalFailCount || 1
-                });
             }
         }
         
@@ -3940,7 +3948,7 @@ function displayFailNotification(failedRecords) {
     console.log(`⚠️ 發現 ${failedRecords.length} 項不合格培訓記錄`);
 }
 
-// ==================== 點擊不合格項目，跳轉到評核頁面 ====================
+// ==================== 點擊不合格項目，跳轉到評核記錄列表頁面 ====================
 async function goToFailedItem(staffId, categoryId, itemId) {
     closeNotificationPanel();
     
@@ -3948,26 +3956,8 @@ async function goToFailedItem(staffId, categoryId, itemId) {
     currentStaffId = staffId;
     currentCategoryId = categoryId;
     
-    // 跳轉到培訓進度頁面
-    if (currentUser.role === 'staff') {
-        await showTrainingProgress(staffId);
-    } else {
-        await showTrainingProgress(staffId);
-    }
-    
-    // 等待頁面載入完成後，展開該分類
-    setTimeout(async () => {
-        await showCategoryEvaluation(categoryId);
-        
-        // 再展開該項目卡片
-        setTimeout(() => {
-            const card = document.getElementById(`eval_item_${itemId}`);
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                card.classList.add('expanded');
-            }
-        }, 500);
-    }, 500);
+    // ⭐⭐⭐ 修改：直接跳轉到評核記錄列表頁面 ⭐⭐⭐
+    await viewEvaluationRecordsList(itemId);
 }
         
         // ==================== 員工查看自己的進度 ====================
@@ -5558,10 +5548,12 @@ async function showStaffList(level) {
         document.getElementById('staffSearchInput').value = '';
         document.getElementById('staffSearchCount').textContent = `共 ${accountsSnapshot.size} 位同事`;
         
-        // ⭐⭐⭐ 新增：重新載入不合格提醒 ⭐⭐⭐
-        setTimeout(() => {
-            loadFailedRecordsNotification();
-        }, 500);
+// ⭐⭐⭐ 新增：重新載入不合格提醒（只有主管和管理員）⭐⭐⭐
+setTimeout(() => {
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        loadFailedRecordsNotification();
+    }
+}, 500);
         
     } catch (error) {
         console.error('載入員工列表失敗:', error);
