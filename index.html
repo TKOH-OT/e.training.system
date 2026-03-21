@@ -3851,19 +3851,13 @@ function showMainPage() {
     document.getElementById('mainMenu').innerHTML = menuHtml.join('');
 showPage('mainPage');
 
-// ⭐⭐⭐ 優化：非同步載入，不阻塞主選單顯示 ⭐⭐⭐
-if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-    // 延遲 500ms 開始載入（讓主選單先顯示）
-    setTimeout(() => {
-        loadFailedRecordsNotification().catch(err => {
-            console.error('載入不合格提醒失敗:', err);
-        });
-        
-        loadTimelineNotification().catch(err => {
-            console.error('載入時間表提醒失敗:', err);
-        });
-    }, 500);
-}
+// ⭐⭐⭐ 新增：登入後自動載入不合格通知 + 重要評核提醒（只有主管和管理員）⭐⭐⭐
+setTimeout(() => {
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        loadFailedRecordsNotification();
+        loadTimelineNotification();  // ⭐ 新增：載入時間表提醒
+    }
+}, 1000);
     
 } // ⭐ 閉合 showMainPage() 函數
         
@@ -5669,17 +5663,13 @@ async function showStaffList(level) {
         document.getElementById('staffSearchInput').value = '';
         document.getElementById('staffSearchCount').textContent = `共 ${accountsSnapshot.size} 位同事`;
         
-// ⭐⭐⭐ 優化：改為非阻塞執行，立即返回 ⭐⭐⭐
-if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
-    // 非同步載入，不等待結果
-    loadFailedRecordsNotification().catch(err => {
-        console.error('載入不合格提醒失敗:', err);
-    });
-    
-    loadTimelineNotification().catch(err => {
-        console.error('載入時間表提醒失敗:', err);
-    });
-}
+// ⭐⭐⭐ 新增：重新載入不合格提醒 + 重要評核提醒（只有主管和管理員）⭐⭐⭐
+setTimeout(() => {
+    if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+        loadFailedRecordsNotification();
+        loadTimelineNotification();  // ⭐ 新增：載入時間表提醒
+    }
+}, 500);
         
     } catch (error) {
         console.error('載入員工列表失敗:', error);
@@ -5768,10 +5758,8 @@ function filterStaffList() {
                 // 根據員工職級決定要顯示哪個類型的培訓
                 const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
 
-               // ⭐⭐⭐ 優化：改為非同步載入，不阻塞主畫面 ⭐⭐⭐
-loadImportantTimeline(staffId, staff.joinDate, staffTrainingType).catch(err => {
-    console.error('載入重要評核時間表失敗:', err);
-});
+                // 載入重要評核時間表
+                await loadImportantTimeline(staffId, staff.joinDate, staffTrainingType);
 
                 const categoriesSnapshot = await db.collection('trainingCategories')
                     .where('trainingType', '==', staffTrainingType)
@@ -5952,175 +5940,169 @@ document.getElementById('trainingProgress').innerHTML = progressHtml.join('');
             }
         }
 
-// ==================== 載入重要評核時間表（優化版：減少查詢次數）====================
-async function loadImportantTimeline(staffId, joinDate, trainingType) {
-    try {
-        if (!joinDate) {
-            document.getElementById('importantTimeline').style.display = 'none';
-            return;
-        }
-
-        // ⭐⭐⭐ 優化 1：先顯示載入中提示 ⭐⭐⭐
-        document.getElementById('timelineItems').innerHTML = `
-            <div style="text-align: center; padding: 20px; color: #ffa502;">
-                <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
-                <div>正在載入重要評核時間表...</div>
-            </div>
-        `;
-        document.getElementById('importantTimeline').style.display = 'block';
-
-        const categoriesSnapshot = await db.collection('trainingCategories')
-            .where('trainingType', '==', trainingType)
-            .get();
-
-        const importantItems = [];
-
-        // ⭐⭐⭐ 優化 2：一次性讀取所有記錄（避免重複查詢）⭐⭐⭐
-        const allRecordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', staffId)
-            .get();
-
-        const recordsByItem = {};
-        allRecordsSnapshot.forEach(doc => {
-            const record = doc.data();
-            const itemId = record.itemId;
-            
-            if (!recordsByItem[itemId]) {
-                recordsByItem[itemId] = [];
-            }
-            recordsByItem[itemId].push({ docId: doc.id, ...record });
-        });
-
-        // 智能選擇顯示記錄（優先 pending）
-        const records = {};
-        Object.keys(recordsByItem).forEach(itemId => {
-            const itemRecords = recordsByItem[itemId];
-            const pendingRecord = itemRecords.find(r => r.status === 'pending');
-            
-            if (pendingRecord) {
-                records[itemId] = pendingRecord;
-            } else {
-                const completedRecords = itemRecords.filter(r => r.status === 'completed');
-                if (completedRecords.length > 0) {
-                    completedRecords.sort((a, b) => {
-                        const timeA = a.completedAt?.toDate?.() || new Date(0);
-                        const timeB = b.completedAt?.toDate?.() || new Date(0);
-                        return timeB - timeA;
-                    });
-                    records[itemId] = completedRecords[0];
+        // ==================== 載入重要評核時間表 ====================
+        async function loadImportantTimeline(staffId, joinDate, trainingType) {
+            try {
+                if (!joinDate) {
+                    document.getElementById('importantTimeline').style.display = 'none';
+                    return;
                 }
-            }
-        });
 
-        // ⭐ 先取得員工資料
-        const staffDoc = await db.collection('accounts').doc(staffId).get();
-        const staff = staffDoc.data();
+                const categoriesSnapshot = await db.collection('trainingCategories')
+                    .where('trainingType', '==', trainingType)
+                    .get();
 
-        for (const categoryDoc of categoriesSnapshot.docs) {
-            const category = categoryDoc.data();
-            
-            const itemsSnapshot = await db.collection('trainingItems')
-                .where('categoryId', '==', categoryDoc.id)
-                .where('isImportant', '==', true)
-                .get();
+                const importantItems = [];
 
-            itemsSnapshot.forEach(doc => {
-                const item = doc.data();
-                
-                // ⭐ 過濾 PCA 級別項目
-                if (category.trainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
-                    if (item.pcaLevel !== staff.level) {
-                        return;
-                    }
-                }
-                
-                importantItems.push({
-                    docId: doc.id,
-                    categoryName: category.name,
-                    categoryEmoji: category.emoji,
-                    ...item
-                });
-            });
+                for (const categoryDoc of categoriesSnapshot.docs) {
+                    const category = categoryDoc.data();
+                    
+                    const itemsSnapshot = await db.collection('trainingItems')
+                        .where('categoryId', '==', categoryDoc.id)
+                        .where('isImportant', '==', true)
+                        .get();
+
+ // ⭐ 先取得員工資料以獲取 level
+const staffDoc = await db.collection('accounts').doc(staffId).get();
+const staff = staffDoc.data();
+
+// ... 在 for loop 內部，找到 itemsSnapshot.forEach 這段
+
+itemsSnapshot.forEach(doc => {
+    const item = doc.data();
+    
+    // ⭐ 過濾 PCA 級別項目
+    if (category.trainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+        if (item.pcaLevel !== staff.level) {
+            return; // 跳過不符合級別的項目
         }
-
-        if (importantItems.length === 0) {
-            document.getElementById('importantTimeline').style.display = 'none';
-            return;
-        }
-
-        const now = new Date();
-        const timelineHtml = [];
-
-        importantItems.forEach(item => {
-            let deadline = null;
-            let daysRemaining = null;
-            let statusClass = '';
-            let statusText = '';
-
-            if (item.hasDeadline) {
-                deadline = calculateDeadline(joinDate, item.deadlineValue, item.deadlineUnit);
-                const diffTime = deadline - now;
-                daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            }
-
-            const record = records[item.docId];
-            
-            // ⭐ 只要 status === 'completed'，無論是否合格，都從時間表移除
-            if (record && record.status === 'completed') {
-                return;
-            }
-
-            // 計算截止日期狀態
-            if (deadline && daysRemaining < 0) {
-                statusClass = 'overdue';
-                statusText = `⚠️ 已逾期 ${Math.abs(daysRemaining)} 天`;
-            } else if (deadline && daysRemaining <= 7) {
-                statusClass = 'overdue';
-                statusText = `⏰ 剩餘 ${daysRemaining} 天`;
-            } else if (deadline) {
-                statusText = `⏰ 剩餘 ${daysRemaining} 天`;
-            } else {
-                statusText = '⏳ 待完成';
-            }
-
-            timelineHtml.push(`
-                <div class="timeline-item ${statusClass}" onclick="quickEvaluate('${item.categoryName}', '${item.docId}')">
-                    <div class="timeline-item-info">
-                        <div class="timeline-item-name">${item.categoryEmoji} ${item.name}</div>
-                        <div class="timeline-item-details">
-                            📂 ${item.categoryName}
-                            ${deadline ? ` | 📅 截止日期: ${deadline.toLocaleDateString('zh-TW')}` : ''}
-                        </div>
-                    </div>
-                    <div class="timeline-item-status">${statusText}</div>
-                </div>
-            `);
-        });
-        
-        if (timelineHtml.length === 0) {
-            document.getElementById('timelineItems').innerHTML = `
-                <div style="text-align: center; padding: 30px; background: #f0f0f0; border-radius: 12px; color: #999;">
-                    <div style="font-size: 3em; margin-bottom: 10px;">✅</div>
-                    <div style="font-size: 1.2em; font-weight: bold;">暫沒有未完成的重要評核</div>
-                    <div style="margin-top: 10px; font-size: 0.9em;">所有重要評核已完成</div>
-                </div>
-            `;
-        } else {
-            document.getElementById('timelineItems').innerHTML = timelineHtml.join('');
-        }
-
-        document.getElementById('importantTimeline').style.display = 'block';
-        
-    } catch (error) {
-        console.error('載入重要評核時間表失敗:', error);
-        document.getElementById('timelineItems').innerHTML = `
-            <div style="text-align: center; padding: 20px; color: #ff4757;">
-                <div style="font-size: 2em; margin-bottom: 10px;">❌</div>
-                <div>載入失敗，請重新整理頁面</div>
-            </div>
-        `;
     }
+    
+    importantItems.push({
+        docId: doc.id,
+        categoryName: category.name,
+        categoryEmoji: category.emoji,
+        ...item
+    });
+});
+                }
+
+                if (importantItems.length === 0) {
+                    document.getElementById('importantTimeline').style.display = 'none';
+                    return;
+                }
+
+                // ⭐⭐⭐ 修復：智能選擇記錄（優先 pending，否則取最新 completed）⭐⭐⭐
+const recordsSnapshot = await db.collection('trainingRecords')
+    .where('userId', '==', staffId)
+    .get();
+
+const recordsByItem = {};
+recordsSnapshot.forEach(doc => {
+    const record = doc.data();
+    const itemId = record.itemId;
+    
+    if (!recordsByItem[itemId]) {
+        recordsByItem[itemId] = [];
+    }
+    recordsByItem[itemId].push({ docId: doc.id, ...record });
+});
+
+// ⭐⭐⭐ 關鍵修復：智能選擇顯示記錄 ⭐⭐⭐
+const records = {};
+Object.keys(recordsByItem).forEach(itemId => {
+    const itemRecords = recordsByItem[itemId];
+    
+    // 優先選擇 pending 記錄
+    const pendingRecord = itemRecords.find(r => r.status === 'pending');
+    
+    if (pendingRecord) {
+        records[itemId] = pendingRecord;
+    } else {
+        // 沒有 pending 記錄，取最新的 completed 記錄
+        const completedRecords = itemRecords.filter(r => r.status === 'completed');
+        if (completedRecords.length > 0) {
+            // 按完成時間排序，取最新的
+            completedRecords.sort((a, b) => {
+                const timeA = a.completedAt?.toDate?.() || new Date(0);
+                const timeB = b.completedAt?.toDate?.() || new Date(0);
+                return timeB - timeA; // 降序排列，最新的在前
+            });
+            records[itemId] = completedRecords[0];
+        }
+    }
+});
+
+                const now = new Date();
+                const timelineHtml = [];
+
+importantItems.forEach(item => {
+    let deadline = null;
+    let daysRemaining = null;
+    let statusClass = '';
+    let statusText = '';
+
+    if (item.hasDeadline) {
+        deadline = calculateDeadline(joinDate, item.deadlineValue, item.deadlineUnit);
+        const diffTime = deadline - now;
+        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    const record = records[item.docId];
+// ⭐⭐⭐ 【關鍵修正】只要 status === 'completed'，無論是否合格，都從時間表移除 ⭐⭐⭐
+if (record && record.status === 'completed') {
+    console.log(`✅ 項目已評核完成，從時間表移除：${item.name}（${record.isPassed ? '合格✅' : '不合格❌'}）`);
+    return; // ⭐ 不顯示已完成的項目
 }
+
+    // 後面的代碼：計算截止日期狀態
+    if (deadline && daysRemaining < 0) {
+        statusClass = 'overdue';
+        statusText = `⚠️ 已逾期 ${Math.abs(daysRemaining)} 天`;
+    } else if (deadline && daysRemaining <= 7) {
+        statusClass = 'overdue';
+        statusText = `⏰ 剩餘 ${daysRemaining} 天`;
+    } else if (deadline) {
+        statusText = `⏰ 剩餘 ${daysRemaining} 天`;
+    } else {
+        statusText = '⏳ 待完成';
+    }
+
+     // 生成時間表項目 HTML
+    timelineHtml.push(`
+        <div class="timeline-item ${statusClass}" onclick="quickEvaluate('${item.categoryName}', '${item.docId}')">
+            <div class="timeline-item-info">
+                <div class="timeline-item-name">${item.categoryEmoji} ${item.name}</div>
+                <div class="timeline-item-details">
+                    📂 ${item.categoryName}
+                    ${deadline ? ` | 📅 截止日期: ${deadline.toLocaleDateString('zh-TW')}` : ''}
+                </div>
+            </div>
+            <div class="timeline-item-status">${statusText}</div>
+        </div>
+    `);
+});
+                
+// ⭐ 檢查是否有未完成的項目
+if (timelineHtml.length === 0) {
+    // 沒有未完成的重要評核 - 顯示灰色狀態
+    document.getElementById('timelineItems').innerHTML = `
+        <div style="text-align: center; padding: 30px; background: #f0f0f0; border-radius: 12px; color: #999;">
+            <div style="font-size: 3em; margin-bottom: 10px;">✅</div>
+            <div style="font-size: 1.2em; font-weight: bold;">暫沒有未完成的重要評核</div>
+            <div style="margin-top: 10px; font-size: 0.9em;">所有重要評核已完成</div>
+        </div>
+    `;
+} else {
+    // 有未完成的項目 - 正常顯示
+    document.getElementById('timelineItems').innerHTML = timelineHtml.join('');
+}
+
+document.getElementById('importantTimeline').style.display = 'block';
+            } catch (error) {
+                console.error('載入重要評核時間表失敗:', error);
+            }
+        }
 
         // ==================== 快速評核（從時間表點擊）====================
         async function quickEvaluate(categoryName, itemId) {
@@ -14178,7 +14160,17 @@ async function confirmFailedRecord(staffId, itemId) {
     
     // ⭐ 立即顯示成功訊息
     showToast('✅ 已標記為「已確認」', 'success');
-        }
+        
+        // ⭐ 重新載入通知（會自動過濾已確認的記錄）
+        setTimeout(() => {
+            loadFailedRecordsNotification();
+        }, 500);
+        
+    } catch (error) {
+        console.error('確認記錄失敗:', error);
+        showToast('❌ 操作失敗', 'error');
+    }
+}
     </script>
 </body>
 </html>
