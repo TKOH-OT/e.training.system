@@ -2698,6 +2698,120 @@
     display: none;
 }
 
+        /* ⭐⭐⭐ 重要評核時間表提醒視窗 ⭐⭐⭐ */
+.timeline-notification-panel {
+    position: fixed;
+    top: 80px;
+    left: 20px;  /* ⭐ 放在左側，避免與不合格提醒重疊 */
+    width: 400px;
+    max-height: 70vh;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(255, 165, 2, 0.4);
+    border: 3px solid #ffa502;
+    z-index: 1500;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    animation: slideInFromLeft 0.5s ease;
+}
+
+@keyframes slideInFromLeft {
+    from { transform: translateX(-450px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.timeline-notification-panel.minimized {
+    width: 80px;
+    height: 80px;
+    max-height: none;
+    cursor: pointer;
+}
+
+.timeline-notification-panel.minimized .notification-header {
+    padding: 10px;
+    text-align: center;
+}
+
+.timeline-notification-panel.minimized .notification-body,
+.timeline-notification-panel.minimized .notification-footer,
+.timeline-notification-panel.minimized .close-btn {
+    display: none;
+}
+
+.timeline-notification-panel.minimized .notification-count-badge {
+    display: block;
+}
+
+.timeline-notification-panel .notification-header {
+    background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
+    color: white;
+    padding: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+}
+
+.timeline-notification-item {
+    background: #fffbf0;
+    border-left: 4px solid #ffa502;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.timeline-notification-item:hover {
+    background: #fff3cd;
+    transform: translateX(5px);
+    box-shadow: 0 3px 10px rgba(255, 165, 2, 0.2);
+}
+
+.timeline-notification-item.overdue {
+    background: #fff5f5;
+    border-left-color: #ff4757;
+}
+
+.timeline-notification-item.overdue:hover {
+    background: #ffe6e6;
+}
+
+.timeline-notification-item-name {
+    font-weight: bold;
+    color: #ffa502;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+}
+
+.timeline-notification-item.overdue .timeline-notification-item-name {
+    color: #ff4757;
+}
+
+.timeline-notification-item-details {
+    color: #666;
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+@media screen and (max-width: 767px) {
+    .timeline-notification-panel {
+        left: 10px;
+        right: 10px;
+        width: auto;
+        top: 70px;
+    }
+    
+    .timeline-notification-panel.minimized {
+        width: 70px;
+        height: 70px;
+        left: 10px;
+        right: auto;
+    }
+}
+        
 /* ⭐⭐⭐ 移除 .minimize-btn，讓它保持顯示 ⭐⭐⭐ */
 
 .fail-notification-panel.minimized .notification-count-badge {
@@ -3322,19 +3436,19 @@
         </div>
     </div>
 
-    <!-- ⭐⭐⭐ 不合格提醒通知視窗 ⭐⭐⭐ -->
-<div id="failNotificationPanel" class="fail-notification-panel" style="display: none;">
+<!-- ⭐⭐⭐ 重要評核時間表提醒視窗 ⭐⭐⭐ -->
+<div id="timelineNotificationPanel" class="timeline-notification-panel" style="display: none;">
     <div class="notification-header">
-        <span>⚠️ 不合格提醒</span>
-        <span class="notification-count-badge" id="failCountBadge">0</span>
-        <button class="minimize-btn" onclick="toggleNotificationPanel()" title="縮小視窗">➖</button>
-        <button class="close-btn" onclick="closeNotificationPanel()" title="關閉通知">✖</button>
+        <span>⏰ 重要評核提醒</span>
+        <span class="notification-count-badge" id="timelineCountBadge">0</span>
+        <button class="minimize-btn" onclick="toggleTimelineNotificationPanel()" title="縮小視窗">➖</button>
+        <button class="close-btn" onclick="closeTimelineNotificationPanel()" title="關閉通知">✖</button>
     </div>
-    <div class="notification-body" id="failNotificationBody">
-        <!-- 動態生成不合格項目 -->
+    <div class="notification-body" id="timelineNotificationBody">
+        <!-- 動態生成重要評核項目 -->
     </div>
     <div class="notification-footer">
-        <button class="btn btn-info btn-small" onclick="toggleNotificationPanel()" style="width: 100%;">
+        <button class="btn btn-info btn-small" onclick="toggleTimelineNotificationPanel()" style="width: 100%;">
             🔼 縮小視窗
         </button>
     </div>
@@ -3737,12 +3851,13 @@ function showMainPage() {
     document.getElementById('mainMenu').innerHTML = menuHtml.join('');
 showPage('mainPage');
 
-// ⭐⭐⭐ 新增：登入後自動載入不合格通知（只有主管和管理員）⭐⭐⭐
+// ⭐⭐⭐ 新增：登入後自動載入不合格通知 + 重要評核提醒（只有主管和管理員）⭐⭐⭐
 setTimeout(() => {
     if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
         loadFailedRecordsNotification();
+        loadTimelineNotification();  // ⭐ 新增：載入時間表提醒
     }
-}, 1000); // 延遲 1 秒載入，避免阻塞主選單
+}, 1000);
     
 } // ⭐ 閉合 showMainPage() 函數
         
@@ -5548,10 +5663,11 @@ async function showStaffList(level) {
         document.getElementById('staffSearchInput').value = '';
         document.getElementById('staffSearchCount').textContent = `共 ${accountsSnapshot.size} 位同事`;
         
-// ⭐⭐⭐ 新增：重新載入不合格提醒（只有主管和管理員）⭐⭐⭐
+// ⭐⭐⭐ 新增：重新載入不合格提醒 + 重要評核提醒（只有主管和管理員）⭐⭐⭐
 setTimeout(() => {
     if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
         loadFailedRecordsNotification();
+        loadTimelineNotification();  // ⭐ 新增：載入時間表提醒
     }
 }, 500);
         
@@ -13734,39 +13850,317 @@ async function confirmPCAUpgrade(fromLevel, toLevel) {
     }
 }
 
-        // ==================== 確認不合格記錄（標記為已處理）====================
-async function confirmFailedRecord(staffId, itemId) {
-    if (!confirm('❓ 確定要標記此記錄為「已確認」嗎？\n\n✅ 標記後將不再顯示在提醒區')) {
-        return;
+        // ==================== 重要評核時間表提醒系統 ====================
+
+// 顯示時間表通知面板
+function showTimelineNotificationPanel() {
+    const panel = document.getElementById('timelineNotificationPanel');
+    if (panel) {
+        panel.style.display = 'block';
+        panel.classList.remove('minimized');
     }
+}
+
+// 關閉時間表通知面板
+function closeTimelineNotificationPanel() {
+    const panel = document.getElementById('timelineNotificationPanel');
+    if (panel) {
+        panel.style.display = 'none';
+        const body = document.getElementById('timelineNotificationBody');
+        if (body) {
+            body.innerHTML = '';
+        }
+        const badge = document.getElementById('timelineCountBadge');
+        if (badge) {
+            badge.textContent = '0';
+        }
+    }
+}
+
+// 切換時間表通知最小化/最大化
+function toggleTimelineNotificationPanel() {
+    const panel = document.getElementById('timelineNotificationPanel');
+    const minimizeBtn = panel?.querySelector('.minimize-btn');
     
-    try {
-        // ⭐ 讀取該記錄，加上「已確認」標記
-        const recordsSnapshot = await db.collection('trainingRecords')
-            .where('userId', '==', staffId)
-            .where('itemId', '==', itemId)
-            .where('status', '==', 'completed')
-            .where('isPassed', '==', false)
-            .orderBy('completedAt', 'desc')
-            .limit(1)
-            .get();
+    if (panel) {
+        const isMinimized = panel.classList.contains('minimized');
         
-        if (recordsSnapshot.empty) {
-            showToast('⚠️ 找不到該記錄', 'warning');
+        if (isMinimized) {
+            panel.classList.remove('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.textContent = '➖';
+                minimizeBtn.title = '縮小視窗';
+            }
+        } else {
+            panel.classList.add('minimized');
+            if (minimizeBtn) {
+                minimizeBtn.textContent = '🔼';
+                minimizeBtn.title = '展開視窗';
+            }
+        }
+    }
+}
+
+// ⭐⭐⭐ 點擊最小化數字時恢復 ⭐⭐⭐
+document.addEventListener('click', (e) => {
+    const panel = document.getElementById('timelineNotificationPanel');
+    if (panel && panel.classList.contains('minimized')) {
+        if (e.target.closest('.notification-count-badge') || 
+            (e.target.closest('.notification-header') && !e.target.closest('.minimize-btn') && !e.target.closest('.close-btn'))) {
+            panel.classList.remove('minimized');
+            const minimizeBtn = panel.querySelector('.minimize-btn');
+            if (minimizeBtn) {
+                minimizeBtn.textContent = '➖';
+                minimizeBtn.title = '縮小視窗';
+            }
+        }
+    }
+});
+
+// ==================== 載入重要評核時間表提醒 ====================
+async function loadTimelineNotification() {
+    try {
+        // ⭐⭐⭐ 只有主管和管理員可以查看 ⭐⭐⭐
+        if (currentUser.role !== 'admin' && currentUser.role !== 'supervisor') {
+            console.log('👤 員工帳戶不顯示重要評核提醒');
+            closeTimelineNotificationPanel();
             return;
         }
         
-        const recordId = recordsSnapshot.docs[0].id;
+        let urgentItems = [];
+        const now = new Date();
         
-        // ⭐⭐⭐ 標記為「已確認」⭐⭐⭐
-        await db.collection('trainingRecords').doc(recordId).update({
-            failConfirmed: true,
-            confirmedBy: currentUser.docId,
-            confirmedByName: currentUser.name,
-            confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
+        // 📊 查看所有員工的重要評核項目
+        const staffSnapshot = await db.collection('accounts')
+            .where('role', '==', 'staff')
+            .get();
+        
+        for (const staffDoc of staffSnapshot.docs) {
+            const staff = staffDoc.data();
+            const staffId = staffDoc.id;
+            
+            if (!staff.joinDate) continue;
+            
+            const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
+            
+            // 讀取重要評核項目
+            const categoriesSnapshot = await db.collection('trainingCategories')
+                .where('trainingType', '==', staffTrainingType)
+                .get();
+            
+            for (const categoryDoc of categoriesSnapshot.docs) {
+                const category = categoryDoc.data();
+                
+                const itemsSnapshot = await db.collection('trainingItems')
+                    .where('categoryId', '==', categoryDoc.id)
+                    .where('isImportant', '==', true)
+                    .get();
+                
+                for (const itemDoc of itemsSnapshot.docs) {
+                    const item = itemDoc.data();
+                    
+                    // ⭐ 過濾 PCA 級別
+                    if (staffTrainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+                        if (item.pcaLevel !== staff.level) {
+                            continue;
+                        }
+                    }
+                    
+                    if (!item.hasDeadline) continue;
+                    
+                    // 計算截止日期
+                    const deadline = calculateDeadline(staff.joinDate, item.deadlineValue, item.deadlineUnit);
+                    const diffTime = deadline - now;
+                    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    // ⭐⭐⭐ 檢查是否已完成 ⭐⭐⭐
+                    const recordsSnapshot = await db.collection('trainingRecords')
+                        .where('userId', '==', staffId)
+                        .where('itemId', '==', itemDoc.id)
+                        .where('status', '==', 'completed')
+                        .limit(1)
+                        .get();
+                    
+                    // 已完成的不顯示
+                    if (!recordsSnapshot.empty) {
+                        continue;
+                    }
+                    
+                    // ⭐⭐⭐ 只顯示逾期或即將逾期（7天內）的項目 ⭐⭐⭐
+                    if (daysRemaining <= 7) {
+                        urgentItems.push({
+                            staffId: staffId,
+                            staffName: staff.name,
+                            staffLevel: staff.level,
+                            itemId: itemDoc.id,
+                            itemName: item.name,
+                            categoryId: categoryDoc.id,
+                            categoryName: category.name,
+                            categoryEmoji: category.emoji,
+                            deadline: deadline,
+                            daysRemaining: daysRemaining,
+                            isOverdue: daysRemaining < 0
+                        });
+                    }
+                }
+            }
+        }
+        
+        // ⭐ 按剩餘天數排序（逾期的排最前）
+        urgentItems.sort((a, b) => {
+            if (a.isOverdue && !b.isOverdue) return -1;
+            if (!a.isOverdue && b.isOverdue) return 1;
+            return a.daysRemaining - b.daysRemaining;
         });
         
-        showToast('✅ 已標記為「已確認」', 'success');
+        // ⭐⭐⭐ 顯示通知 ⭐⭐⭐
+        if (urgentItems.length > 0) {
+            displayTimelineNotification(urgentItems);
+        } else {
+            closeTimelineNotificationPanel();
+        }
+        
+    } catch (error) {
+        console.error('載入重要評核提醒失敗:', error);
+    }
+}
+
+// ==================== 顯示重要評核通知 ====================
+function displayTimelineNotification(urgentItems) {
+    const panel = document.getElementById('timelineNotificationPanel');
+    const body = document.getElementById('timelineNotificationBody');
+    const badge = document.getElementById('timelineCountBadge');
+    
+    if (!panel || !body || !badge) return;
+    
+    badge.textContent = urgentItems.length;
+    
+    let notificationHtml = '';
+    
+    urgentItems.forEach(item => {
+        const dateStr = item.deadline.toLocaleDateString('zh-TW');
+        const daysText = item.isOverdue 
+            ? `⚠️ 已逾期 ${Math.abs(item.daysRemaining)} 天`
+            : `⏰ 剩餘 ${item.daysRemaining} 天`;
+        
+        const itemClass = item.isOverdue ? 'overdue' : '';
+        
+        notificationHtml += `
+            <div class="timeline-notification-item ${itemClass}" 
+                 onclick="goToTimelineItem('${item.staffId}', '${item.categoryId}', '${item.itemId}')">
+                <div class="timeline-notification-item-name">
+                    ${item.categoryEmoji} ${item.itemName}
+                </div>
+                <div class="timeline-notification-item-details">
+                    👤 員工：${item.staffName} (${item.staffLevel})<br>
+                    📂 分類：${item.categoryName}<br>
+                    📅 截止日期：${dateStr}<br>
+                    ${daysText}
+                </div>
+            </div>
+        `;
+    });
+    
+    body.innerHTML = notificationHtml;
+    showTimelineNotificationPanel();
+    
+    console.log(`⏰ 發現 ${urgentItems.length} 項緊急重要評核`);
+}
+
+// ==================== 點擊時間表項目，跳轉到評核頁面 ====================
+async function goToTimelineItem(staffId, categoryId, itemId) {
+    closeTimelineNotificationPanel();
+    
+    currentStaffId = staffId;
+    currentCategoryId = categoryId;
+    
+    await showTrainingProgress(staffId);
+    
+    setTimeout(async () => {
+        await showCategoryEvaluation(categoryId);
+        
+        setTimeout(() => {
+            const card = document.getElementById(`eval_item_${itemId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.classList.add('expanded');
+            }
+        }, 500);
+    }, 500);
+}
+        
+// ==================== 確認不合格記錄（標記為已處理）【優化版：前端即時更新】====================
+async function confirmFailedRecord(staffId, itemId) {
+    // ⭐⭐⭐ 關鍵優化：先在前端移除該項目，不等待 Firebase 回應 ⭐⭐⭐
+    const panel = document.getElementById('failNotificationPanel');
+    const body = document.getElementById('failNotificationBody');
+    const badge = document.getElementById('failCountBadge');
+    
+    if (!body || !badge) return;
+    
+    // ⭐ 先找到該通知項目的 DOM 元素
+    const items = body.querySelectorAll('.notification-item');
+    let targetItem = null;
+    
+    items.forEach(item => {
+        const onclickAttr = item.getAttribute('onclick');
+        if (onclickAttr && onclickAttr.includes(staffId) && onclickAttr.includes(itemId)) {
+            targetItem = item;
+        }
+    });
+    
+    // ⭐⭐⭐ 立即從畫面移除（不等 Firebase）⭐⭐⭐
+    if (targetItem) {
+        targetItem.style.opacity = '0';
+        targetItem.style.transform = 'translateX(-20px)';
+        
+        setTimeout(() => {
+            targetItem.remove();
+            
+            // 更新數量
+            const remainingItems = body.querySelectorAll('.notification-item');
+            badge.textContent = remainingItems.length;
+            
+            // 如果沒有剩餘項目，關閉面板
+            if (remainingItems.length === 0) {
+                closeNotificationPanel();
+            }
+        }, 300);
+    }
+    
+    // ⭐⭐⭐ 背景非同步更新 Firebase（不阻塞 UI）⭐⭐⭐
+    (async () => {
+        try {
+            const recordsSnapshot = await db.collection('trainingRecords')
+                .where('userId', '==', staffId)
+                .where('itemId', '==', itemId)
+                .where('status', '==', 'completed')
+                .where('isPassed', '==', false)
+                .orderBy('completedAt', 'desc')
+                .limit(1)
+                .get();
+            
+            if (!recordsSnapshot.empty) {
+                const recordId = recordsSnapshot.docs[0].id;
+                
+                await db.collection('trainingRecords').doc(recordId).update({
+                    failConfirmed: true,
+                    confirmedBy: currentUser.docId,
+                    confirmedByName: currentUser.name,
+                    confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('✅ 不合格記錄已確認並儲存至 Firebase');
+            }
+        } catch (error) {
+            console.error('確認記錄失敗:', error);
+            showToast('⚠️ 記錄已從畫面移除，但 Firebase 儲存失敗', 'warning');
+        }
+    })();
+    
+    // ⭐ 立即顯示成功訊息
+    showToast('✅ 已標記為「已確認」', 'success');
+}
         
         // ⭐ 重新載入通知（會自動過濾已確認的記錄）
         setTimeout(() => {
