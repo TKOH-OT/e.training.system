@@ -13755,28 +13755,6 @@ async function confirmFailedRecord(staffId, itemId) {
             showToast('⚠️ 找不到該記錄', 'warning');
             return;
         }
-        
-        const recordId = recordsSnapshot.docs[0].id;
-        
-        // ⭐⭐⭐ 標記為「已確認」⭐⭐⭐
-        await db.collection('trainingRecords').doc(recordId).update({
-            failConfirmed: true,
-            confirmedBy: currentUser.docId,
-            confirmedByName: currentUser.name,
-            confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        showToast('✅ 已標記為「已確認」', 'success');
-        
-        // ⭐ 重新載入通知（會自動過濾已確認的記錄）
-        setTimeout(() => {
-            loadFailedRecordsNotification();
-        }, 500);
-        
-    } catch (error) {
-        console.error('確認記錄失敗:', error);
-        showToast('❌ 操作失敗', 'error');
-    }
 }
     </script>
 </body>
