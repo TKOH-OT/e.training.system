@@ -2698,11 +2698,11 @@
     display: none;
 }
 
-        /* ⭐⭐⭐ 重要評核時間表提醒視窗 ⭐⭐⭐ */
+/* ⭐⭐⭐ 修改：貼近主選單左邊 ⭐⭐⭐ */
 .timeline-notification-panel {
     position: fixed;
-    top: 80px;
-    left: 20px;  /* ⭐ 放在左側，避免與不合格提醒重疊 */
+    top: 120px;       /* ⭐ 改為 120px，避開 top-bar */
+    left: 20px;       /* ⭐ 保持左側 20px */
     width: 400px;
     max-height: 70vh;
     background: white;
@@ -4040,26 +4040,29 @@ async function loadFailedRecordsNotification() {
             }
         }
         
-        // ⭐⭐⭐ 顯示通知 ⭐⭐⭐
-        if (failedRecords.length > 0) {
-            displayFailNotification(failedRecords);
-        } else {
-            // ⭐ 如果沒有記錄，關閉通知面板
-            closeNotificationPanel();
-        }
+// ⭐⭐⭐ 顯示通知（修正：如果已縮小，不要自動展開）⭐⭐⭐
+if (failedRecords.length > 0) {
+    displayFailNotification(failedRecords, true);  // ⭐ 新增參數 preserveState
+} else {
+    // ⭐ 如果沒有記錄，關閉通知面板
+    closeNotificationPanel();
+}
         
     } catch (error) {
         console.error('載入不合格記錄失敗:', error);
     }
 }
 
-// ==================== 顯示不合格通知 ====================
-function displayFailNotification(failedRecords) {
+// ==================== 顯示不合格通知（修正：保留縮小狀態）====================
+function displayFailNotification(failedRecords, preserveState = false) {  // ⭐ 新增參數
     const panel = document.getElementById('failNotificationPanel');
     const body = document.getElementById('failNotificationBody');
     const badge = document.getElementById('failCountBadge');
     
     if (!panel || !body || !badge) return;
+    
+    // ⭐⭐⭐ 記錄當前是否已縮小 ⭐⭐⭐
+    const wasMinimized = panel.classList.contains('minimized');
     
     // 更新數量
     badge.textContent = failedRecords.length;
@@ -4094,10 +4097,16 @@ function displayFailNotification(failedRecords) {
         `;
     });
     
-    body.innerHTML = notificationHtml;
+body.innerHTML = notificationHtml;
     
-    // 顯示通知面板
-    showNotificationPanel();
+    // ⭐⭐⭐ 修正：如果原本已縮小，保持縮小狀態 ⭐⭐⭐
+    if (preserveState && wasMinimized) {
+        panel.style.display = 'block';
+        panel.classList.add('minimized');  // ⭐ 保持縮小
+        console.log('✅ 保持不合格提醒縮小狀態');
+    } else {
+        showNotificationPanel();  // ⭐ 首次載入才展開
+    }
     
     console.log(`⚠️ 發現 ${failedRecords.length} 項不合格培訓記錄`);
 }
@@ -14095,9 +14104,9 @@ async function loadTimelineNotification() {
             return a.daysRemaining - b.daysRemaining;
         });
         
-        // ⭐⭐⭐ 顯示通知 ⭐⭐⭐
+       // ⭐⭐⭐ 顯示通知（修正：如果已縮小，不要自動展開）⭐⭐⭐
         if (urgentItems.length > 0) {
-            displayTimelineNotification(urgentItems);
+            displayTimelineNotification(urgentItems, true);  // ⭐ 新增參數 preserveState
         } else {
             closeTimelineNotificationPanel();
         }
@@ -14107,13 +14116,16 @@ async function loadTimelineNotification() {
     }
 }
 
-// ==================== 顯示重要評核通知 ====================
-function displayTimelineNotification(urgentItems) {
+// ==================== 顯示重要評核通知（修正：保留縮小狀態）====================
+function displayTimelineNotification(urgentItems, preserveState = false) {  // ⭐ 新增參數
     const panel = document.getElementById('timelineNotificationPanel');
     const body = document.getElementById('timelineNotificationBody');
     const badge = document.getElementById('timelineCountBadge');
     
     if (!panel || !body || !badge) return;
+    
+    // ⭐⭐⭐ 記錄當前是否已縮小 ⭐⭐⭐
+    const wasMinimized = panel.classList.contains('minimized');
     
     badge.textContent = urgentItems.length;
     
@@ -14143,8 +14155,16 @@ function displayTimelineNotification(urgentItems) {
         `;
     });
     
-    body.innerHTML = notificationHtml;
-    showTimelineNotificationPanel();
+body.innerHTML = notificationHtml;
+    
+    // ⭐⭐⭐ 修正：如果原本已縮小，保持縮小狀態 ⭐⭐⭐
+    if (preserveState && wasMinimized) {
+        panel.style.display = 'block';
+        panel.classList.add('minimized');  // ⭐ 保持縮小
+        console.log('✅ 保持重要評核提醒縮小狀態');
+    } else {
+        showTimelineNotificationPanel();  // ⭐ 首次載入才展開
+    }
     
     console.log(`⏰ 發現 ${urgentItems.length} 項緊急重要評核`);
 }
