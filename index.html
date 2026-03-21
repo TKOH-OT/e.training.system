@@ -3799,7 +3799,7 @@ async function loadFailedRecordsNotification() {
                 const staff = staffDoc.data();
                 const staffId = staffDoc.id;
                 
-                // 查詢該員工的所有 completed + isPassed=false 的記錄
+                // ⭐⭐⭐ 修改：過濾已確認的記錄 ⭐⭐⭐
                 const recordsSnapshot = await db.collection('trainingRecords')
                     .where('userId', '==', staffId)
                     .where('status', '==', 'completed')
@@ -3808,6 +3808,11 @@ async function loadFailedRecordsNotification() {
                 
                 for (const recordDoc of recordsSnapshot.docs) {
                     const record = recordDoc.data();
+                    
+                    // ⭐⭐⭐ 跳過已確認的記錄 ⭐⭐⭐
+                    if (record.failConfirmed === true) {
+                        continue;
+                    }
                     
                     // 讀取項目資訊
                     const itemDoc = await db.collection('trainingItems').doc(record.itemId).get();
@@ -3845,6 +3850,11 @@ async function loadFailedRecordsNotification() {
             for (const recordDoc of recordsSnapshot.docs) {
                 const record = recordDoc.data();
                 
+                // ⭐⭐⭐ 跳過已確認的記錄 ⭐⭐⭐
+                if (record.failConfirmed === true) {
+                    continue;
+                }
+                
                 const itemDoc = await db.collection('trainingItems').doc(record.itemId).get();
                 if (!itemDoc.exists) continue;
                 const item = itemDoc.data();
@@ -3871,6 +3881,9 @@ async function loadFailedRecordsNotification() {
         // ⭐⭐⭐ 顯示通知 ⭐⭐⭐
         if (failedRecords.length > 0) {
             displayFailNotification(failedRecords);
+        } else {
+            // ⭐ 如果沒有記錄，關閉通知面板
+            closeNotificationPanel();
         }
         
     } catch (error) {
@@ -3908,6 +3921,13 @@ function displayFailNotification(failedRecords) {
                     📅 評核日期：${dateStr}<br>
                     ❌ 評核結果：不合格（第 ${record.attemptNumber} 次）
                 </div>
+                <div style="margin-top: 10px; text-align: right;">
+                    <button class="btn btn-success btn-small" 
+                            onclick="event.stopPropagation(); confirmFailedRecord('${record.staffId}', '${record.itemId}')"
+                            style="font-size: 0.8em; padding: 5px 10px;">
+                        ✅ 已確認
+                    </button>
+                </div>
             </div>
         `;
     });
@@ -3917,7 +3937,6 @@ function displayFailNotification(failedRecords) {
     // 顯示通知面板
     showNotificationPanel();
     
-    // ⭐ 播放提示音效（可選）
     console.log(`⚠️ 發現 ${failedRecords.length} 項不合格培訓記錄`);
 }
 
@@ -5493,7 +5512,7 @@ async function createTrainingItem() {
             }
         }
 
-        // ==================== 顯示員工列表 ====================
+       // ==================== 顯示員工列表 ====================
 async function showStaffList(level) {
     currentStaffLevel = level;
     
@@ -5536,9 +5555,13 @@ async function showStaffList(level) {
 
         document.getElementById('staffList').innerHTML = staffListHtml.join('');
         
-        // ⭐⭐⭐ 新增以下兩行 ⭐⭐⭐
-        document.getElementById('staffSearchInput').value = '';  // 清空搜尋框
-        document.getElementById('staffSearchCount').textContent = `共 ${accountsSnapshot.size} 位同事`;  // 顯示總數
+        document.getElementById('staffSearchInput').value = '';
+        document.getElementById('staffSearchCount').textContent = `共 ${accountsSnapshot.size} 位同事`;
+        
+        // ⭐⭐⭐ 新增：重新載入不合格提醒 ⭐⭐⭐
+        setTimeout(() => {
+            loadFailedRecordsNotification();
+        }, 500);
         
     } catch (error) {
         console.error('載入員工列表失敗:', error);
@@ -13716,6 +13739,51 @@ async function confirmPCAUpgrade(fromLevel, toLevel) {
     } catch (error) {
         console.error('升級失敗:', error);
         showToast('❌ 升級失敗: ' + error.message, 'error');
+    }
+}
+
+        // ==================== 確認不合格記錄（標記為已處理）====================
+async function confirmFailedRecord(staffId, itemId) {
+    if (!confirm('❓ 確定要標記此記錄為「已確認」嗎？\n\n✅ 標記後將不再顯示在提醒區')) {
+        return;
+    }
+    
+    try {
+        // ⭐ 讀取該記錄，加上「已確認」標記
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', staffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'completed')
+            .where('isPassed', '==', false)
+            .orderBy('completedAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (recordsSnapshot.empty) {
+            showToast('⚠️ 找不到該記錄', 'warning');
+            return;
+        }
+        
+        const recordId = recordsSnapshot.docs[0].id;
+        
+        // ⭐⭐⭐ 標記為「已確認」⭐⭐⭐
+        await db.collection('trainingRecords').doc(recordId).update({
+            failConfirmed: true,
+            confirmedBy: currentUser.docId,
+            confirmedByName: currentUser.name,
+            confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('✅ 已標記為「已確認」', 'success');
+        
+        // ⭐ 重新載入通知（會自動過濾已確認的記錄）
+        setTimeout(() => {
+            loadFailedRecordsNotification();
+        }, 500);
+        
+    } catch (error) {
+        console.error('確認記錄失敗:', error);
+        showToast('❌ 操作失敗', 'error');
     }
 }
     </script>
