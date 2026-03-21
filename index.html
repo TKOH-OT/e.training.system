@@ -3436,6 +3436,24 @@
         </div>
     </div>
 
+    <!-- ⭐⭐⭐ 不合格提醒視窗 ⭐⭐⭐ -->
+<div id="failNotificationPanel" class="fail-notification-panel" style="display: none;">
+    <div class="notification-header">
+        <span>❌ 不合格提醒</span>
+        <span class="notification-count-badge" id="failCountBadge">0</span>
+        <button class="minimize-btn" onclick="toggleNotificationPanel()" title="縮小視窗">➖</button>
+        <button class="close-btn" onclick="closeNotificationPanel()" title="關閉通知">✖</button>
+    </div>
+    <div class="notification-body" id="failNotificationBody">
+        <!-- 動態生成不合格項目 -->
+    </div>
+    <div class="notification-footer">
+        <button class="btn btn-info btn-small" onclick="toggleNotificationPanel()" style="width: 100%;">
+            🔼 縮小視窗
+        </button>
+    </div>
+</div>
+    
 <!-- ⭐⭐⭐ 重要評核時間表提醒視窗 ⭐⭐⭐ -->
 <div id="timelineNotificationPanel" class="timeline-notification-panel" style="display: none;">
     <div class="notification-header">
@@ -5933,6 +5951,14 @@ else if (item.hasChecklist && record) {
 document.getElementById('trainingProgress').innerHTML = progressHtml.join('');
                 
                 resetZoom(); // 
+
+                 // ⭐⭐⭐ 新增：載入提醒面板 ⭐⭐⭐
+        setTimeout(() => {
+            if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+                loadFailedRecordsNotification();
+                loadTimelineNotification();
+            }
+        }, 500);
                 
             } catch (error) {
                 console.error('載入培訓進度失敗:', error);
