@@ -6085,9 +6085,16 @@ if (record && record.status === 'completed') {
     if (deadline && daysRemaining < 0) {
         statusClass = 'overdue';
         statusText = `⚠️ 已逾期 ${Math.abs(daysRemaining)} 天`;
-    } else if (deadline && daysRemaining <= 7) {
-        statusClass = 'overdue';
-        statusText = `⏰ 剩餘 ${daysRemaining} 天`;
+} else if (deadline && daysRemaining <= 90) {
+        // ⭐⭐⭐ 修改：即將逾期界定為「90天內」⭐⭐⭐
+        if (daysRemaining <= 7) {
+            statusClass = 'overdue';
+            statusText = `⚠️ 剩餘 ${daysRemaining} 天`;
+        } else if (daysRemaining <= 30) {
+            statusText = `⏰ 剩餘 ${daysRemaining} 天`;
+        } else {
+            statusText = `📅 剩餘 ${daysRemaining} 天`;
+        }
     } else if (deadline) {
         statusText = `⏰ 剩餘 ${daysRemaining} 天`;
     } else {
@@ -13943,7 +13950,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ==================== 載入重要評核時間表提醒 ====================
+// ==================== 載入重要評核時間表提醒（優化版：加快速度 + 3個月提醒）====================
 async function loadTimelineNotification() {
     try {
         // ⭐⭐⭐ 只有主管和管理員可以查看 ⭐⭐⭐
@@ -13953,84 +13960,112 @@ async function loadTimelineNotification() {
             return;
         }
         
+        console.time('⏱️ 載入重要評核提醒'); // ⭐ 測試速度
+        
         let urgentItems = [];
         const now = new Date();
         
-        // 📊 查看所有員工的重要評核項目
+        // ⭐⭐⭐ 優化 1：先一次性讀取所有員工 ⭐⭐⭐
         const staffSnapshot = await db.collection('accounts')
             .where('role', '==', 'staff')
             .get();
         
-        for (const staffDoc of staffSnapshot.docs) {
+        if (staffSnapshot.empty) {
+            closeTimelineNotificationPanel();
+            console.timeEnd('⏱️ 載入重要評核提醒');
+            return;
+        }
+        
+        // ⭐⭐⭐ 優化 2：先一次性讀取所有分類 ⭐⭐⭐
+        const allCategoriesSnapshot = await db.collection('trainingCategories').get();
+        const categoriesMap = {};
+        
+        allCategoriesSnapshot.forEach(doc => {
+            const category = doc.data();
+            categoriesMap[doc.id] = category;
+        });
+        
+        // ⭐⭐⭐ 優化 3：先一次性讀取所有重要項目 ⭐⭐⭐
+        const allImportantItemsSnapshot = await db.collection('trainingItems')
+            .where('isImportant', '==', true)
+            .where('hasDeadline', '==', true)
+            .get();
+        
+        const importantItems = [];
+        allImportantItemsSnapshot.forEach(doc => {
+            const item = doc.data();
+            importantItems.push({ docId: doc.id, ...item });
+        });
+        
+        console.log(`📊 找到 ${staffSnapshot.size} 位員工，${importantItems.length} 個重要評核項目`);
+        
+        // ⭐⭐⭐ 優化 4：批次查詢已完成記錄（一次查詢全部）⭐⭐⭐
+        const allCompletedRecordsSnapshot = await db.collection('trainingRecords')
+            .where('status', '==', 'completed')
+            .get();
+        
+        const completedMap = new Set();
+        allCompletedRecordsSnapshot.forEach(doc => {
+            const record = doc.data();
+            completedMap.add(`${record.userId}_${record.itemId}`);
+        });
+        
+        console.log(`✅ 找到 ${completedMap.size} 筆已完成記錄`);
+        
+        // ⭐⭐⭐ 遍歷員工，計算緊急項目 ⭐⭐⭐
+        staffSnapshot.forEach(staffDoc => {
             const staff = staffDoc.data();
             const staffId = staffDoc.id;
             
-            if (!staff.joinDate) continue;
+            if (!staff.joinDate) return;
             
             const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
             
-            // 讀取重要評核項目
-            const categoriesSnapshot = await db.collection('trainingCategories')
-                .where('trainingType', '==', staffTrainingType)
-                .get();
-            
-            for (const categoryDoc of categoriesSnapshot.docs) {
-                const category = categoryDoc.data();
+            // 遍歷重要項目
+            importantItems.forEach(item => {
+                const category = categoriesMap[item.categoryId];
+                if (!category) return;
                 
-                const itemsSnapshot = await db.collection('trainingItems')
-                    .where('categoryId', '==', categoryDoc.id)
-                    .where('isImportant', '==', true)
-                    .get();
+                // ⭐ 過濾培訓類型
+                if (category.trainingType !== staffTrainingType) return;
                 
-                for (const itemDoc of itemsSnapshot.docs) {
-                    const item = itemDoc.data();
-                    
-                    // ⭐ 過濾 PCA 級別
-                    if (staffTrainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
-                        if (item.pcaLevel !== staff.level) {
-                            continue;
-                        }
-                    }
-                    
-                    if (!item.hasDeadline) continue;
-                    
-                    // 計算截止日期
-                    const deadline = calculateDeadline(staff.joinDate, item.deadlineValue, item.deadlineUnit);
-                    const diffTime = deadline - now;
-                    const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    // ⭐⭐⭐ 檢查是否已完成 ⭐⭐⭐
-                    const recordsSnapshot = await db.collection('trainingRecords')
-                        .where('userId', '==', staffId)
-                        .where('itemId', '==', itemDoc.id)
-                        .where('status', '==', 'completed')
-                        .limit(1)
-                        .get();
-                    
-                    // 已完成的不顯示
-                    if (!recordsSnapshot.empty) {
-                        continue;
-                    }
-                    
-                    // ⭐⭐⭐ 只顯示逾期或即將逾期（7天內）的項目 ⭐⭐⭐
-                    if (daysRemaining <= 7) {
-                        urgentItems.push({
-                            staffId: staffId,
-                            staffName: staff.name,
-                            staffLevel: staff.level,
-                            itemId: itemDoc.id,
-                            itemName: item.name,
-                            categoryId: categoryDoc.id,
-                            categoryName: category.name,
-                            categoryEmoji: category.emoji,
-                            deadline: deadline,
-                            daysRemaining: daysRemaining,
-                            isOverdue: daysRemaining < 0
-                        });
-                    }
+                // ⭐ 過濾 PCA 級別
+                if (staffTrainingType === 'PCA' && item.pcaLevel && item.pcaLevel !== 'ALL') {
+                    if (item.pcaLevel !== staff.level) return;
                 }
-            }
-        }
+                
+                // ⭐⭐⭐ 檢查是否已完成（使用 Set，O(1) 查詢）⭐⭐⭐
+                const recordKey = `${staffId}_${item.docId}`;
+                if (completedMap.has(recordKey)) {
+                    return; // 已完成，跳過
+                }
+                
+                // 計算截止日期
+                const deadline = calculateDeadline(staff.joinDate, item.deadlineValue, item.deadlineUnit);
+                const diffTime = deadline - now;
+                const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                // ⭐⭐⭐ 修改：即將逾期界定為「3個月內」（90天）⭐⭐⭐
+                if (daysRemaining <= 90) {
+                    urgentItems.push({
+                        staffId: staffId,
+                        staffName: staff.name,
+                        staffLevel: staff.level,
+                        itemId: item.docId,
+                        itemName: item.name,
+                        categoryId: item.categoryId,
+                        categoryName: category.name,
+                        categoryEmoji: category.emoji,
+                        deadline: deadline,
+                        daysRemaining: daysRemaining,
+                        isOverdue: daysRemaining < 0
+                    });
+                }
+            });
+        });
+        
+        console.timeEnd('⏱️ 載入重要評核提醒'); // ⭐ 顯示耗時
+        console.log(`⚠️ 找到 ${urgentItems.length} 項緊急重要評核`);
         
         // ⭐ 按剩餘天數排序（逾期的排最前）
         urgentItems.sort((a, b) => {
