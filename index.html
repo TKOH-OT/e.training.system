@@ -14129,48 +14129,35 @@ async function confirmFailedRecord(staffId, itemId) {
     }
     
     // ⭐⭐⭐ 背景非同步更新 Firebase（不阻塞 UI）⭐⭐⭐
-    (async () => {
-        try {
-            const recordsSnapshot = await db.collection('trainingRecords')
-                .where('userId', '==', staffId)
-                .where('itemId', '==', itemId)
-                .where('status', '==', 'completed')
-                .where('isPassed', '==', false)
-                .orderBy('completedAt', 'desc')
-                .limit(1)
-                .get();
+    try {
+        const recordsSnapshot = await db.collection('trainingRecords')
+            .where('userId', '==', staffId)
+            .where('itemId', '==', itemId)
+            .where('status', '==', 'completed')
+            .where('isPassed', '==', false)
+            .orderBy('completedAt', 'desc')
+            .limit(1)
+            .get();
+        
+        if (!recordsSnapshot.empty) {
+            const recordId = recordsSnapshot.docs[0].id;
             
-            if (!recordsSnapshot.empty) {
-                const recordId = recordsSnapshot.docs[0].id;
-                
-                await db.collection('trainingRecords').doc(recordId).update({
-                    failConfirmed: true,
-                    confirmedBy: currentUser.docId,
-                    confirmedByName: currentUser.name,
-                    confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                console.log('✅ 不合格記錄已確認並儲存至 Firebase');
-            }
-        } catch (error) {
-            console.error('確認記錄失敗:', error);
-            showToast('⚠️ 記錄已從畫面移除，但 Firebase 儲存失敗', 'warning');
+            await db.collection('trainingRecords').doc(recordId).update({
+                failConfirmed: true,
+                confirmedBy: currentUser.docId,
+                confirmedByName: currentUser.name,
+                confirmedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            console.log('✅ 不合格記錄已確認並儲存至 Firebase');
         }
-    })();
+    } catch (error) {
+        console.error('確認記錄失敗:', error);
+        showToast('⚠️ 記錄已從畫面移除，但 Firebase 儲存失敗', 'warning');
+    }
     
     // ⭐ 立即顯示成功訊息
     showToast('✅ 已標記為「已確認」', 'success');
-}
-        
-        // ⭐ 重新載入通知（會自動過濾已確認的記錄）
-        setTimeout(() => {
-            loadFailedRecordsNotification();
-        }, 500);
-        
-    } catch (error) {
-        console.error('確認記錄失敗:', error);
-        showToast('❌ 操作失敗', 'error');
-    }
 }
     </script>
 </body>
