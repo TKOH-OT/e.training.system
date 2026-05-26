@@ -3010,7 +3010,7 @@
             <div class="top-bar">
                 <h2>👥 帳戶管理系統</h2>
                 <div>
-                    <button class="btn btn-success" onclick="()">➕ 新增帳戶</button>
+                    <button class="btn btn-success" onclick="showAddAccountModal()">➕ 新增帳戶</button>
                     <button class="btn btn-secondary" onclick="showPage('mainPage')">🔙 返回</button>
                 </div>
             </div>
@@ -4196,9 +4196,9 @@ async function loadAccounts() {
     <div class="account-item">
         <div class="account-info">
             <div class="name">👤 ${account.name} ${roleBadge} ${levelBadge}</div>
-<div class="details">
-    📋 帳號: ${account.id} | 📅 入職: ${account.joinDate || '未設定'} | 📅 Appointment: ${account.appointmentDate || account.joinDate || '未設定'}
-</div>
+            <div class="details">
+                📋 帳號: ${account.id} | 📅 入職日期: ${account.joinDate || '未設定'}
+            </div>
         </div>
         <div class="account-actions">
             <button class="btn btn-warning btn-small" onclick="showEditAccountModal('${account.docId}', '${account.name}', '${account.joinDate || ''}')">✏️ 編輯</button>
@@ -4247,17 +4247,10 @@ async function loadAccounts() {
                         <option value="">請先選擇職級</option>
                     </select>
                 </div>
- <div class="input-group">
-    <label>📅 入職日期 (Join Date)</label>
-    <input type="date" id="newAccountJoinDate">
-</div>
-<div class="input-group">
-    <label>📅 Appointment Date（用於計算截止日期）</label>
-    <input type="date" id="newAccountAppointmentDate">
-    <small style="color: #666; display: block; margin-top: 5px;">
-        💡 預設與入職日期相同。升級後會自動更新為升級日期
-    </small>
-</div>
+                <div class="input-group">
+                    <label>📅 入職日期</label>
+                    <input type="date" id="newAccountJoinDate">
+                </div>
                 <div class="input-group">
                     <label>🔑 登入帳號</label>
                     <input type="text" id="newAccountId" placeholder="請輸入登入帳號">
@@ -4320,18 +4313,15 @@ async function loadAccounts() {
                     return;
                 }
 
-                const appointmentDate = document.getElementById('newAccountAppointmentDate').value || joinDate;
-
-await db.collection('accounts').add({
-    id: id,
-    password: pw,
-    name: name,
-    role: role,
-    level: level,
-    joinDate: joinDate,
-    appointmentDate: appointmentDate,  // ⭐ 新增這一行
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-});
+                await db.collection('accounts').add({
+                    id: id,
+                    password: pw,
+                    name: name,
+                    role: role,
+                    level: level,
+                    joinDate: joinDate,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
 
                 showToast('✅ 帳戶新增成功', 'success');
                 closeModal();
@@ -5799,20 +5789,11 @@ function filterStaffList() {
             showZoomControls(); // 
             
             try {
-const staffDoc = await db.collection('accounts').doc(staffId).get();
-const staff = staffDoc.data();
+                const staffDoc = await db.collection('accounts').doc(staffId).get();
+                const staff = staffDoc.data();
 
-// ⭐⭐⭐ 顯示 Appointment Date ⭐⭐⭐
-const appointmentDate = staff.appointmentDate || staff.joinDate;
-document.getElementById('progressStaffName').innerHTML = `
-    ${staff.name} - 培訓進度
-    <div style="font-size: 0.7em; color: #666; margin-top: 5px;">
-        📅 Appointment Date: ${appointmentDate || '未設定'} 
-        ${staff.appointmentDate && staff.appointmentDate !== staff.joinDate ? 
-            `<span style="color: #2ed573;">(已更新)</span>` : ''}
-    </div>
-`;
-                
+                document.getElementById('progressStaffName').textContent = `${staff.name} - 培訓進度`;
+
                 // ⭐⭐⭐ 新增：控制 PCA 升級按鈕顯示 ⭐⭐⭐
         const upgradeBtn = document.getElementById('pcaUpgradeBtn');
         if (upgradeBtn) {
@@ -5826,9 +5807,7 @@ document.getElementById('progressStaffName').innerHTML = `
                 const staffTrainingType = ['PCA1', 'PCA2', 'PCA3'].includes(staff.level) ? 'PCA' : 'OTA';
 
                 // 載入重要評核時間表
-// ⭐⭐⭐ 優先使用 appointmentDate，無則用 joinDate ⭐⭐⭐
-const referenceDate = staff.appointmentDate || staff.joinDate;
-await loadImportantTimeline(staffId, referenceDate, staffTrainingType);
+                await loadImportantTimeline(staffId, staff.joinDate, staffTrainingType);
 
                 const categoriesSnapshot = await db.collection('trainingCategories')
                     .where('trainingType', '==', staffTrainingType)
@@ -13380,16 +13359,9 @@ async function showEditAccountModal(docId, name, currentJoinDate) {
             </div>
             
             <div class="input-group">
-    <label>📅 入職日期 (Join Date)</label>
-    <input type="date" id="editJoinDate" value="${currentJoinDate}">
-</div>
-<div class="input-group">
-    <label>📅 Appointment Date（用於計算截止日期）</label>
-    <input type="date" id="editAppointmentDate" value="${account.appointmentDate || currentJoinDate}">
-    <small style="color: #666; display: block; margin-top: 5px;">
-        💡 用於計算培訓截止日期。升級後會自動更新
-    </small>
-</div>
+                <label>📅 入職日期</label>
+                <input type="date" id="editJoinDate" value="${currentJoinDate}">
+            </div>
             
             <div class="input-group">
                 <label>🔑 新密碼（留空表示不修改）</label>
@@ -13439,13 +13411,10 @@ async function saveEditedAccount(docId) {
     }
     
     try {
-const appointmentDate = document.getElementById('editAppointmentDate').value;
-
-const updateData = {
-    joinDate: joinDate,
-    appointmentDate: appointmentDate,  // ⭐ 新增這一行
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-};
+        const updateData = {
+            joinDate: joinDate,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
         
         // 如果有輸入新密碼，就更新
         if (newPassword) {
@@ -13867,25 +13836,20 @@ async function showPCAUpgradeModal() {
                 <strong>⬆️ 升級至：</strong><span class="badge badge-${targetLevel}">${targetLevel}</span>
             </div>
             
- <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
-    <strong>✅ 升級後的變化：</strong><br>
-    <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
-        <li>職級從 <strong>${staff.level}</strong> 升至 <strong>${targetLevel}</strong></li>
-        <li>⭐ <strong>Appointment Date</strong> 會更新為升級日期</li>
-        <li>⭐ 新職級的截止日期會從升級日期開始計算</li>
-        <li>✅ 所有培訓記錄<strong>完整保留</strong></li>
-        <li>✅ 新職級的培訓項目會自動顯示</li>
-        <li>✅ 舊職級的記錄仍可查看</li>
-    </ul>
-</div>
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
+                <strong>✅ 升級後的變化：</strong><br>
+                <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                    <li>職級從 <strong>${staff.level}</strong> 升至 <strong>${targetLevel}</strong></li>
+                    <li>✅ 所有培訓記錄<strong>完整保留</strong></li>
+                    <li>✅ 新職級的培訓項目會自動顯示</li>
+                    <li>✅ 舊職級的記錄仍可查看</li>
+                </ul>
+            </div>
             
-<div class="input-group">
-    <label>📅 升級日期</label>
-    <input type="date" id="upgradeDate" value="${new Date().toISOString().split('T')[0]}">
-    <small style="color: #666; display: block; margin-top: 5px;">
-        💡 可選擇過去或未來日期
-    </small>
-</div>
+            <div class="input-group">
+                <label>📅 升級日期</label>
+                <input type="date" id="upgradeDate" value="${new Date().toISOString().split('T')[0]}" max="${new Date().toISOString().split('T')[0]}">
+            </div>
             
             <div class="input-group">
                 <label>💬 升級備註（可選）</label>
@@ -13924,20 +13888,18 @@ async function confirmPCAUpgrade(fromLevel, toLevel) {
         const staff = staffDoc.data();
         
         // ⭐⭐⭐ 更新員工職級 ⭐⭐⭐
-// ⭐⭐⭐ 升級時自動更新 appointmentDate ⭐⭐⭐
-await db.collection('accounts').doc(currentStaffId).update({
-    level: toLevel,
-    appointmentDate: upgradeDate,  // ⭐ 自動更新為升級日期
-    upgradeHistory: firebase.firestore.FieldValue.arrayUnion({
-        fromLevel: fromLevel,
-        toLevel: toLevel,
-        upgradeDate: upgradeDate,
-        remark: remark,
-        upgradedBy: currentUser.docId,
-        upgradedByName: currentUser.name,
-        upgradedAt: new Date().toISOString()
-    })
-});
+        await db.collection('accounts').doc(currentStaffId).update({
+            level: toLevel,
+            upgradeHistory: firebase.firestore.FieldValue.arrayUnion({
+                fromLevel: fromLevel,
+                toLevel: toLevel,
+                upgradeDate: upgradeDate,
+                remark: remark,
+                upgradedBy: currentUser.docId,
+                upgradedByName: currentUser.name,
+                upgradedAt: new Date().toISOString()
+            })
+        });
         
         showToast(`✅ 已成功將 ${staff.name} 從 ${fromLevel} 升級至 ${toLevel}！`, 'success');
         closeModal();
