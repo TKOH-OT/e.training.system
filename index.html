@@ -4221,56 +4221,56 @@ async function loadAccounts() {
     }
 }
 
-        // ==================== 顯示新增帳戶視窗 ====================
+// ==================== 顯示新增帳戶視窗 ====================
 function showAddAccountModal() {
     const modalBody = `
-        <div class="input-group">
-            <label>👤 姓名</label>
-            <input type="text" id="newAccountName" placeholder="請輸入姓名">
-        </div>
-        <div class="input-group">
-            <label>📊 用戶職級</label>
-            <select id="newAccountLevel" onchange="updateRoleOptions()">
-                <option value="">請選擇職級</option>
-                <option value="WM">WM (病房經理)</option>
-                <option value="APN">APN (資深護師)</option>
-                <option value="RN">RN (註冊護士)</option>
-                <option value="PCA1">PCA1</option>
-                <option value="PCA2">PCA2</option>
-                <option value="PCA3">PCA3</option>
-                <option value="OTA">OTA</option>
-            </select>
-        </div>
-        <div class="input-group">
-            <label>👔 用戶角色</label>
-            <select id="newAccountRole" disabled>
-                <option value="">請先選擇職級</option>
-            </select>
-        </div>
-        <div class="input-group">
-            <label>📅 入職日期 (Join Date)</label>
-            <input type="date" id="newAccountJoinDate">
-        </div>
-        <div class="input-group">
-            <label>📅 Appointment Date（用於計算截止日期）</label>
-            <input type="date" id="newAccountAppointmentDate">
-            <small style="color: #666; display: block; margin-top: 5px;">
-                💡 預設與入職日期相同。升級後會自動更新為升級日期
-            </small>
-        </div>
-        <div class="input-group">
-            <label>🔑 登入帳號</label>
-            <input type="text" id="newAccountId" placeholder="請輸入登入帳號">
-        </div>
-        <div class="input-group">
-            <label>🔒 登入密碼</label>
-            <input type="password" id="newAccountPw" placeholder="請輸入登入密碼">
-        </div>
-        <div class="modal-buttons">
-            <button class="btn btn-success" onclick="createAccount()">✅ 新增</button>
-            <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
-        </div>
-    `;
+<div class="input-group">
+    <label>👤 姓名</label>
+    <input type="text" id="newAccountName" placeholder="請輸入姓名">
+</div>
+<div class="input-group">
+    <label>📊 用戶職級</label>
+    <select id="newAccountLevel" onchange="updateRoleOptions()">
+        <option value="">請選擇職級</option>
+        <option value="WM">WM (病房經理)</option>
+        <option value="APN">APN (資深護師)</option>
+        <option value="RN">RN (註冊護士)</option>
+        <option value="PCA1">PCA1</option>
+        <option value="PCA2">PCA2</option>
+        <option value="PCA3">PCA3</option>
+        <option value="OTA">OTA</option>
+    </select>
+</div>
+<div class="input-group">
+    <label>👔 用戶角色</label>
+    <select id="newAccountRole" disabled>
+        <option value="">請先選擇職級</option>
+    </select>
+</div>
+<div class="input-group">
+    <label>📅 入職日期 (Join Date)</label>
+    <input type="date" id="newAccountJoinDate">
+</div>
+<div class="input-group">
+    <label>📅 Appointment Date（用於計算截止日期）</label>
+    <input type="date" id="newAccountAppointmentDate">
+    <small style="color: #666; display: block; margin-top: 5px;">
+        💡 預設與入職日期相同。升級後會自動更新為升級日期
+    </small>
+</div>
+<div class="input-group">
+    <label>🔑 登入帳號</label>
+    <input type="text" id="newAccountId" placeholder="請輸入登入帳號">
+</div>
+<div class="input-group">
+    <label>🔒 登入密碼</label>
+    <input type="password" id="newAccountPw" placeholder="請輸入登入密碼">
+</div>
+<div class="modal-buttons">
+    <button class="btn btn-success" onclick="createAccount()">✅ 新增</button>
+    <button class="btn btn-secondary" onclick="closeModal()">❌ 取消</button>
+</div>
+`;
     showModal('➕ 新增帳戶', modalBody);
 }
 
