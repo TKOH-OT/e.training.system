@@ -783,11 +783,6 @@
             background: #f0fff4;
         }
 
-        .checklist-item.na {
-border-left-color: #9ca3af;
-background: #f3f4f6;
-}
-        
         .checklist-item.failed {
             border-left-color: #ff4757;
             background: #fff5f5;
@@ -844,16 +839,6 @@ background: #f3f4f6;
             transform: translateY(-2px);
         }
 
-        .step-btn-na {
-            background: #9ca3af;
-            color: white;
-        }
-
-        .step-btn-na:hover {
-            background: #6b7280;
-            transform: translateY(-2px);
-        }
-        
         .step-btn-reset {
             background: #ffa502;
             color: white;
@@ -5936,12 +5921,7 @@ else if (item.hasChecklist && record) {
     let passedSteps = 0;
     
     item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle && 
-            record.checklistStatus && 
-            (record.checklistStatus[index] === 'pass' || 
-             record.checklistStatus [index] === 'na'
-             )
-           ) {
+        if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
             passedSteps++;
         }
     });
@@ -5952,14 +5932,7 @@ else if (item.hasChecklist && record) {
     
     const allCriticalPassed = item.checklist.every((step, index) => {
         if (step.isSubtitle || !step.critical) return true;
-        
-        return (
-            record.checklistStatus && 
-                (
-                    record.checklistStatus[index] === 'pass' ||
-                    record.checklistStatus [index] === 'na'
-                )
-                );
+        return record.checklistStatus && record.checklistStatus[index] === 'pass';
     });
     
     // ⭐⭐⭐ 關鍵判斷：必須同時滿足 ⭐⭐⭐
@@ -6289,8 +6262,6 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
             showToast('✅ 已標記為合格', 'success');
         } else if (status === 'fail') {
             showToast('❌ 已標記為不合格', 'warning');
-        } else if (status === 'na') {
-            showToast('⚪ 已標記為 N/A', 'warning');
         } else {
             showToast('🔄 已重設狀態', 'success');
         }
@@ -6718,15 +6689,9 @@ if (item.isHistorical) {
                 let passedSteps = 0;
 
                 item.checklist.forEach((step, index) => {
-                    if (
-!step.isSubtitle &&
-(
-checklistStatus[index] === 'pass' ||
-checklistStatus[index] === 'na'
-)
-) {
-passedSteps++;
-}
+                    if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                        passedSteps++;
+                    }
                 });
 
                 const completionRate = Math.round((passedSteps / totalSteps) * 100);
@@ -6736,13 +6701,7 @@ passedSteps++;
 
                 const allCriticalPassed = item.checklist.every((step, index) => {
                     if (step.isSubtitle || !step.critical) return true;
-                    return (
-                        checklistStatus &&
-                        (
-                            checklistStatus[index] === 'pass' ||
-                            checklistStatus[index] === 'na'
-                        )
-                    );
+                    return checklistStatus[index] === 'pass';
                 });
 
                 let badges = '';
@@ -6786,11 +6745,6 @@ passedSteps++;
                     } else if (status === 'fail') {
                         statusClass = 'failed';
                         statusText = `❌ 不合格${stepFailCount > 0 ? ` (此步驟第 ${stepFailCount} 次)` : ''}`;
-                    } else if (status === 'na') {
-                        statusClass = 'na';
-                        statusText = '⚪ N/A'; {
-                    } else if (status === 'pending') {
-                        statusText = '⏳ 待評核';
                     } else {
                         statusText = '⏳ 待評核';
                     }
@@ -6808,7 +6762,6 @@ passedSteps++;
                                     <div class="checklist-step-actions">
                                         <button class="step-btn step-btn-pass" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'pass')">✅ 合格</button>
                                         <button class="step-btn step-btn-fail" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'fail')">❌ 不合格</button>
-                                        <button class="step-btn step-btn-na" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'na')">⚪ N/A</button>
                                         <button class="step-btn step-btn-reset" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'pending')">🔄 重設</button>
                                     </div>
                                 ` : ''}
@@ -7145,20 +7098,17 @@ async function refreshCurrentItemCard(itemId) {
         let passedSteps = 0;
         let evaluatedSteps = 0;
 
-item.checklist.forEach((step, index) => {
-    if (!step.isSubtitle) {
-
-        const status = checklistStatus[index];
-
-        if (status === 'pass' || status === 'na') {
-            passedSteps++;
-            evaluatedSteps++;
-        } 
-        else if (status === 'fail') {
-            evaluatedSteps++;
-        }
-    }
-});
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle) {
+                const status = checklistStatus[index];
+                if (status === 'pass') {
+                    passedSteps++;
+                    evaluatedSteps++;
+                } else if (status === 'fail') {
+                    evaluatedSteps++;
+                }
+            }
+        });
 
         const completionRate = Math.round((passedSteps / totalSteps) * 100);
         
@@ -7200,42 +7150,26 @@ item.checklist.forEach((step, index) => {
                 const status = checklistStatus[index] || 'pending';
                 const checklistItems = card.querySelectorAll('.checklist-item');
                 
-if (checklistItems[checklistItemIndex]) {
-
-    checklistItems[checklistItemIndex].className =
-        `checklist-item 
-        ${step.critical ? 'critical' : ''} 
-        ${status === 'pass' ? 'completed' : 
-          status === 'fail' ? 'failed' : 
-          status === 'na' ? 'na' : ''}`;
-
-    const statusTextDiv = checklistItems[checklistItemIndex]
-        .querySelector('div[style*="margin: 8px"]');
-
-    if (statusTextDiv) {
-
-        if (status === 'pass') {
-            statusTextDiv.textContent = '✅ 合格';
-            statusTextDiv.style.color = '#666';
-            statusTextDiv.style.fontWeight = 'normal';
-        } 
-        else if (status === 'fail') {
-            statusTextDiv.textContent = '❌ 不合格';
-            statusTextDiv.style.color = '#ff4757';
-            statusTextDiv.style.fontWeight = 'bold';
-        } 
-        else if (status === 'na') {
-            statusTextDiv.textContent = '⚪ N/A';
-            statusTextDiv.style.color = '#6b7280';
-            statusTextDiv.style.fontWeight = 'normal';
-        } 
-        else {
-            statusTextDiv.textContent = '⏳ 待評核';
-            statusTextDiv.style.color = '#666';
-            statusTextDiv.style.fontWeight = 'normal';
-        }
-    }
-}
+                if (checklistItems[checklistItemIndex]) {
+                    checklistItems[checklistItemIndex].className = `checklist-item ${step.critical ? 'critical' : ''} ${status === 'pass' ? 'completed' : status === 'fail' ? 'failed' : ''}`;
+                    
+                    const statusTextDiv = checklistItems[checklistItemIndex].querySelector('div[style*="margin: 8px"]');
+                    if (statusTextDiv) {
+                        if (status === 'pass') {
+                            statusTextDiv.textContent = '✅ 合格';
+                            statusTextDiv.style.color = '#666';
+                            statusTextDiv.style.fontWeight = 'normal';
+                        } else if (status === 'fail') {
+                            statusTextDiv.textContent = '❌ 不合格';
+                            statusTextDiv.style.color = '#ff4757';
+                            statusTextDiv.style.fontWeight = 'bold';
+                        } else {
+                            statusTextDiv.textContent = '⏳ 待評核';
+                            statusTextDiv.style.color = '#666';
+                            statusTextDiv.style.fontWeight = 'normal';
+                        }
+                    }
+                }
                 
                 checklistItemIndex++;
             });
@@ -7243,15 +7177,8 @@ if (checklistItems[checklistItemIndex]) {
             // 更新整體狀態
             const allCriticalPassed = item.checklist.every((step, index) => {
                 if (step.isSubtitle || !step.critical) return true;
-                
-                return (
-        checklistStatus &&
-        (
-            checklistStatus[index] === 'pass' ||
-            checklistStatus[index] === 'na'
-        )
-    );
-});
+                return checklistStatus[index] === 'pass';
+            });
 
             let overallStatus = '';
             let overallClass = '';
@@ -7421,21 +7348,13 @@ async function markItemComplete(itemId) {
                 !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
             );
             
-// 計算合格步驟數
-let passedSteps = 0;
-
-item.checklist.forEach((step, index) => {
-    if (
-        !step.isSubtitle &&
-        checklistStatus &&
-        (
-            checklistStatus[index] === 'pass' ||
-            checklistStatus[index] === 'na'
-        )
-    ) {
-        passedSteps++;
-    }
-});
+            // 計算合格步驟數
+            let passedSteps = 0;
+            item.checklist.forEach((step, index) => {
+                if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                    passedSteps++;
+                }
+            });
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
@@ -7666,48 +7585,30 @@ async function viewEvaluationRecordsList(itemId) {
             const checklistStatus = record.checklistStatus || {};
             const remarks = record.remarks || {};
             
-// 計算完成率
-const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-let passedSteps = 0;
-
-item.checklist.forEach((step, index) => {
-    if (
-        !step.isSubtitle &&
-        checklistStatus &&
-        (
-            checklistStatus[index] === 'pass' ||
-            checklistStatus[index] === 'na'
-        )
-    ) {
-        passedSteps++;
-    }
-});
+            // 計算完成率
+            const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+            let passedSteps = 0;
+            
+            item.checklist.forEach((step, index) => {
+                if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                    passedSteps++;
+                }
+            });
             
 const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
 // ⭐⭐⭐ 修復：正確讀取 isPassed 狀態 ⭐⭐⭐
 let isPassed = false;
-
 if (record.isPassed === true) {
     isPassed = true;
-} 
-else if (record.isPassed === false) {
+} else if (record.isPassed === false) {
     isPassed = false;
-} 
-else {
+} else {
     // 舊數據兼容：沒有明確標記時，用 completionRate 和 Critical 步驟判斷
     const allCriticalPassed = item.checklist.every((step, index) => {
         if (step.isSubtitle || !step.critical) return true;
-
-        return (
-            checklistStatus &&
-            (
-                checklistStatus[index] === 'pass' ||
-                checklistStatus[index] === 'na'
-            )
-        );
+        return checklistStatus[index] === 'pass';
     });
-
     isPassed = allCriticalPassed && completionRate === 100;
 }
             
@@ -7807,22 +7708,14 @@ async function viewEvaluationResultDetail(recordId, itemId) {
         // ⭐⭐⭐ 新增：讀取總評語 ⭐⭐⭐
         const overallComment = record.overallComment || '';
         
-// 計算數據
-const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-let passedSteps = 0;
-
-item.checklist.forEach((step, index) => {
-    if (
-        !step.isSubtitle &&
-        checklistStatus &&
-        (
-            checklistStatus[index] === 'pass' ||
-            checklistStatus[index] === 'na'
-        )
-    ) {
-        passedSteps++;
-    }
-});
+        // 計算數據
+        const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+        let passedSteps = 0;
+        item.checklist.forEach((step, index) => {
+            if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                passedSteps++;
+            }
+        });
         
         const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
         
@@ -7914,37 +7807,28 @@ item.checklist.forEach((step, index) => {
                         <span class="step-subtitle">${step.step}</span>
                     </div>
                 `;
-} else {
-
-    stepCounter++;
-    const status = checklistStatus[index] || 'pending';
-    const remark = remarks[index] || '';
-    const stepFailCount = (record.failureCount && record.failureCount[index]) || 0;
-    
-    let statusClass = '';
-    let statusText = '';
-    let statusColor = '';
-    
-    if (status === 'pass') {
-        statusClass = 'correct';
-        statusText = '✅ 合格';
-        statusColor = '#2ed573';
-    } 
-    else if (status === 'fail') {
-        statusClass = 'incorrect';
-        statusText = `❌ 不合格${stepFailCount > 0 ? ` (第 ${stepFailCount} 次)` : ''}`;
-        statusColor = '#ff4757';
-    } 
-    else if (status === 'na') {
-        statusClass = 'na';
-        statusText = '⚪ N/A';
-        statusColor = '#9ca3af';
-    } 
-    else {
-        statusText = '⏳ 未評核';
-        statusColor = '#999';
-    }
-}
+            } else {
+                stepCounter++;
+                const status = checklistStatus[index] || 'pending';
+                const remark = remarks[index] || '';
+                const stepFailCount = (record.failureCount && record.failureCount[index]) || 0;
+                
+                let statusClass = '';
+                let statusText = '';
+                let statusColor = '';
+                
+                if (status === 'pass') {
+                    statusClass = 'correct';
+                    statusText = '✅ 合格';
+                    statusColor = '#2ed573';
+                } else if (status === 'fail') {
+                    statusClass = 'incorrect';
+                    statusText = `❌ 不合格${stepFailCount > 0 ? ` (第 ${stepFailCount} 次)` : ''}`;
+                    statusColor = '#ff4757';
+                } else {
+                    statusText = '⏳ 未評核';
+                    statusColor = '#999';
+                }
                 
                 resultHtml += `
                     <div class="quiz-question-card">
@@ -8166,50 +8050,29 @@ async function exportToExcel() {
                 totalItems++;
                 const record = records[doc.id];
 
-if (item.recordType === 'training' && record && record.status === 'completed') {
-    completedItems++;
-}
-else if (item.hasChecklist && record) {
-
-    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-    let passedSteps = 0;
-
-    item.checklist.forEach((step, index) => {
-        if (
-            !step.isSubtitle &&
-            record.checklistStatus &&
-            (
-                record.checklistStatus[index] === 'pass' ||
-                record.checklistStatus[index] === 'na'
-            )
-        ) {
-            passedSteps++;
-        }
-    });
+                if (item.recordType === 'training' && record && record.status === 'completed') {
+                    completedItems++;
+                } else if (item.hasChecklist && record) {
+                    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                    let passedSteps = 0;
                     
-      const allCriticalPassed = item.checklist.every((step, index) => {
-        if (step.isSubtitle || !step.critical) return true;
-
-        return (
-            record.checklistStatus &&
-            (
-                record.checklistStatus[index] === 'pass' ||
-                record.checklistStatus[index] === 'na'
-            )
-        );
-    });
-
-    if (record.status === 'completed' && record.isPassed === true) {
-        completedItems++;
-    } 
-    else if (
-        record.isPassed !== false &&
-        allCriticalPassed &&
-        passedSteps === actualSteps.length
-    ) {
-        completedItems++;
-    }
-}
+                    item.checklist.forEach((step, index) => {
+                        if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
+                            passedSteps++;
+                        }
+                    });
+                    
+                    const allCriticalPassed = item.checklist.every((step, index) => {
+                        if (step.isSubtitle || !step.critical) return true;
+                        return record.checklistStatus && record.checklistStatus[index] === 'pass';
+                    });
+                    
+                    if (record.status === 'completed' && record.isPassed === true) {
+                        completedItems++;
+                    } else if (record.isPassed !== false && allCriticalPassed && passedSteps === actualSteps.length) {
+                        completedItems++;
+                    }
+                }
             });
         }
 
@@ -8331,24 +8194,17 @@ else if (item.hasChecklist && record) {
                     }
 
                 } else {
-  // ========== 評核 Checklist 類型 ==========
-const checklistStatus = record?.checklistStatus || {};
-const remarks = record?.remarks || {};
-const actualSteps = item.checklist.filter(s => !s.isSubtitle);
-
-let passedSteps = 0;
-
-item.checklist.forEach((step, index) => {
-    if (
-        !step.isSubtitle &&
-        (
-            checklistStatus[index] === 'pass' ||
-            checklistStatus[index] === 'na'
-        )
-    ) {
-        passedSteps++;
-    }
-});
+                    // ========== 評核 Checklist 類型 ==========
+                    const checklistStatus = record?.checklistStatus || {};
+                    const remarks = record?.remarks || {};
+                    const actualSteps = item.checklist.filter(s => !s.isSubtitle);
+                    
+                    let passedSteps = 0;
+                    item.checklist.forEach((step, index) => {
+                        if (!step.isSubtitle && checklistStatus[index] === 'pass') {
+                            passedSteps++;
+                        }
+                    });
 
                     const completionRate = actualSteps.length > 0 
                         ? Math.round((passedSteps / actualSteps.length) * 100) 
@@ -8398,8 +8254,6 @@ item.checklist.forEach((step, index) => {
                                 statusText = '合格';
                             } else if (status === 'fail') {
                                 statusText = '不合格';
-                            } else if (status === 'na') {
-                                statusText = 'N/A';
                             } else {
                                 statusText = '待評核';
                             }
@@ -9323,7 +9177,7 @@ async function viewAuditDetail(auditId) {
                                 statusText = '❌ 不合格';
                                 statusColor = '#ff4757';
                             } else if (itemData.status === 'na') {
-                                statusText = '⚪ N/A';
+                                statusText = '⚪ 不適用';
                                 statusColor = '#999';
                             } else {
                                 statusText = '⏳ 未評核';
