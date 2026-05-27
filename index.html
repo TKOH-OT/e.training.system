@@ -839,6 +839,22 @@
             transform: translateY(-2px);
         }
 
+        /* 新增的灰色 N/A 按鈕樣式 */
+.step-btn-na {
+    background: #6c757d; /* 灰色 */
+    color: white;
+}
+.step-btn-na:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+
+/* 當 Checklist 項目被標記為 N/A 時的背景底色（與合格的綠、不合格的紅作區分） */
+.checklist-item.na-item {
+    border-left-color: #6c757d !important;
+    background: #f1f3f5 !important; /* 淺灰色背景，純粹顯示上最尾查看可以看到 */
+}
+        
         .step-btn-reset {
             background: #ffa502;
             color: white;
@@ -5919,20 +5935,18 @@ if (item.recordType === 'training' && item.hasChecklist && record) {
 else if (item.hasChecklist && record) {
     const actualSteps = item.checklist.filter(s => !s.isSubtitle);
     let passedSteps = 0;
-    
     item.checklist.forEach((step, index) => {
-        if (!step.isSubtitle && record.checklistStatus && record.checklistStatus[index] === 'pass') {
+        // 🌟 核心修改：原本只有 === 'pass'，現在加上 || === 'na'
+        if (!step.isSubtitle && record.checklistStatus && (record.checklistStatus[index] === 'pass' || record.checklistStatus[index] === 'na')) {
             passedSteps++;
         }
     });
+    const completionRate = actualSteps.length > 0 ? Math.round((passedSteps / actualSteps.length) * 100) : 0;
     
-    const completionRate = actualSteps.length > 0 
-        ? Math.round((passedSteps / actualSteps.length) * 100) 
-        : 0;
-    
+    // 檢查 Critical 項目是否全部通過 (N/A 項目既然不適用，默認也算通過，或者 Critical 項目不應該設為 N/A)
     const allCriticalPassed = item.checklist.every((step, index) => {
         if (step.isSubtitle || !step.critical) return true;
-        return record.checklistStatus && record.checklistStatus[index] === 'pass';
+        return record.checklistStatus && (record.checklistStatus[index] === 'pass' || record.checklistStatus[index] === 'na');
     });
     
     // ⭐⭐⭐ 關鍵判斷：必須同時滿足 ⭐⭐⭐
@@ -6206,37 +6220,34 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
     try {
         const itemDoc = await db.collection('trainingItems').doc(itemId).get();
         const item = itemDoc.data();
-
-        // ⭐⭐⭐ 只查詢 pending 記錄 ⭐⭐⭐
+        
         const recordsSnapshot = await db.collection('trainingRecords')
             .where('userId', '==', currentStaffId)
             .where('itemId', '==', itemId)
             .where('status', '==', 'pending')
             .limit(1)
             .get();
-
+            
         let checklistStatus = {};
         let remarks = {};
         let failureCount = {};
-
+        
         if (!recordsSnapshot.empty) {
             const record = recordsSnapshot.docs[0].data();
             checklistStatus = record.checklistStatus || {};
             remarks = record.remarks || {};
             failureCount = record.failureCount || {};
         }
-
-        // 更新步驟狀態
+        
+        // 更新步驟狀態 (可以接受 'pass', 'fail', 'na', 'pending')
         checklistStatus[stepIndex] = status;
-
-        // ⭐ 如果標記為「不合格」，累加次數
+        
         if (status === 'fail') {
             failureCount[stepIndex] = (failureCount[stepIndex] || 0) + 1;
-        } else if (status === 'pending') {
-            // 重設時，清除不合格次數
+        } else if (status === 'pending' || status === 'na') { // 🌟 新增：重設或設為 N/A 時清除該步驟的不合格次數
             failureCount[stepIndex] = 0;
         }
-
+        
         const recordData = {
             userId: currentStaffId,
             itemId: itemId,
@@ -6247,25 +6258,25 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
             evaluatedBy: currentUser.docId,
             evaluatedAt: new Date().toISOString()
         };
-
+        
         if (recordsSnapshot.empty) {
             await db.collection('trainingRecords').add(recordData);
         } else {
             await db.collection('trainingRecords').doc(recordsSnapshot.docs[0].id).update(recordData);
         }
-
-        // ⭐⭐⭐ 即時刷新卡片狀態 ⭐⭐⭐
+        
         await refreshCurrentItemCard(itemId);
-
-        // ⭐⭐⭐ 提示訊息 ⭐⭐⭐
+        
+        // 🌟 新增提示訊息
         if (status === 'pass') {
             showToast('✅ 已標記為合格', 'success');
         } else if (status === 'fail') {
             showToast('❌ 已標記為不合格', 'warning');
+        } else if (status === 'na') {
+            showToast('⚪ 已標記為 N/A (不計入扣分)', 'success'); // 🌟 N/A 提示
         } else {
             showToast('🔄 已重設狀態', 'success');
         }
-
     } catch (error) {
         console.error('更新步驟狀態失敗:', error);
         showToast('❌ 更新失敗: ' + error.message, 'error');
@@ -6681,28 +6692,25 @@ if (item.isHistorical) {
             }
             
             // ========== Checklist 評核類型 ========== 
-            if (item.hasChecklist && item.checklist) {
-                const checklistStatus = record?.checklistStatus || {};
-                const remarks = record?.remarks || {};
-
-                let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
-                let passedSteps = 0;
-
-                item.checklist.forEach((step, index) => {
-                    if (!step.isSubtitle && checklistStatus[index] === 'pass') {
-                        passedSteps++;
-                    }
-                });
-
-                const completionRate = Math.round((passedSteps / totalSteps) * 100);
-                
-                const circumference = 2 * Math.PI * 50;
-                const offset = circumference - (completionRate / 100) * circumference;
-
-                const allCriticalPassed = item.checklist.every((step, index) => {
-                    if (step.isSubtitle || !step.critical) return true;
-                    return checklistStatus[index] === 'pass';
-                });
+if (item.hasChecklist && item.checklist) {
+    const checklistStatus = record?.checklistStatus || {};
+    const remarks = record?.remarks || {};
+    let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
+    let passedSteps = 0;
+    item.checklist.forEach((step, index) => {
+        // 🌟 核心修改：計算進度時，pass 和 na 都算入已通過步驟數
+        if (!step.isSubtitle && (checklistStatus[index] === 'pass' || checklistStatus[index] === 'na')) {
+            passedSteps++;
+        }
+    });
+    
+    const completionRate = Math.round((passedSteps / totalSteps) * 100);
+    
+    // 🌟 核心修改：檢查 critical 步驟時，na 項目也要放行
+    const allCriticalPassed = item.checklist.every((step, index) => {
+        if (step.isSubtitle || !step.critical) return true;
+        return checklistStatus[index] === 'pass' || checklistStatus[index] === 'na';
+    });
 
                 let badges = '';
                 
@@ -6745,6 +6753,9 @@ if (item.isHistorical) {
                     } else if (status === 'fail') {
                         statusClass = 'failed';
                         statusText = `❌ 不合格${stepFailCount > 0 ? ` (此步驟第 ${stepFailCount} 次)` : ''}`;
+                        } else if (status === 'na') { // 🌟 新增：N/A 狀態對應的 Class 與文字
+                          statusClass = 'na-item';
+                          statusText = '⚪ N/A (不適用項目)';
                     } else {
                         statusText = '⏳ 待評核';
                     }
@@ -6762,6 +6773,7 @@ if (item.isHistorical) {
                                     <div class="checklist-step-actions">
                                         <button class="step-btn step-btn-pass" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'pass')">✅ 合格</button>
                                         <button class="step-btn step-btn-fail" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'fail')">❌ 不合格</button>
+                                        <button class="step-btn step-btn-na" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'na')">⚪ N/A</button>
                                         <button class="step-btn step-btn-reset" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'pending')">🔄 重設</button>
                                     </div>
                                 ` : ''}
@@ -9738,7 +9750,7 @@ async function viewTrainingRecordsList(itemId) {
     }
 }
 
-// ⭐⭐⭐ 修改：訓練記錄詳情（只顯示簽名和日期）⭐⭐⭐
+// ⭐⭐⭐ 修改：訓練記錄詳情（支援顯示 N/A 狀態）⭐⭐⭐
 async function viewTrainingRecordDetail(recordId, itemId) {
     showPage('evaluationRecordDetailPage');
     
@@ -9753,6 +9765,8 @@ async function viewTrainingRecordDetail(recordId, itemId) {
         const record = recordDoc.data();
         
         const stepRecords = record.stepRecords || {};
+        // 🌟 新增：讀取當時評核儲存的各個步驟狀態（例如 pass, fail, na）
+        const checklistStatus = record.checklistStatus || {}; 
         
         // 計算訓練次數
         let trainingCount = record.trainingCount;
@@ -9801,16 +9815,16 @@ async function viewTrainingRecordDetail(recordId, itemId) {
                         ${record.completedAt ? new Date(record.completedAt.toDate()).toLocaleString('zh-TW') : '未知'}
                     </div>
                 </div>
-                    ${record.overallComment ? `
-        <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
-            <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
-                <strong>💬 主管總評語：</strong><br>
-                <div style="margin-top: 10px; padding: 15px; background: rgba(255,255,255,0.5); border-radius: 8px; white-space: pre-wrap; line-height: 1.6;">
-                    ${record.overallComment}
-                </div>
-            </div>
-        </div>
-    ` : ''}
+                ${record.overallComment ? `
+                    <div style="margin-top: 25px; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">
+                        <div style="font-size: 1em; opacity: 0.95; line-height: 1.8;">
+                            <strong>💬 主管總評語：</strong><br>
+                            <div style="margin-top: 10px; padding: 15px; background: rgba(255,255,255,0.5); border-radius: 8px; white-space: pre-wrap; line-height: 1.6;">
+                                ${record.overallComment}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
         
@@ -9827,12 +9841,27 @@ async function viewTrainingRecordDetail(recordId, itemId) {
                 stepCounter++;
                 const stepRecord = stepRecords[index] || {};
                 
+                // 🌟⭐⭐ 核心修改：判斷該步驟當時的狀態是否為 N/A ⭐⭐⭐
+                const currentStatus = checklistStatus[index];
+                let badgeHtml = '';
+                let cardStyle = '';
+
+                if (currentStatus === 'na') {
+                    // 如果是 N/A，呈現灰色標籤，並且卡片加淡灰色背景（純粹顯示上最尾查看可以看到）
+                    badgeHtml = '<span class="badge" style="margin-left: 10px; background-color: #6c757d; color: white;">⚪ N/A (不適用)</span>';
+                    cardStyle = 'background-color: #f8f9fa; opacity: 0.85;'; 
+                } else {
+                    // 預設或符合合格，維持原本的綠色已完成標籤
+                    badgeHtml = '<span class="badge badge-success" style="margin-left: 10px;">✅ 已完成</span>';
+                    cardStyle = '';
+                }
+                
                 resultHtml += `
-                    <div class="quiz-question-card">
+                    <div class="quiz-question-card" style="${cardStyle}">
                         <div class="quiz-question-header">
                             <div>
                                 <span class="quiz-question-number">Step ${stepCounter}</span>
-                                <span class="badge badge-success" style="margin-left: 10px;">✅ 已完成</span>
+                                ${badgeHtml}
                             </div>
                         </div>
                         <div class="quiz-question-text" style="font-size: 1.1em;">${step.step}</div>
