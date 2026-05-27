@@ -6274,14 +6274,17 @@ async function updateChecklistStepStatus(itemId, stepIndex, status) {
         await refreshCurrentItemCard(itemId);
 
         // ⭐⭐⭐ 提示訊息 ⭐⭐⭐
-        if (status === 'pass') {
-            showToast('✅ 已標記為合格', 'success');
-        } else if (status === 'fail') {
-            showToast('❌ 已標記為不合格', 'warning');
-        } else {
-            showToast('🔄 已重設狀態', 'success');
-        }
-
+if (status === 'pass') {
+    showToast('✅ 已標記為合格', 'success');
+} else if (status === 'fail') {
+    showToast('❌ 已標記為不合格', 'warning');
+} else if (status === 'na') {
+    // ⭐ 新增：按下 N/A 的時候，不再顯示已重設
+    showToast('⚪ 已標記為 N/A (不適用)', 'info'); 
+} else {
+    showToast('🔄 已重設狀態', 'success');
+}
+        
     } catch (error) {
         console.error('更新步驟狀態失敗:', error);
         showToast('❌ 更新失敗: ' + error.message, 'error');
@@ -7839,22 +7842,27 @@ async function viewEvaluationResultDetail(recordId, itemId) {
                 const remark = remarks[index] || '';
                 const stepFailCount = (record.failureCount && record.failureCount[index]) || 0;
                 
-                let statusClass = '';
-                let statusText = '';
-                let statusColor = '';
-                
-                if (status === 'pass') {
-                    statusClass = 'correct';
-                    statusText = '✅ 合格';
-                    statusColor = '#2ed573';
-                } else if (status === 'fail') {
-                    statusClass = 'incorrect';
-                    statusText = `❌ 不合格${stepFailCount > 0 ? ` (第 ${stepFailCount} 次)` : ''}`;
-                    statusColor = '#ff4757';
-                } else {
-                    statusText = '⏳ 未評核';
-                    statusColor = '#999';
-                }
+   let statusClass = '';
+let statusText = '';
+let statusColor = '';
+
+if (status === 'pass') {
+    statusClass = 'correct';
+    statusText = '✅ 合格';
+    statusColor = '#2ed573';
+} else if (status === 'fail') {
+    statusClass = 'incorrect';
+    statusText = `❌ 不合格${stepFailCount > 0 ? ` (第 ${stepFailCount} 次)` : ''}`;
+    statusColor = '#ff4757';
+} else if (status === 'na') {
+    // ⭐ 新增：歷史詳細記錄中，如果是 N/A 項目的顯示樣式
+    statusClass = 'na-status'; 
+    statusText = '⚪ N/A (不適用)';
+    statusColor = '#6c757d'; // 灰色字
+} else {
+    statusText = '⏳ 未評核';
+    statusColor = '#999';
+}
                 
                 resultHtml += `
                     <div class="quiz-question-card">
