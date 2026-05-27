@@ -6712,11 +6712,10 @@ if (item.hasChecklist && item.checklist) {
     
     const completionRate = totalSteps > 0 ? Math.round((passedSteps / totalSteps) * 100) : 0;
     
-    // 🌟⭐⭐ 核心變數統一定義 ⭐⭐⭐
+    // 🌟⭐⭐ 核心修復：這裏統一定義名稱為 offset，與下方 SVG 完美對應 ⭐⭐⭐
     const radius = 52;
     const circumference = 2 * Math.PI * radius;
-    // 統一定義名稱為 strokeDashoffset
-    const strokeDashoffset = circumference - (completionRate / 100) * circumference; 
+    const offset = circumference - (completionRate / 100) * circumference; 
     
     // 檢查 critical 步驟是否全過（na 項目放行）
     const allCriticalPassed = item.checklist.every((step, index) => {
@@ -6731,7 +6730,7 @@ if (item.hasChecklist && item.checklist) {
                 <svg class="progress-circle" width="120" height="120">
                     <circle class="progress-circle-bg" cx="60" cy="60" r="${radius}"></circle>
                     <circle class="progress-circle-bar" cx="60" cy="60" r="${radius}" 
-                            style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${strokeDashoffset}; stroke: ${completionRate === 100 ? '#2ed573' : '#3b82f6'};">
+                            style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${offset}; stroke: ${completionRate === 100 ? '#2ed573' : '#3b82f6'};">
                     </circle>
                 </svg>
                 <div class="progress-value">${completionRate}%</div>
@@ -6754,7 +6753,7 @@ if (item.hasChecklist && item.checklist) {
         badges += '<span class="badge badge-critical">⭐ 重要評核</span>';
     }
     
-    badges += backdateBadge; // ⭐ 加入補登標記
+    badges += backdateBadge; // 加入補登標記
 
     let stepCounter = 0;
 
@@ -6945,7 +6944,7 @@ if (item.hasChecklist && item.checklist) {
                         <circle class="item-progress-ring-circle" cx="60" cy="60" r="50" 
                             fill="none" stroke-width="10"
                             stroke-dasharray="${circumference}" 
-                            stroke-dashoffset="${strokeDashoffset}"
+                            stroke-dashoffset="${offset}"
                             stroke-linecap="round"/>
                     </svg>
                     <div class="item-progress-text">
