@@ -8282,15 +8282,18 @@ async function exportToExcel() {
                         } else {
                             stepCounter++;
                             const status = checklistStatus[index] || 'pending';
-                            let statusText = '';
-                            
-                            if (status === 'pass') {
-                                statusText = '合格';
-                            } else if (status === 'fail') {
-                                statusText = '不合格';
-                            } else {
-                                statusText = '待評核';
-                            }
+  let statusText = '';
+
+if (status === 'pass') {
+    statusText = '合格';
+} else if (status === 'fail') {
+    statusText = '不合格';
+} else if (status === 'na') {
+    // ⭐ 新增：導出 Excel 時，將 N/A 狀態正確轉化為對應文字
+    statusText = 'N/A 不適用';
+} else {
+    statusText = '待評核';
+}
 
                             categoryData.push([
                                 `Step ${stepCounter}: ${step.step}`,
@@ -9211,7 +9214,7 @@ async function viewAuditDetail(auditId) {
                                 statusText = '❌ 不合格';
                                 statusColor = '#ff4757';
                             } else if (itemData.status === 'na') {
-                                statusText = '⚪ 不適用';
+                                statusText = '⚪ N/A 不適用';
                                 statusColor = '#999';
                             } else {
                                 statusText = '⏳ 未評核';
