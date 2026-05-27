@@ -839,6 +839,22 @@
             transform: translateY(-2px);
         }
 
+        .step-btn-na {
+    background: #6c757d; /* 灰色 */
+    color: white;
+}
+
+.step-btn-na:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+
+/* Checklist 項目 N/A 狀態的左邊條與背景 */
+.checklist-item.na-status {
+    border-left-color: #6c757d;
+    background: #f1f3f5;
+}
+        
         .step-btn-reset {
             background: #ffa502;
             color: white;
@@ -6739,15 +6755,18 @@ if (item.isHistorical) {
                     let statusClass = '';
                     let statusText = '';
                     
-                    if (status === 'pass') {
-                        statusClass = 'completed';
-                        statusText = '✅ 合格';
-                    } else if (status === 'fail') {
-                        statusClass = 'failed';
-                        statusText = `❌ 不合格${stepFailCount > 0 ? ` (此步驟第 ${stepFailCount} 次)` : ''}`;
-                    } else {
-                        statusText = '⏳ 待評核';
-                    }
+  if (status === 'pass') {
+    statusClass = 'completed';
+    statusText = '✅ 合格';
+} else if (status === 'fail') {
+    statusClass = 'failed';
+    statusText = `❌ 不合格${stepFailCount > 0 ? ` (此步驟第 ${stepFailCount} 次)` : ''}`;
+} else if (status === 'na') {
+    statusClass = 'na-status'; // 灰色的樣式 class
+    statusText = '⚪ N/A (不適用)';
+} else { 
+    statusText = '⏳ 待評核'; 
+}
 
                     const criticalBadge = step.critical ? '<span class="badge badge-critical">⚠️ Critical</span>' : '';
 
@@ -6762,6 +6781,7 @@ if (item.isHistorical) {
                                     <div class="checklist-step-actions">
                                         <button class="step-btn step-btn-pass" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'pass')">✅ 合格</button>
                                         <button class="step-btn step-btn-fail" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'fail')">❌ 不合格</button>
+                                        <button class="step-btn step-btn-na" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'na')">⚪ N/A</button>
                                         <button class="step-btn step-btn-reset" onclick="event.stopPropagation(); updateChecklistStepStatus('${item.docId}', ${index}, 'pending')">🔄 重設</button>
                                     </div>
                                 ` : ''}
@@ -7098,17 +7118,21 @@ async function refreshCurrentItemCard(itemId) {
         let passedSteps = 0;
         let evaluatedSteps = 0;
 
-        item.checklist.forEach((step, index) => {
-            if (!step.isSubtitle) {
-                const status = checklistStatus[index];
-                if (status === 'pass') {
-                    passedSteps++;
-                    evaluatedSteps++;
-                } else if (status === 'fail') {
-                    evaluatedSteps++;
-                }
-            }
-        });
+   item.checklist.forEach((step, index) => {
+    if (!step.isSubtitle) {
+        const status = checklistStatus[index];
+        if (status === 'pass') {
+            passedSteps++;
+            evaluatedSteps++;
+        } else if (status === 'fail') {
+            evaluatedSteps++;
+        } else if (status === 'na') {
+            // N/A 算作已評核，且計分時不扣分（這裡採用將其計入分子，等同照當合格）
+            passedSteps++; 
+            evaluatedSteps++;
+        }
+    }
+});
 
         const completionRate = Math.round((passedSteps / totalSteps) * 100);
         
@@ -7151,23 +7175,24 @@ async function refreshCurrentItemCard(itemId) {
                 const checklistItems = card.querySelectorAll('.checklist-item');
                 
                 if (checklistItems[checklistItemIndex]) {
-                    checklistItems[checklistItemIndex].className = `checklist-item ${step.critical ? 'critical' : ''} ${status === 'pass' ? 'completed' : status === 'fail' ? 'failed' : ''}`;
-                    
+checklistItems[checklistItemIndex].className = `checklist-item ${step.critical ? 'critical' : ''} ${status === 'pass' ? 'completed' : status === 'fail' ? 'failed' : ''} ${status === 'na' ? 'na-status' : ''}`;
                     const statusTextDiv = checklistItems[checklistItemIndex].querySelector('div[style*="margin: 8px"]');
                     if (statusTextDiv) {
-                        if (status === 'pass') {
-                            statusTextDiv.textContent = '✅ 合格';
-                            statusTextDiv.style.color = '#666';
-                            statusTextDiv.style.fontWeight = 'normal';
-                        } else if (status === 'fail') {
-                            statusTextDiv.textContent = '❌ 不合格';
-                            statusTextDiv.style.color = '#ff4757';
-                            statusTextDiv.style.fontWeight = 'bold';
-                        } else {
-                            statusTextDiv.textContent = '⏳ 待評核';
-                            statusTextDiv.style.color = '#666';
-                            statusTextDiv.style.fontWeight = 'normal';
-                        }
+ if (status === 'pass') {
+    statusTextDiv.textContent = '✅ 合格';
+    statusTextDiv.style.color = '#666';
+} else if (status === 'fail') {
+    statusTextDiv.textContent = '❌ 不合格';
+    statusTextDiv.style.color = '#ff4757';
+    statusTextDiv.style.fontWeight = 'bold';
+} else if (status === 'na') {
+    statusTextDiv.textContent = '⚪ N/A (不適用)';
+    statusTextDiv.style.color = '#6c757d'; // 灰色字
+    statusTextDiv.style.fontWeight = 'normal';
+} else {
+    statusTextDiv.textContent = '⏳ 待評核';
+    statusTextDiv.style.color = '#666';
+}
                     }
                 }
                 
@@ -7177,8 +7202,8 @@ async function refreshCurrentItemCard(itemId) {
             // 更新整體狀態
             const allCriticalPassed = item.checklist.every((step, index) => {
                 if (step.isSubtitle || !step.critical) return true;
-                return checklistStatus[index] === 'pass';
-            });
+               return checklistStatus[index] === 'pass' || checklistStatus[index] === 'na'; 
+});
 
             let overallStatus = '';
             let overallClass = '';
@@ -7334,27 +7359,28 @@ async function markItemComplete(itemId) {
             const actualSteps = item.checklist.filter(s => !s.isSubtitle);
             
             // ✅ 檢查 1: 是否有未評核的步驟
-            const hasPendingSteps = item.checklist.some((step, index) =>
-                !step.isSubtitle && (!checklistStatus[index] || checklistStatus[index] === 'pending')
-            );
-            
-            if (hasPendingSteps) {
-                showToast('❌ 尚有步驟未完成評核！請為所有步驟選擇「合格」或「不合格」', 'error');
-                return;
-            }
-            
-            // ✅ 檢查 2: 檢查 Critical 步驟是否不合格（但不阻止提交）
-            const hasCriticalFailed = item.checklist.some((step, index) =>
-                !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
-            );
-            
-            // 計算合格步驟數
-            let passedSteps = 0;
-            item.checklist.forEach((step, index) => {
-                if (!step.isSubtitle && checklistStatus[index] === 'pass') {
-                    passedSteps++;
-                }
-            });
+   const hasPendingSteps = item.checklist.some((step, index) => 
+    !step.isSubtitle && (!checklistStatus[index] || checklistStatus[index] === 'pending')
+);
+if (hasPendingSteps) {
+    showToast('❌ 尚有步驟未完成評核！請為所有步驟選擇「合格」、「不合格」或「N/A」', 'error');
+    return;
+}
+
+// ✅ 檢查 2: 檢查 Critical 步驟是否不合格 (N/A 算通過，不觸發不合格)
+const hasCriticalFailed = item.checklist.some((step, index) => 
+    !step.isSubtitle && step.critical && checklistStatus[index] === 'fail'
+);
+
+// 計算合格步驟數 (將 N/A 當作合格分子計入，確保「N/A 唔會扣分」)
+let passedSteps = 0;
+item.checklist.forEach((step, index) => {
+    if (!step.isSubtitle) {
+        if (checklistStatus[index] === 'pass' || checklistStatus[index] === 'na') {
+            passedSteps++;
+        }
+    }
+});
 
             const completionRate = Math.round((passedSteps / actualSteps.length) * 100);
 
