@@ -6692,26 +6692,34 @@ if (item.isHistorical) {
             }
             
             // ========== Checklist 評核類型 ========== 
+// 尋找 showCategoryEvaluation 內處理 Checklist 的這一段，用以下代碼替換：
+
 if (item.hasChecklist && item.checklist) {
     const checklistStatus = record?.checklistStatus || {};
     const remarks = record?.remarks || {};
     let totalSteps = item.checklist.filter(s => !s.isSubtitle).length;
     let passedSteps = 0;
+    
     item.checklist.forEach((step, index) => {
-        // 🌟 核心修改：計算進度時，pass 和 na 都算入已通過步驟數
+        // 🌟 N/A 與 pass 均照算合格，不扣分
         if (!step.isSubtitle && (checklistStatus[index] === 'pass' || checklistStatus[index] === 'na')) {
             passedSteps++;
         }
     });
     
-    const completionRate = Math.round((passedSteps / totalSteps) * 100);
+    const completionRate = totalSteps > 0 ? Math.round((passedSteps / totalSteps) * 100) : 0;
     
-    // 🌟 核心修改：檢查 critical 步驟時，na 項目也要放行
+    // 🌟⭐⭐ 補回被刪除的關鍵計算（修復 Bug 的核心）⭐⭐🌟
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (completionRate / 100) * circumference;
+    
+    // 檢查 critical 步驟是否全過（na 項目放行）
     const allCriticalPassed = item.checklist.every((step, index) => {
         if (step.isSubtitle || !step.critical) return true;
         return checklistStatus[index] === 'pass' || checklistStatus[index] === 'na';
     });
-
+    
                 let badges = '';
                 
                 if (item.hasDeadline) {
