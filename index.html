@@ -3513,14 +3513,6 @@
 
     <!-- SheetJS for Excel export -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-
-    <script type="importmap">
-  {
-    "imports": {
-      "@google/generative-ai": "https://esm.run/@google/generative-ai"
-    }
-  }
-</script>
     
     <script>
         // ==================== Firebase 初始化 ====================
@@ -12377,10 +12369,10 @@ async function gradeQuiz(recordId) {
             .orderBy('order', 'asc')
             .get();
         
-      let gradingHtml = `
+        let gradingHtml = `
             <div style="background: #f0f4ff; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
                 <h3 style="color: #ffa502; margin-bottom: 10px;">${category.emoji} ${category.name}</h3>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 15px;">
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
                     <div>
                         <strong>員工：</strong>${record.staffName} (${record.staffLevel})
                     </div>
@@ -12388,16 +12380,7 @@ async function gradeQuiz(recordId) {
                         <strong>完成時間：</strong>${record.completedAt?.toDate().toLocaleString('zh-TW')}
                     </div>
                     <div>
-                        <strong>當前分數：</strong><span id="currentTotalScoreDisplay">${record.totalScore}</span> / ${record.maxScore} 分
-                    </div>
-                </div>
-                
-                <div style="border-top: 1px solid #d0dbff; padding-top: 15px; text-align: center;">
-                    <button class="btn btn-info" id="aiGradeBtn" onclick="event.stopPropagation(); runGeminiAiGrading('${recordId}')" style="width: auto; padding: 10px 25px;">
-                        🤖 Gemini A.I. 一鍵預批所有填充題
-                    </button>
-                    <div id="aiGradingStatus" style="display:none; color: #1e90ff; margin-top: 8px; font-weight: bold;">
-                        ⏳ Gemini 正在認真批改中，請稍候...
+                        <strong>當前分數：</strong>${record.totalScore} / ${record.maxScore} 分
                     </div>
                 </div>
             </div>
@@ -14352,117 +14335,6 @@ async function confirmFailedRecord(staffId, itemId) {
     // ⭐ 立即顯示成功訊息
     showToast('✅ 已標記為「已確認」', 'success');
 }
-
-   // ==================== 🤖 Gemini A.I. 自動預批功能 ====================
-async function runGeminiAiGrading(recordId) {
-    const aiBtn = document.getElementById('aiGradeBtn');
-    const aiStatus = document.getElementById('aiGradingStatus');
-    
-    if (!confirm('🤖 是否啟動 Gemini A.I. 幫你預先批改此試卷的所有填充題？\n（A.I. 會自動分析語意並填寫分數與評語，主管隨時可以微調修改）')) {
-        return;
-    }
-    
-    try {
-        aiBtn.disabled = true;
-        aiStatus.style.display = 'block';
-        aiStatus.textContent = '⏳ Gemini 正在細心閱讀員工提交的答案...';
-        
-        // 1. 獲取當前試卷記錄
-        const recordDoc = await db.collection('quizRecords').doc(recordId).get();
-        const record = recordDoc.data();
-        
-        // 2. 獲取該分類下所有的題目
-        const itemsSnapshot = await db.collection('quizItems')
-            .where('categoryId', '==', record.categoryId)
-            .get();
-            
-        // 3. 動態加載 Google Gemini AI 前端 SDK
-        const { GoogleGenerativeAI } = await import("@google/generative-ai");
-        
-        // 🔑 你的 Gemini API Key（可於 Google AI Studio 免費申請）
-        const API_KEY = "AIzaSyDDkALOTGl6fZunGU_Xd5FOy45WnXZWT8E"; 
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        
-        // 使用適合快速文本處理與結構化輸出的 1.5 Flash 模型
-        const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash",
-            generationConfig: {
-                responseMimeType: "application/json", // 強制要求回傳結構化 JSON
-            }
-        });
-        
-        let aiSuccessCount = 0;
-        
-        // 4. 遍歷題目，只處理填充題 (fill)
-        for (const itemDoc of itemsSnapshot.docs) {
-            const item = itemDoc.data();
-            const itemId = itemDoc.id;
-            const answer = record.answers[itemId];
-            
-            if (item.type === 'fill' && answer) {
-                aiStatus.textContent = `⏳ Gemini 正在分析第 ${item.order} 題並撰寫評語...`;
-                
-                // 構造給 Gemini 的嚴謹評分 Prompt
-                const prompt = `
-                    你現在是醫院去污區（Decontamination Area）及手術室儀器部的專業培訓主管（Supervisor）。
-                    請根據提供的「標準參考答案」，極其客觀且嚴謹地批改員工提交的填充題。
-                    
-                    [題目內容]: ${item.question}
-                    [標準參考答案]: ${item.modelAnswer || '請考官根據專業醫學常識與完整度靈活給分'}
-                    [本題最高滿分]: ${item.score} 分
-                    
-                    [員工提交答案]: ${answer.answer || '(學員留空沒有作答)'}
-                    
-                    評分準則：
-                    1. 檢查員工答案的核心意思是否符合專業規範。字眼不需要一模一樣，重點是概念、時機、專有名詞或步驟是否正確完整。
-                    2. 如果學員完全沒寫，或答非所問、胡言亂語，直接給 0 分。
-                    3. 根據回答的完整度，給予 0 至 ${item.score} 之間的整數分數。
-                    4. 提供一段簡短、專業、繁體中文（香港醫院病房慣用語，如常出現的「Sink盤」、「Washer」、「同事」、「不合格」等）的批改評語，指出好在哪裡或漏了什麼。
-                    
-                    請嚴格以下列 JSON 格式回傳，不要包含任何 Markdown 語法或外包裝（不要寫 \`\`\`json）：
-                    {
-                        "score": 給予的分數,
-                        "remark": "批改評語內容"
-                    }
-                `;
-                
-                // 呼叫 Gemini
-                const result = await model.generateContent(prompt);
-                const responseText = result.response.text();
-                
-                try {
-                    const aiResult = JSON.parse(responseText);
-                    
-                    // 5. 將 A.I. 批改出來的結果，即時塞入畫面上對應題目的 Input 和 Textarea 欄位
-                    const scoreInput = document.getElementById(`score_${itemId}`);
-                    const remarkTextarea = document.getElementById(`remark_${itemId}`);
-                    
-                    if (scoreInput) scoreInput.value = aiResult.score;
-                    if (remarkTextarea) remarkTextarea.value = aiResult.remark;
-                    
-                    aiSuccessCount++;
-                } catch (jsonErr) {
-                    console.error(`解析第 ${item.order} 題 A.I. 回傳失敗:`, jsonErr, responseText);
-                }
-            }
-        }
-        
-        aiStatus.style.display = 'none';
-        aiBtn.disabled = false;
-        
-        if (aiSuccessCount > 0) {
-            showToast(`🤖 Gemini 已成功預批 ${aiSuccessCount} 條填充題！請核對後點擊「完成批改」`, 'success');
-        } else {
-            showToast('ℹ️ 本試卷沒有需要 A.I. 批改的填充題', 'warning');
-        }
-        
-    } catch (error) {
-        console.error('Gemini A.I. 批改失敗:', error);
-        aiStatus.style.display = 'none';
-        aiBtn.disabled = false;
-        showToast('❌ A.I. 預批失敗: ' + error.message, 'error');
-    }
-}     
     </script>
 </body>
 </html>
