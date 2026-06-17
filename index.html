@@ -2993,23 +2993,24 @@
     
     <h1>TKOH A&OT Training & Quality Monitoring System</h1>
 <div class="login-form">
-    <div id="traditionalLoginForm">
+    <div style="text-align: center; margin: 30px 0;">
+        <p style="color: #666; margin-bottom: 15px; font-weight: bold;">🏥 醫管局同事請使用個人 Google 帳號進行身份認證</p>
+        <button class="btn" onclick="loginWithGoogle()" style="background: white; color: #333; border: 2px solid #ffa502; width: 100%; padding: 16px; display: flex; align-items: center; justify-content: center; gap: 15px; font-size: 1.2em; border-radius: 12px; box-shadow: 0 4px 12px rgba(255, 165, 2, 0.15);">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 24px; height: 24px;">
+            <strong>使用 Google 帳號安全登入</strong>
+        </button>
+    </div>
+    
+    <div id="traditionalLoginForm" style="display: none;">
         <div class="input-group">
             <label>👤 帳號 (Email)</label>
-            <input type="text" id="loginId" placeholder="請輸入 Google Email">
+            <input type="text" id="loginId">
         </div>
         <div class="input-group">
             <label>🔒 密碼</label>
-            <input type="password" id="loginPw" placeholder="請輸入密碼">
+            <input type="password" id="loginPw">
         </div>
-        <button class="btn btn-primary" onclick="login()" style="margin-bottom: 15px;">🚀 登入</button>
-    </div>
-
-    <div style="text-align: center; margin-top: 10px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
-        <button class="btn" onclick="loginWithGoogle()" style="background: white; color: #757575; border: 2px solid #e0e0e0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 18px; height: 18px;">
-            使用 Google 帳號登入
-        </button>
+        <button class="btn btn-primary" onclick="login()">🚀 登入</button>
     </div>
     
     <div id="loginStatus" class="loading-message" style="display:none;"></div>
@@ -3755,25 +3756,28 @@ function cancelSignatureLogin() {
     if (window.signatureLoginReject) window.signatureLoginReject();
 }
 
-        // 🌟 核心新增：處理 Google 帳號登入
+// ==================== 核心優化：Google 帳號安全登入 ====================
 async function loginWithGoogle() {
     const statusDiv = document.getElementById('loginStatus');
     const provider = new firebase.auth.GoogleAuthProvider();
     
+    // 💡 關鍵設定：強制 Google 每次都彈出「帳號選取視窗」
+    // 這樣不同同事在同一個病房 iPad/電腦上登入時，就不會自動吃上一個人的快取！
+    provider.setCustomParameters({ prompt: 'select_account' });
+    
     try {
         statusDiv.style.display = 'block';
-        statusDiv.textContent = '🔄 正在開啟 Google 驗證...';
+        statusDiv.textContent = '🔄 正在開啟 Google 安全驗證視窗...';
         
-        // 1. 彈出 Google 登入視窗
+        // 1. 彈出 Google 驗證
         const result = await auth.signInWithPopup(provider);
         const googleUser = result.user;
-        const googleEmail = googleUser.email.toLowerCase().trim(); // 取得登入者的 Email
+        const googleEmail = googleUser.email.toLowerCase().trim(); // 取得當前登入的 Gmail
         
-        statusDiv.textContent = '🔍 正在比對系統員工名單...';
+        statusDiv.textContent = '🔍 正在核對將軍澳醫院系統員工名單...';
         await initializeSystem();
         
-        // 2. 用該 Email 去你的 Firestore 尋找對應的員工帳號
-        // 💡 提示：請確保你在後台開戶時，「帳號」欄位輸入的是他們完整的 Google Email
+        // 2. 用該 Email 去核對 Firestore 資料庫中的 `id` 欄位
         const accountsSnapshot = await db.collection('accounts')
             .where('id', '==', googleEmail)
             .limit(1)
@@ -3783,22 +3787,22 @@ async function loginWithGoogle() {
             const doc = accountsSnapshot.docs[0];
             const account = doc.data();
             
-            // 3. 驗證成功！將用戶資料寫入全域變數
+            // 3. 驗證完全匹配！直接將歷史權限、資料塞入 currentUser
             currentUser = { docId: doc.id, ...account };
             
             statusDiv.style.display = 'none';
-            showToast(`✅ 歡迎回來，${currentUser.name}！`, 'success');
+            showToast(`✅ 驗證成功！歡迎回來，${currentUser.name} 同事。`, 'success');
             showMainPage();
         } else {
             statusDiv.style.display = 'none';
-            // 如果驗證成功但 Firestore 內沒有這個登記的 Email 帳號
-            showToast('❌ 登入失敗！此 Google Email 未在系統中登記註冊。', 'error');
-            await auth.signOut(); // 強制登出 Auth 狀態
+            // 保安機制：如果他有 Google 帳號，但他不在此系統的開戶 Allowlist 名單內，拒絕訪問
+            showToast('❌ 登入失敗！此 Google Email 未在系統中登記註冊，請聯絡管理員開戶。', 'error');
+            await auth.signOut(); // 強制登出 Auth 狀態，防止污染背景
         }
     } catch (error) {
         console.error('❌ Google 登入失敗:', error);
         statusDiv.style.display = 'none';
-        showToast('❌ 驗證取消或失敗，請稍後再試', 'error');
+        showToast('❌ 驗證取消或失敗，請確保網路通暢並再試一次', 'error');
     }
 }
         
@@ -4298,7 +4302,7 @@ async function loadAccounts() {
     }
 }
 
-// ==================== 顯示新增帳戶視窗 ====================
+// ==================== 顯示新增帳戶視窗（已拔除密碼） ====================
 function showAddAccountModal() {
     const modalBody = `
 <div class="input-group">
@@ -4336,12 +4340,11 @@ function showAddAccountModal() {
     </small>
 </div>
 <div class="input-group">
-    <label>🔑 登入帳號</label>
-    <input type="text" id="newAccountId" placeholder="請輸入登入帳號">
-</div>
-<div class="input-group">
-    <label>🔒 登入密碼</label>
-    <input type="password" id="newAccountPw" placeholder="請輸入登入密碼">
+    <label>📧 員工 Google 帳號 (Email)</label>
+    <input type="text" id="newAccountId" placeholder="請填寫同事登入用的 Gmail">
+    <small style="color: #666; display: block; margin-top: 5px;">
+        ⚠️ 請務必填寫完整的 Google Email，系統會以此作為核對依據
+    </small>
 </div>
 <div class="modal-buttons">
     <button class="btn btn-success" onclick="createAccount()">✅ 新增</button>
@@ -4371,52 +4374,60 @@ function showAddAccountModal() {
             }
         }
 
-        // ==================== 創建帳戶 ====================
-        async function createAccount() {
-            const name = document.getElementById('newAccountName').value.trim();
-            const level = document.getElementById('newAccountLevel').value;
-            const role = document.getElementById('newAccountRole').value;
-            const joinDate = document.getElementById('newAccountJoinDate').value;
-            const id = document.getElementById('newAccountId').value.trim();
-            const pw = document.getElementById('newAccountPw').value;
+// ==================== 創建帳戶（無密碼版） ====================
+async function createAccount() {
+    const name = document.getElementById('newAccountName').value.trim();
+    const level = document.getElementById('newAccountLevel').value;
+    const role = document.getElementById('newAccountRole').value;
+    const joinDate = document.getElementById('newAccountJoinDate').value;
+    // 將新輸入的 id (Email) 強制轉為小寫，防止同事登入時大小寫對不上
+    const id = document.getElementById('newAccountId').value.trim().toLowerCase();
 
-            if (!name || !level || !role || !joinDate || !id || !pw) {
-                showToast('❌ 請填寫所有欄位', 'error');
-                return;
-            }
+    // 💡 檢查欄位（移除了密碼密文的檢查）
+    if (!name || !level || !role || !joinDate || !id) {
+        showToast('❌ 請填寫所有欄位', 'error');
+        return;
+    }
 
-            try {
-                const existingSnapshot = await db.collection('accounts')
-                    .where('id', '==', id)
-                    .limit(1)
-                    .get();
+    // 簡單檢查是不是格式正確的 Email
+    if (!id.includes('@')) {
+        showToast('❌ 請輸入有效的 Google Email 帳號', 'error');
+        return;
+    }
 
-                if (!existingSnapshot.empty) {
-                    showToast('❌ 此帳號已存在', 'error');
-                    return;
-                }
+    try {
+        const existingSnapshot = await db.collection('accounts')
+            .where('id', '==', id)
+            .limit(1)
+            .get();
 
-                const appointmentDate = document.getElementById('newAccountAppointmentDate').value || joinDate;
-
-await db.collection('accounts').add({
-    id: id,
-    password: pw,
-    name: name,
-    role: role,
-    level: level,
-    joinDate: joinDate,
-    appointmentDate: appointmentDate,  // ⭐ 新增這一行
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-});
-
-                showToast('✅ 帳戶新增成功', 'success');
-                closeModal();
-                loadAccounts();
-            } catch (error) {
-                console.error('新增帳戶失敗:', error);
-                showToast('❌ 新增帳戶失敗', 'error');
-            }
+        if (!existingSnapshot.empty) {
+            showToast('❌ 此 Email 帳號已存在系統中', 'error');
+            return;
         }
+
+        const appointmentDate = document.getElementById('newAccountAppointmentDate').value || joinDate;
+
+        // 寫入 Firestore Database
+        await db.collection('accounts').add({
+            id: id,
+            name: name,
+            role: role,
+            level: level,
+            joinDate: joinDate,
+            appointmentDate: appointmentDate,
+            // password 欄位直接移除，或寫入常數。這裡建議直接不設密碼，提高安全性
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showToast('✅ 帳戶已成功加入預先授權名單', 'success');
+        closeModal();
+        loadAccounts();
+    } catch (error) {
+        console.error('新增帳戶失敗:', error);
+        showToast('❌ 新增帳戶失敗', 'error');
+    }
+}
 
         // ==================== 刪除帳戶 ====================
         async function deleteAccount(docId, name) {
