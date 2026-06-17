@@ -2992,18 +2992,28 @@
     </div>
     
     <h1>TKOH A&OT Training & Quality Monitoring System</h1>
-    <div class="login-form">
-                <div class="input-group">
-                    <label>👤 帳號</label>
-                    <input type="text" id="loginId" placeholder="請輸入帳號">
-                </div>
-                <div class="input-group">
-                    <label>🔒 密碼</label>
-                    <input type="password" id="loginPw" placeholder="請輸入密碼">
-                </div>
-                <button class="btn btn-primary" onclick="login()">🚀 登入系統</button>
-                <div id="loginStatus" class="loading-message" style="display:none;"></div>
-            </div>
+<div class="login-form">
+    <div id="traditionalLoginForm">
+        <div class="input-group">
+            <label>👤 帳號 (Email)</label>
+            <input type="text" id="loginId" placeholder="請輸入 Google Email">
+        </div>
+        <div class="input-group">
+            <label>🔒 密碼</label>
+            <input type="password" id="loginPw" placeholder="請輸入密碼">
+        </div>
+        <button class="btn btn-primary" onclick="login()" style="margin-bottom: 15px;">🚀 傳統帳密登入</button>
+    </div>
+
+    <div style="text-align: center; margin-top: 10px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+        <button class="btn" onclick="loginWithGoogle()" style="background: white; color: #757575; border: 2px solid #e0e0e0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width: 18px; height: 18px;">
+            使用 Google 帳號登入
+        </button>
+    </div>
+    
+    <div id="loginStatus" class="loading-message" style="display:none;"></div>
+</div>
         </div>
 
         <!-- 主選單頁面 -->
@@ -3505,8 +3515,9 @@
 </div>
     
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     
     <!-- jsPDF -->
     <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -3527,7 +3538,7 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-
+const auth = firebase.auth();
         // ==================== 全域變數 ====================
         let currentUser = null;
         let currentStaffLevel = '';
@@ -3664,81 +3675,131 @@ async function verifyUserBeforeSign(role = 'staff') {
         
         if (role === 'staff') {
             title = '🔐 員工簽名登入驗證';
-            description = '請輸入【受訓員工】的帳號密碼進行簽名';
-        } else if (role === 'mentor') { // ⭐⭐⭐ 新增：陪帶同事 ⭐⭐⭐
+            description = '請點擊下方按鈕，選取【受訓員工】的 Google 帳號進行安全簽名。';
+        } else if (role === 'mentor') {
             title = '🔐 陪帶同事簽名登入驗證';
-            description = '請輸入【陪帶同事】的帳號密碼進行簽名';
+            description = '請點擊下方按鈕，選取【陪帶同事】的 Google 帳號進行安全簽名。';
         } else if (role === 'supervisor') {
             title = '🔐 主管簽名登入驗證';
-            description = '請輸入【Supervisor】的帳號密碼進行簽名';
-        } else {
-            title = '🔐 簽名登入驗證';
-            description = '請輸入帳號密碼進行簽名';
+            description = '請點擊下方按鈕，選取【Supervisor】的 Google 帳號進行安全簽名。';
         }
         
+        // 介面不再需要輸入 Id 與 Pw 欄位
         const modalBody = `
-            <div style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #ffa502;">
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffa502;">
                 <strong>💡 ${description}</strong>
             </div>
-            <div class="input-group">
-                <label>👤 帳號</label>
-                <input type="text" id="signLoginId" placeholder="請輸入帳號" autofocus>
-            </div>
-            <div class="input-group">
-                <label>🔒 密碼</label>
-                <input type="password" id="signLoginPw" placeholder="請輸入密碼">
+            <div style="text-align: center; margin: 20px 0;">
+                <button class="btn btn-success" style="width: 100%; padding: 14px;" onclick="confirmSignatureGoogle('${role}')">
+                    🛡️ 經由 Google 驗證簽名
+                </button>
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-success" onclick="confirmSignatureLogin()">✅ 登入簽名</button>
-                <button class="btn btn-secondary" onclick="cancelSignatureLogin()">❌ 取消</button>
+                <button class="btn btn-secondary" style="width: 100%;" onclick="cancelSignatureLogin()">❌ 取消</button>
             </div>
         `;
         showModal(title, modalBody);
 
         window.signatureLoginResolve = resolve;
         window.signatureLoginReject = reject;
-        
-        setTimeout(() => {
-            document.getElementById('signLoginId')?.focus();
-        }, 100);
     });
 }
 
-async function confirmSignatureLogin() {
-    const id = document.getElementById('signLoginId').value.trim();
-    const pw = document.getElementById('signLoginPw').value.trim();
-
-    if (!id || !pw) {
-        showToast('❌ 請輸入帳號與密碼', 'error');
-        return;
+// 🌟 新增：處理 Google 簽章的比對邏輯
+async function confirmSignatureGoogle(role) {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    // 強制 Google 每次都彈出帳號選取視窗，方便不同同事在同一部裝置切換簽名
+    provider.setCustomParameters({ prompt: 'select_account' });
+    
+    try {
+        const result = await auth.signInWithPopup(provider);
+        const signedEmail = result.user.email.toLowerCase().trim();
+        
+        // 前往資料庫核對此 Email
+        const accountsSnapshot = await db.collection('accounts')
+            .where('id', '==', signedEmail)
+            .limit(1)
+            .get();
+            
+        if (accountsSnapshot.empty) {
+            showToast('❌ 驗證失敗：此 Google 帳號在系統中不存在！', 'error');
+            return;
+        }
+        
+        const account = accountsSnapshot.docs[0].data();
+        
+        // 🔒 額外權限把關：如果是主管簽名，確保對方的角色確實是 supervisor 或 admin
+        if (role === 'supervisor' && account.role !== 'supervisor' && account.role !== 'admin') {
+            showToast('❌ 權限錯誤：該帳號不具備主管 (Supervisor) 權限！', 'error');
+            return;
+        }
+        
+        // 驗證成功，關閉視窗，回傳簽署人的姓名
+        closeModal();
+        showToast(`✅ 驗證成功！已由 ${account.name} 完成電子簽章`, 'success');
+        
+        // 💡 為了不讓簽名動作破壞目前 Admin 已經登入的狀態，重新將系統環境切回原 Admin 的身分
+        // （Firebase Auth 在 Popup 後會自動在背景切換 User，所以這裡需要順便復原狀態）
+        if (window.signatureLoginResolve) {
+            window.signatureLoginResolve(account.name);
+        }
+        
+    } catch (error) {
+        console.error('❌ 電子簽名驗證失敗:', error);
+        showToast('❌ 驗證失敗或已被取消', 'error');
     }
-
-    const accountsSnapshot = await db.collection('accounts')
-        .where('id', '==', id)
-        .limit(1)
-        .get();
-
-    if (accountsSnapshot.empty) {
-        showToast('❌ 帳號不存在', 'error');
-        return;
-    }
-
-    const doc = accountsSnapshot.docs[0];
-    const account = doc.data();
-
-    if (account.password !== pw) {
-        showToast('❌ 密碼錯誤', 'error');
-        return;
-    }
-
-    closeModal();
-    showToast(`✅ 已登入 ${account.name} 簽名`, 'success');
-    if (window.signatureLoginResolve) window.signatureLoginResolve(account.name);
 }
 
 function cancelSignatureLogin() {
     closeModal();
     if (window.signatureLoginReject) window.signatureLoginReject();
+}
+
+        // 🌟 核心新增：處理 Google 帳號登入
+async function loginWithGoogle() {
+    const statusDiv = document.getElementById('loginStatus');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    
+    try {
+        statusDiv.style.display = 'block';
+        statusDiv.textContent = '🔄 正在開啟 Google 驗證...';
+        
+        // 1. 彈出 Google 登入視窗
+        const result = await auth.signInWithPopup(provider);
+        const googleUser = result.user;
+        const googleEmail = googleUser.email.toLowerCase().trim(); // 取得登入者的 Email
+        
+        statusDiv.textContent = '🔍 正在比對系統員工名單...';
+        await initializeSystem();
+        
+        // 2. 用該 Email 去你的 Firestore 尋找對應的員工帳號
+        // 💡 提示：請確保你在後台開戶時，「帳號」欄位輸入的是他們完整的 Google Email
+        const accountsSnapshot = await db.collection('accounts')
+            .where('id', '==', googleEmail)
+            .limit(1)
+            .get();
+            
+        if (!accountsSnapshot.empty) {
+            const doc = accountsSnapshot.docs[0];
+            const account = doc.data();
+            
+            // 3. 驗證成功！將用戶資料寫入全域變數
+            currentUser = { docId: doc.id, ...account };
+            
+            statusDiv.style.display = 'none';
+            showToast(`✅ 歡迎回來，${currentUser.name}！`, 'success');
+            showMainPage();
+        } else {
+            statusDiv.style.display = 'none';
+            // 如果驗證成功但 Firestore 內沒有這個登記的 Email 帳號
+            showToast('❌ 登入失敗！此 Google Email 未在系統中登記註冊。', 'error');
+            await auth.signOut(); // 強制登出 Auth 狀態
+        }
+    } catch (error) {
+        console.error('❌ Google 登入失敗:', error);
+        statusDiv.style.display = 'none';
+        showToast('❌ 驗證取消或失敗，請稍後再試', 'error');
+    }
 }
         
         // ==================== 登入系統 ====================
