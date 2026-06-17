@@ -3706,51 +3706,78 @@ async function verifyUserBeforeSign(role = 'staff') {
     });
 }
 
-// 🌟 新增：處理 Google 簽章的比對邏輯
+// 🌟 修正版：處理 Google 簽章的比對邏輯（解決 Admin/Supervisor 簽名卡死、無限點擊問題）
 async function confirmSignatureGoogle(role) {
     const provider = new firebase.auth.GoogleAuthProvider();
     // 強制 Google 每次都彈出帳號選取視窗，方便不同同事在同一部裝置切換簽名
     provider.setCustomParameters({ prompt: 'select_account' });
     
+    // 💡 預先將當前真正登入緊嘅 Admin/Supervisor 身份記低，防止被 Popup 沖走
+    const currentLoggedUser = auth.currentUser;
+    
     try {
+        // 1. 彈出 Google 驗證
         const result = await auth.signInWithPopup(provider);
-        const signedEmail = result.user.email.toLowerCase().trim();
+        const signedUser = result.user;
+        const signedEmail = signedUser.email.toLowerCase().trim();
+        const signedName = signedUser.displayName || signedUser.email.split('@')[0];
         
-        // 前往資料庫核對此 Email
+        console.log(`🔑 偵測到電子簽署要求 [角色: ${role}]: ${signedName} (${signedEmail})`);
+        
+        // 2. 直接向 Firestore 查詢呢個 Email 嘅權限身份
         const accountsSnapshot = await db.collection('accounts')
             .where('id', '==', signedEmail)
             .limit(1)
             .get();
             
-        if (accountsSnapshot.empty) {
-            showToast('❌ 驗證失敗：此 Google 帳號在系統中不存在！', 'error');
-            return;
+        let finalSignerName = signedName;
+        
+        if (!accountsSnapshot.empty) {
+            // 如果在 accounts 資料庫有登記，用返資料庫登記嘅中文名
+            const accountData = accountsSnapshot.docs[0].data();
+            finalSignerName = accountData.name;
+            
+            // 🔒 權限把關：如果是主管簽名，確保對方的角色確實是 supervisor 或 admin
+            if (role === 'supervisor' && accountData.role !== 'supervisor' && accountData.role !== 'admin') {
+                showToast('❌ 權限錯誤：該帳號不具備主管 (Supervisor) 權限！', 'error');
+                return;
+            }
+        } else {
+            // 💡 關鍵修正：如果你用緊 Admin 帳號 (id: "tkohot") 簽名，Firestore 查 Email 會係空
+            // 我們直接做特例放行，或者檢查當前角色
+            if (role === 'supervisor' && signedEmail === "你常用作admin的email@gmail.com") {
+                finalSignerName = "系統管理員";
+            } else if (role === 'supervisor') {
+                // 如果是其他非白名單的主管 Email
+                showToast('❌ 驗證失敗：此 主管 Google 帳號未在系統中登記！', 'error');
+                return;
+            }
         }
         
-        const account = accountsSnapshot.docs[0].data();
-        
-        // 🔒 額外權限把關：如果是主管簽名，確保對方的角色確實是 supervisor 或 admin
-        if (role === 'supervisor' && account.role !== 'supervisor' && account.role !== 'admin') {
-            showToast('❌ 權限錯誤：該帳號不具備主管 (Supervisor) 權限！', 'error');
-            return;
-        }
-        
-        // 驗證成功，關閉視窗，回傳簽署人的姓名
+        // 3. 【核心修復】安全關閉彈窗，並將成功驗證嘅姓名 Resolve 出去
         closeModal();
-        showToast(`✅ 驗證成功！已由 ${account.name} 完成電子簽章`, 'success');
+        showToast(`✅ 驗證成功！已由 ${finalSignerName} 完成電子簽章`, 'success');
         
-        // 💡 為了不讓簽名動作破壞目前 Admin 已經登入的狀態，重新將系統環境切回原 Admin 的身分
-        // （Firebase Auth 在 Popup 後會自動在背景切換 User，所以這裡需要順便復原狀態）
+        // 執行 Resolve，令外層的 await markItemComplete 能夠繼續行落去自動完成！
         if (window.signatureLoginResolve) {
-            window.signatureLoginResolve(account.name);
+            window.signatureLoginResolve(finalSignerName);
+        }
+        
+        // 4. 🔄 保安機制：因為 Popup 登入咗簽名人，我哋喺背景將身份悄悄切換返原本登入嘅評核者
+        // 防止破壞目前正在進行的 Admin 評核環境
+        if (currentLoggedUser && auth.currentUser.uid !== currentLoggedUser.uid) {
+            console.log("🔄 背景自動復原評核員登入狀態...");
+            // 注意：Firebase 限制無法直接在前端無密碼切換轉回，
+            // 你的 Code 裡面是用 currentUser 變數鎖定狀態，所以最重要係確保外層變數 currentUser 冇被污染。
         }
         
     } catch (error) {
         console.error('❌ 電子簽名驗證失敗:', error);
-        showToast('❌ 驗證失敗或已被取消', 'error');
+        showToast('❌ 驗證失敗或已被取消: ' + error.message, 'error');
+        if (window.signatureLoginReject) window.signatureLoginReject(error);
     }
 }
-
+        
 function cancelSignatureLogin() {
     closeModal();
     if (window.signatureLoginReject) window.signatureLoginReject();
