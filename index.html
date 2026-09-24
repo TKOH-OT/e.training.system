@@ -173,15 +173,15 @@
         /* 主選單 */
         .menu-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
             margin-top: 30px;
         }
 
         .menu-card {
             background: linear-gradient(135deg, #ffa502 0%, #ff9500 100%);
             color: white;
-            padding: 30px;
+            padding: 15px 10px;
             border-radius: 15px;
             text-align: center;
             cursor: pointer;
@@ -194,12 +194,12 @@
         }
 
         .menu-card .emoji {
-            font-size: 3em;
+            font-size: 2em;
             margin-bottom: 10px;
         }
 
         .menu-card .title {
-            font-size: 1.2em;
+            font-size: 0.9em;
             font-weight: bold;
         }
 
@@ -2133,7 +2133,7 @@
 @media screen and (max-width: 1024px) {
     .container {
         padding: 20px;
-        max-width: 100%;
+        max-width: 95%;
         border-radius: 0;
     }
 
@@ -2145,7 +2145,7 @@
     .training-dashboard,
     .staff-grid,
     .items-dashboard {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         gap: 15px;
     }
 
@@ -2165,37 +2165,37 @@
     }
 
     .container {
-        padding: 15px;
+        padding: 12px;
         border-radius: 0;
         max-height: 100vh;
         box-shadow: none;
     }
 
     h1 {
-        font-size: 1.5em;
+        font-size: 1.4em;
         margin-bottom: 20px;
     }
 
     h2 {
-        font-size: 1.3em;
+        font-size: 1.2em;
     }
 
     /* 單欄式選單 */
     .menu-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
     }
 
     .menu-card {
-        padding: 20px;
+        padding: 15px 10px;
     }
 
     .menu-card .emoji {
-        font-size: 2.5em;
+        font-size: 2em;
     }
 
     .menu-card .title {
-        font-size: 1em;
+        font-size: 0.9em;
     }
 
     /* Dashboard 卡片 */
